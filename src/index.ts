@@ -9,6 +9,7 @@ import { pokerCommand, refreshTableMessage, finalizeAndDisplaySummary } from './
 import { statsCommand, leaderboardCommand } from './commands/stats';
 import { profileCommand } from './commands/profile';
 import { clearCommand } from './commands/clear';
+import { helpCommand } from './commands/help';
 import * as repo from './database/repo';
 import {
   createCustomRebuyModal,
@@ -56,6 +57,8 @@ client.on('interactionCreate', async (interaction: Interaction) => {
         await profileCommand.execute(interaction);
       } else if (commandName === 'clear') {
         await clearCommand.execute(interaction);
+      } else if (commandName === 'help') {
+        await helpCommand.execute(interaction);
       }
       return;
     }
