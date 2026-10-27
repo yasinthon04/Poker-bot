@@ -1,74 +1,108 @@
-import sqlite3 from 'sqlite3';
-import { open, Database } from 'sqlite';
-import path from 'path';
 import fs from 'fs';
+import path from 'path';
+
+export interface UserRecord {
+  id: string;
+  username: string;
+  display_name: string | null;
+  promptpay: string | null;
+  created_at: string;
+}
+
+export interface SessionRecord {
+  id: number;
+  guild_id: string;
+  channel_id: string;
+  host_id: string;
+  default_buyin: number;
+  status: 'active' | 'completed' | 'cancelled';
+  message_id: string | null;
+  created_at: string;
+  ended_at: string | null;
+}
+
+export interface SessionPlayerRecord {
+  id: number;
+  session_id: number;
+  user_id: string;
+  buy_in: number;
+  cash_out: number | null;
+  status: 'playing' | 'left';
+  left_at: string | null;
+  created_at: string;
+}
+
+export interface SettlementRecord {
+  id: number;
+  session_id: number;
+  from_user_id: string;
+  to_user_id: string;
+  amount: number;
+  created_at: string;
+}
+
+export interface DatabaseSchema {
+  users: Record<string, UserRecord>;
+  sessions: Record<string, SessionRecord>;
+  session_players: Record<string, SessionPlayerRecord>;
+  settlements: Record<string, SettlementRecord>;
+  counters: {
+    sessionId: number;
+    sessionPlayerId: number;
+    settlementId: number;
+  };
+}
 
 const dataDir = path.join(process.cwd(), 'data');
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
-const dbPath = path.join(dataDir, 'poker.db');
+const dbFilePath = path.join(dataDir, 'poker-data.json');
 
-let dbInstance: Database<sqlite3.Database, sqlite3.Statement> | null = null;
+const initialData: DatabaseSchema = {
+  users: {},
+  sessions: {},
+  session_players: {},
+  settlements: {},
+  counters: {
+    sessionId: 0,
+    sessionPlayerId: 0,
+    settlementId: 0,
+  },
+};
 
-export async function getDb(): Promise<Database<sqlite3.Database, sqlite3.Statement>> {
-  if (dbInstance) return dbInstance;
+let memoryDb: DatabaseSchema = initialData;
 
-  dbInstance = await open({
-    filename: dbPath,
-    driver: sqlite3.Database,
-  });
+// Load existing data on startup
+if (fs.existsSync(dbFilePath)) {
+  try {
+    const raw = fs.readFileSync(dbFilePath, 'utf-8');
+    memoryDb = { ...initialData, ...JSON.parse(raw) };
+  } catch (err) {
+    console.error('Failed to read db file, using fresh store:', err);
+    memoryDb = initialData;
+  }
+} else {
+  fs.writeFileSync(dbFilePath, JSON.stringify(initialData, null, 2), 'utf-8');
+}
 
-  await dbInstance.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      username TEXT NOT NULL,
-      display_name TEXT,
-      promptpay TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
+export function getMemoryDb(): DatabaseSchema {
+  return memoryDb;
+}
 
-    CREATE TABLE IF NOT EXISTS sessions (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      guild_id TEXT NOT NULL,
-      channel_id TEXT NOT NULL,
-      host_id TEXT NOT NULL,
-      default_buyin REAL NOT NULL DEFAULT 100,
-      status TEXT NOT NULL DEFAULT 'active',
-      message_id TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      ended_at DATETIME
-    );
+let saveTimeout: NodeJS.Timeout | null = null;
 
-    CREATE TABLE IF NOT EXISTS session_players (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      session_id INTEGER NOT NULL,
-      user_id TEXT NOT NULL,
-      buy_in REAL NOT NULL DEFAULT 0,
-      cash_out REAL DEFAULT NULL,
-      status TEXT NOT NULL DEFAULT 'playing',
-      left_at DATETIME,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY(session_id) REFERENCES sessions(id),
-      FOREIGN KEY(user_id) REFERENCES users(id),
-      UNIQUE(session_id, user_id)
-    );
-
-    CREATE TABLE IF NOT EXISTS settlements (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      session_id INTEGER NOT NULL,
-      from_user_id TEXT NOT NULL,
-      to_user_id TEXT NOT NULL,
-      amount REAL NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY(session_id) REFERENCES sessions(id)
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_sessions_guild_status ON sessions(guild_id, status);
-    CREATE INDEX IF NOT EXISTS idx_sessions_channel_status ON sessions(channel_id, status);
-    CREATE INDEX IF NOT EXISTS idx_session_players_user ON session_players(user_id);
-  `);
-
-  return dbInstance;
+export function persistDb(): void {
+  // Debounce save to disk
+  if (saveTimeout) clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(() => {
+    try {
+      const tempPath = `${dbFilePath}.tmp`;
+      fs.writeFileSync(tempPath, JSON.stringify(memoryDb, null, 2), 'utf-8');
+      fs.renameSync(tempPath, dbFilePath);
+    } catch (err) {
+      console.error('Failed to persist database to disk:', err);
+    }
+  }, 100);
 }
