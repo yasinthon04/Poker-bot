@@ -8,28 +8,27 @@ import { helpCommand } from './commands/help';
 
 dotenv.config();
 
-const token = process.env.DISCORD_TOKEN;
-const clientId = process.env.CLIENT_ID;
-const guildId = process.env.GUILD_ID;
+export async function registerSlashCommands(): Promise<void> {
+  const token = process.env.DISCORD_TOKEN;
+  const clientId = process.env.CLIENT_ID;
+  const guildId = process.env.GUILD_ID;
 
-if (!token || !clientId || token === 'your_bot_token_here' || clientId === 'your_client_id_here') {
-  console.error('\n❌ กรุณาตั้งค่า DISCORD_TOKEN และ CLIENT_ID ในไฟล์ .env ก่อนครับ!');
-  console.error('👉 เปิดไฟล์: /Users/yasinthon/Discord-bot/Poker-Bot/.env\n');
-  process.exit(1);
-}
+  if (!token || !clientId || token === 'your_bot_token_here' || clientId === 'your_client_id_here') {
+    console.error('\n❌ กรุณาตั้งค่า DISCORD_TOKEN และ CLIENT_ID ในไฟล์ .env ก่อนครับ!');
+    return;
+  }
 
-const commands = [
-  pokerCommand.data.toJSON(),
-  statsCommand.data.toJSON(),
-  leaderboardCommand.data.toJSON(),
-  profileCommand.data.toJSON(),
-  clearCommand.data.toJSON(),
-  helpCommand.data.toJSON(),
-];
+  const commands = [
+    pokerCommand.data.toJSON(),
+    statsCommand.data.toJSON(),
+    leaderboardCommand.data.toJSON(),
+    profileCommand.data.toJSON(),
+    clearCommand.data.toJSON(),
+    helpCommand.data.toJSON(),
+  ];
 
-const rest = new REST({ version: '10' }).setToken(token);
+  const rest = new REST({ version: '10' }).setToken(token);
 
-(async () => {
   try {
     console.log(`⏳ กำลังลงทะเบียน ${commands.length} Slash Commands เข้า Discord...`);
 
@@ -47,4 +46,9 @@ const rest = new REST({ version: '10' }).setToken(token);
   } catch (error) {
     console.error('❌ Failed to register commands:', error);
   }
-})();
+}
+
+// If executed directly (e.g. npm run register)
+if (require.main === module) {
+  registerSlashCommands();
+}

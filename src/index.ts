@@ -37,9 +37,13 @@ const client = new Client({
   ],
 });
 
-client.once('ready', () => {
+import { registerSlashCommands } from './register-commands';
+
+client.once('ready', async () => {
   console.log(`🤖 Logged in as ${client.user?.tag}!`);
   console.log('🃏 Poker Bot is online and ready.');
+  // Automatically register and sync slash commands on startup
+  await registerSlashCommands();
 });
 
 client.on('interactionCreate', async (interaction: Interaction) => {
