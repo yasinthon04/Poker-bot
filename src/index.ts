@@ -57,7 +57,7 @@ client.on('interactionCreate', async (interaction: Interaction) => {
         await profileCommand.execute(interaction);
       } else if (commandName === 'clear') {
         await clearCommand.execute(interaction);
-      } else if (commandName === 'help') {
+      } else if (commandName === 'help' || commandName === 'phelp') {
         await helpCommand.execute(interaction);
       }
       return;

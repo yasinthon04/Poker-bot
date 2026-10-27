@@ -102,6 +102,11 @@ export const pokerCommand = {
       sub
         .setName('cancel')
         .setDescription('[Host] ยกเลิกโต๊ะที่กำลังเล่นอยู่')
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('help')
+        .setDescription('ดูคู่มือและคำสั่งทั้งหมดของบอท Poker Bot')
     ),
 
   async execute(interaction: ChatInputCommandInteraction) {
@@ -123,6 +128,13 @@ export const pokerCommand = {
         ? (interaction.member as any).displayName
         : user.displayName
     );
+
+    // HELP (No active session needed)
+    if (subcommand === 'help') {
+      const { helpCommand } = await import('./help');
+      await helpCommand.execute(interaction);
+      return;
+    }
 
     // 1. START (Standard)
     if (subcommand === 'start') {

@@ -6,7 +6,7 @@ import {
 
 export const helpCommand = {
   data: new SlashCommandBuilder()
-    .setName('help')
+    .setName('phelp')
     .setDescription('ดูคู่มือและคำสั่งทั้งหมดของบอท Poker Bot'),
 
   async execute(interaction: ChatInputCommandInteraction) {
