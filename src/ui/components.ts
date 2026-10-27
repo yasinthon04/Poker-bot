@@ -1,0 +1,103 @@
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+} from 'discord.js';
+
+export function createTableActionRows(defaultBuyin: number): ActionRowBuilder<ButtonBuilder>[] {
+  const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId('btn_poker_join')
+      .setLabel(`🟢 เข้าร่วม (${defaultBuyin}฿)`)
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId('btn_poker_rebuy')
+      .setLabel(`🔄 Rebuy (+${defaultBuyin}฿)`)
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId('btn_poker_custom_rebuy')
+      .setLabel('➕ เติมชิป (ระบุเอง)')
+      .setStyle(ButtonStyle.Secondary)
+  );
+
+  const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId('btn_poker_leave')
+      .setLabel('🏃 ขอออกก่อน (Cash-out)')
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId('btn_poker_end')
+      .setLabel('🏁 ปิดโต๊ะ / คิดเงิน')
+      .setStyle(ButtonStyle.Danger),
+    new ButtonBuilder()
+      .setCustomId('btn_poker_refresh')
+      .setLabel('🔄 รีเฟรช')
+      .setStyle(ButtonStyle.Secondary)
+  );
+
+  return [row1, row2];
+}
+
+export function createLeaveModal(): ModalBuilder {
+  const modal = new ModalBuilder()
+    .setCustomId('modal_poker_leave')
+    .setTitle('🏃 ขอออกก่อน (Early Cash-out)');
+
+  const chipsInput = new TextInputBuilder()
+    .setCustomId('input_chips')
+    .setLabel('ชิปคงเหลือของคุณ ณ ตอนนี้ (ใส่ 0 ถ้าหมดตัว)')
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder('เช่น 0 หรือ 150')
+    .setRequired(true);
+
+  const row = new ActionRowBuilder<TextInputBuilder>().addComponents(chipsInput);
+  modal.addComponents(row);
+
+  return modal;
+}
+
+export function createCustomRebuyModal(): ModalBuilder {
+  const modal = new ModalBuilder()
+    .setCustomId('modal_poker_custom_rebuy')
+    .setTitle('➕ เติมชิป (ระบุจำนวนเงิน)');
+
+  const amountInput = new TextInputBuilder()
+    .setCustomId('input_amount')
+    .setLabel('จำนวนเงินที่ต้องการซื้อเพิ่ม (บาท)')
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder('เช่น 100, 200')
+    .setRequired(true);
+
+  const row = new ActionRowBuilder<TextInputBuilder>().addComponents(amountInput);
+  modal.addComponents(row);
+
+  return modal;
+}
+
+export function createEndSessionModal(
+  activePlayers: { user_id: string; username: string; display_name: string | null }[]
+): ModalBuilder {
+  const modal = new ModalBuilder()
+    .setCustomId('modal_poker_end_chips')
+    .setTitle('🏁 กรอกชิปตอนจบเกมของผู้เล่น');
+
+  // Discord modal allows max 5 TextInput components
+  const limitedPlayers = activePlayers.slice(0, 5);
+
+  for (const player of limitedPlayers) {
+    const name = player.display_name || player.username;
+    const input = new TextInputBuilder()
+      .setCustomId(`chips_${player.user_id}`)
+      .setLabel(`ชิปของ ${name.substring(0, 25)}`)
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('ใส่จำนวนชิปคงเหลือ (เช่น 200 หรือ 0)')
+      .setRequired(true);
+
+    modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(input));
+  }
+
+  return modal;
+}
