@@ -404,6 +404,9 @@ export const pokerCommand = {
       }
 
       const attachment = interaction.options.getAttachment('image', true);
+      const explicitLeaver = interaction.options.getUser('leaver');
+      const explicitLeaverChips = interaction.options.getNumber('leaver_chips');
+
       if (!attachment.contentType?.startsWith('image/')) {
         await interaction.reply({ content: '❌ ไฟล์ที่แนบต้องเป็นไฟล์รูปภาพเท่านั้นครับ', ephemeral: true });
         return;
@@ -412,156 +415,15 @@ export const pokerCommand = {
       await interaction.deferReply();
 
       try {
-        const { parsePokerScreenshot, matchPlayersWithDiscord } = await import('../services/vision');
-        const detected = await parsePokerScreenshot(attachment.url);
-
-        if (detected.length === 0) {
-          await interaction.editReply({
-            content: '⚠️ AI ไม่พบชื่อหรือชิปผู้เล่นในรูปภาพ กรุณาลองแคปรูปใหม่ที่เห็นชื่อและยอดเงินชัดเจนครับ',
-          });
-          return;
-        }
-
-        const players = await repo.getSessionPlayers(session.id);
-        const activePlayers = players.filter(p => p.status === 'playing');
-
-        const { matched, unmatchedDiscord } = matchPlayersWithDiscord(detected, activePlayers);
-
-        if (matched.length === 0) {
-          const detectedList = detected.map(d => `• ${d.name}: ${d.chips}฿`).join('\n');
-          await interaction.editReply({
-            content: `⚠️ AI อ่านรายชื่อบนโต๊ะได้:\n${detectedList}\n\nแต่ชื่อไม่ตรงกับผู้เล่นใน Discord สักคน กรุณาตรวจสอบชื่อผู้เล่นบนโต๊ะ หรือกรอกชิปด้วยมือครับ`,
-          });
-          return;
-        }
-
-        const explicitLeaver = interaction.options.getUser('leaver');
-        const explicitLeaverChips = interaction.options.getNumber('leaver_chips');
-
-        // Apply chips to matched players
-        const activeChipsMap: Record<string, number> = {};
-        for (const m of matched) {
-          activeChipsMap[m.userId] = m.chips;
-        }
-
-        // Apply explicit leaver if specified
-        if (explicitLeaver && explicitLeaverChips !== null && explicitLeaverChips !== undefined) {
-          activeChipsMap[explicitLeaver.id] = explicitLeaverChips;
-        }
-
-        // Remaining active players in Discord not in screenshot and not explicitly set
-        const remainingUnmatched = activePlayers.filter(
-          p => !matched.some(m => m.userId === p.user_id) && activeChipsMap[p.user_id] === undefined
+        await processTableScan(
+          interaction,
+          session,
+          attachment.url,
+          attachment.name || 'scanned-table.png',
+          isPreview,
+          explicitLeaver,
+          explicitLeaverChips
         );
-
-        // Calculate total buyin and accounted chips to deduce remaining pot
-        const totalSessionBuyIn = players.reduce((sum, p) => sum + p.buy_in, 0);
-        let accountedChips = 0;
-
-        // Already cashed out early ('left')
-        for (const p of players) {
-          if (p.status === 'left') {
-            accountedChips += p.cash_out ?? 0;
-          }
-        }
-        // Matched by AI or explicitly set
-        for (const chips of Object.values(activeChipsMap)) {
-          accountedChips += chips;
-        }
-
-        const remainingPot = Math.max(0, Math.round((totalSessionBuyIn - accountedChips) * 100) / 100);
-        let leaverNote = '';
-
-        if (explicitLeaver && (explicitLeaverChips === null || explicitLeaverChips === undefined)) {
-          // Explicit leaver without chips -> assign remaining pot
-          activeChipsMap[explicitLeaver.id] = remainingPot;
-          leaverNote += `\n💡 **<@${explicitLeaver.id}>** ออกจากโต๊ะไปก่อน ➔ บอทคำนวณชิปคงเหลือจากกองกลางให้อัตโนมัติ: **${remainingPot.toLocaleString()}฿**`;
-        } else if (remainingUnmatched.length === 1) {
-          // Exactly 1 missing player -> automatically assign remaining pot!
-          const singleLeaver = remainingUnmatched[0];
-          activeChipsMap[singleLeaver.user_id] = remainingPot;
-          leaverNote += `\n💡 **<@${singleLeaver.user_id}>** ออกจากโต๊ะไปก่อน (ไม่ได้กดขอออกก่อน) ➔ บอทคำนวณชิปคงเหลือจากกองกลางให้อัตโนมัติ: **${remainingPot.toLocaleString()}฿** *(ยอดเงินลงตัวพอดี)*`;
-        } else if (remainingUnmatched.length > 1) {
-          // Multiple missing players -> split remaining pot equally
-          const splitChips = Math.round((remainingPot / remainingUnmatched.length) * 100) / 100;
-          for (const u of remainingUnmatched) {
-            activeChipsMap[u.user_id] = splitChips;
-          }
-          leaverNote += `\n⚠️ ตรวจพบผู้เล่นที่ไม่อยู่ในรูปภาพ ${remainingUnmatched.length} คน: ${remainingUnmatched.map(u => `<@${u.user_id}>`).join(', ')} ➔ บอทเฉลี่ยชิปที่เหลือจากกองกลางคนละ **${splitChips.toLocaleString()}฿** *(สามารถใช้ /poker set-chips เพื่อแก้ไขได้)*`;
-        }
-
-        // Show early cash-out players if any
-        const earlyLeavers = players.filter(p => p.status === 'left');
-        let earlyLeaverNote = '';
-        if (earlyLeavers.length > 0) {
-          earlyLeaverNote = '\n' + earlyLeavers.map(el => `🏃 **<@${el.user_id}>** ขอออกก่อนไว้แล้ว ➔ ชิปคงเหลือ **${(el.cash_out ?? 0).toLocaleString()}฿**`).join('\n');
-        }
-
-        let matchSummary = isPreview
-          ? `🔍 **AI สแกนพรีวิวรูปภาพสำเร็จ (${matched.length} คน - โต๊ะยังไม่ปิด):**\n`
-          : `🤖 **AI สแกนรูปภาพสำเร็จ (${matched.length} คน):**\n`;
-
-        matchSummary += matched
-          .map(m => `✅ **${m.discordName}** (ในรูป: \`${m.detectedName}\`) ➔ ชิป **${m.chips.toLocaleString()}฿**`)
-          .join('\n');
-
-        if (leaverNote) {
-          matchSummary += leaverNote;
-        }
-        if (earlyLeaverNote) {
-          matchSummary += earlyLeaverNote;
-        }
-
-        const tableFile = new AttachmentBuilder(attachment.url, {
-          name: attachment.name || 'scanned-table.png',
-        });
-
-        if (isPreview) {
-          const { calculateSettlements } = await import('../services/settlement');
-          const playerInputs = players.map(p => ({
-            userId: p.user_id,
-            name: p.display_name || p.username,
-            buyIn: p.buy_in,
-            cashOut: p.status === 'playing' ? (activeChipsMap[p.user_id] ?? 0) : (p.cash_out ?? 0),
-          }));
-          const settlement = calculateSettlements(playerInputs);
-
-          const ppMap: Record<string, string | null> = {};
-          for (const p of players) {
-            ppMap[p.user_id] = p.promptpay;
-          }
-
-          const embed = createSummaryEmbed(session, settlement, ppMap, true);
-          const files: any[] = [tableFile];
-
-          const topCreditor = settlement.players.find(p => p.net > 0 && ppMap[p.userId]);
-          if (topCreditor && ppMap[topCreditor.userId]) {
-            const topAmount = topCreditor.net;
-            const { generatePromptPayAttachment } = await import('../services/qr');
-            const qrAttachment = await generatePromptPayAttachment(ppMap[topCreditor.userId]!, topAmount);
-            if (qrAttachment) {
-              embed.setImage('attachment://promptpay-qr.png');
-              embed.addFields({
-                name: `📱 QR Code พร้อมเพย์ของ ${topCreditor.name} (${topAmount.toLocaleString()}฿)`,
-                value: `สามารถสแกน QR Code ด้านล่างเพื่อโอนเงินได้ทันที`,
-              });
-              files.push(qrAttachment);
-            }
-          }
-
-          await interaction.editReply({
-            content: matchSummary,
-            embeds: [embed],
-            files,
-          });
-          return;
-        }
-
-        await interaction.editReply({
-          content: matchSummary,
-          files: [tableFile],
-        });
-        await finalizeAndDisplaySummary(interaction, session, activeChipsMap, attachment.url);
       } catch (err: any) {
         console.error('Failed to parse poker screenshot:', err);
         if (err.message?.includes('GEMINI_API_KEY')) {
@@ -576,6 +438,8 @@ export const pokerCommand = {
       }
       return;
     }
+
+
 
     // 3.1 PREVIEW (Check current debts without ending session)
     if (subcommand === 'preview') {
@@ -875,4 +739,155 @@ export async function finalizeAndDisplaySummary(
   } else {
     await interaction.reply({ embeds: [embed], files, components: [actionRow] });
   }
+}
+
+export async function processTableScan(
+  context: any,
+  session: repo.SessionRow,
+  imageUrl: string,
+  imageFileName: string,
+  isPreview: boolean,
+  explicitLeaver?: any,
+  explicitLeaverChips?: number | null
+) {
+  const { parsePokerScreenshot, matchPlayersWithDiscord } = await import('../services/vision');
+  const detected = await parsePokerScreenshot(imageUrl);
+
+  if (detected.length === 0) {
+    await context.editReply({
+      content: '⚠️ AI ไม่พบชื่อหรือชิปผู้เล่นในรูปภาพ กรุณาลองแคปรูปใหม่ที่เห็นชื่อและยอดเงินชัดเจนครับ',
+    });
+    return;
+  }
+
+  const players = await repo.getSessionPlayers(session.id);
+  const activePlayers = players.filter(p => p.status === 'playing');
+
+  const { matched, unmatchedDiscord } = matchPlayersWithDiscord(detected, activePlayers);
+
+  if (matched.length === 0) {
+    const detectedList = detected.map(d => `• ${d.name}: ${d.chips}฿`).join('\n');
+    await context.editReply({
+      content: `⚠️ AI อ่านรายชื่อบนโต๊ะได้:\n${detectedList}\n\nแต่ชื่อไม่ตรงกับผู้เล่นใน Discord สักคน กรุณาตรวจสอบชื่อผู้เล่นบนโต๊ะ หรือกรอกชิปด้วยมือครับ`,
+    });
+    return;
+  }
+
+  // Apply chips to matched players
+  const activeChipsMap: Record<string, number> = {};
+  for (const m of matched) {
+    activeChipsMap[m.userId] = m.chips;
+  }
+
+  // Apply explicit leaver if specified
+  if (explicitLeaver && explicitLeaverChips !== null && explicitLeaverChips !== undefined) {
+    activeChipsMap[explicitLeaver.id] = explicitLeaverChips;
+  }
+
+  // Remaining active players in Discord not in screenshot and not explicitly set
+  const remainingUnmatched = activePlayers.filter(
+    p => !matched.some(m => m.userId === p.user_id) && activeChipsMap[p.user_id] === undefined
+  );
+
+  // Calculate total buyin and accounted chips to deduce remaining pot
+  const totalSessionBuyIn = players.reduce((sum, p) => sum + p.buy_in, 0);
+  let accountedChips = 0;
+
+  // Already cashed out early ('left')
+  for (const p of players) {
+    if (p.status === 'left') {
+      accountedChips += p.cash_out ?? 0;
+    }
+  }
+  // Matched by AI or explicitly set
+  for (const chips of Object.values(activeChipsMap)) {
+    accountedChips += chips;
+  }
+
+  const remainingPot = Math.max(0, Math.round((totalSessionBuyIn - accountedChips) * 100) / 100);
+  let leaverNote = '';
+
+  if (explicitLeaver && (explicitLeaverChips === null || explicitLeaverChips === undefined)) {
+    activeChipsMap[explicitLeaver.id] = remainingPot;
+    leaverNote += `\n💡 **<@${explicitLeaver.id}>** ออกจากโต๊ะไปก่อน ➔ บอทคำนวณชิปคงเหลือจากกองกลางให้อัตโนมัติ: **${remainingPot.toLocaleString()}฿**`;
+  } else if (remainingUnmatched.length === 1) {
+    const singleLeaver = remainingUnmatched[0];
+    activeChipsMap[singleLeaver.user_id] = remainingPot;
+    leaverNote += `\n💡 **<@${singleLeaver.user_id}>** ออกจากโต๊ะไปก่อน (ไม่ได้กดขอออกก่อน) ➔ บอทคำนวณชิปคงเหลือจากกองกลางให้อัตโนมัติ: **${remainingPot.toLocaleString()}฿** *(ยอดเงินลงตัวพอดี)*`;
+  } else if (remainingUnmatched.length > 1) {
+    const splitChips = Math.round((remainingPot / remainingUnmatched.length) * 100) / 100;
+    for (const u of remainingUnmatched) {
+      activeChipsMap[u.user_id] = splitChips;
+    }
+    leaverNote += `\n⚠️ ตรวจพบผู้เล่นที่ไม่อยู่ในรูปภาพ ${remainingUnmatched.length} คน: ${remainingUnmatched.map(u => `<@${u.user_id}>`).join(', ')} ➔ บอทเฉลี่ยชิปที่เหลือจากกองกลางคนละ **${splitChips.toLocaleString()}฿** *(สามารถใช้ /poker set-chips เพื่อแก้ไขได้)*`;
+  }
+
+  // Show early cash-out players if any
+  const earlyLeavers = players.filter(p => p.status === 'left');
+  let earlyLeaverNote = '';
+  if (earlyLeavers.length > 0) {
+    earlyLeaverNote = '\n' + earlyLeavers.map(el => `🏃 **<@${el.user_id}>** ขอออกก่อนไว้แล้ว ➔ ชิปคงเหลือ **${(el.cash_out ?? 0).toLocaleString()}฿**`).join('\n');
+  }
+
+  let matchSummary = isPreview
+    ? `🔍 **AI สแกนพรีวิวรูปภาพสำเร็จ (${matched.length} คน - โต๊ะยังไม่ปิด):**\n`
+    : `🤖 **AI สแกนรูปภาพสำเร็จ (${matched.length} คน):**\n`;
+
+  matchSummary += matched
+    .map(m => `✅ **${m.discordName}** (ในรูป: \`${m.detectedName}\`) ➔ ชิป **${m.chips.toLocaleString()}฿**`)
+    .join('\n');
+
+  if (leaverNote) matchSummary += leaverNote;
+  if (earlyLeaverNote) matchSummary += earlyLeaverNote;
+
+  const tableFile = new AttachmentBuilder(imageUrl, {
+    name: imageFileName || 'scanned-table.png',
+  });
+
+  if (isPreview) {
+    const { calculateSettlements } = await import('../services/settlement');
+    const playerInputs = players.map(p => ({
+      userId: p.user_id,
+      name: p.display_name || p.username,
+      buyIn: p.buy_in,
+      cashOut: p.status === 'playing' ? (activeChipsMap[p.user_id] ?? 0) : (p.cash_out ?? 0),
+    }));
+    const settlement = calculateSettlements(playerInputs);
+
+    const ppMap: Record<string, string | null> = {};
+    for (const p of players) {
+      ppMap[p.user_id] = p.promptpay;
+    }
+
+    const embed = createSummaryEmbed(session, settlement, ppMap, true);
+    const files: any[] = [tableFile];
+
+    const topCreditor = settlement.players.find(p => p.net > 0 && ppMap[p.userId]);
+    if (topCreditor && ppMap[topCreditor.userId]) {
+      const topAmount = topCreditor.net;
+      const { generatePromptPayAttachment } = await import('../services/qr');
+      const qrAttachment = await generatePromptPayAttachment(ppMap[topCreditor.userId]!, topAmount);
+      if (qrAttachment) {
+        embed.setImage('attachment://promptpay-qr.png');
+        embed.addFields({
+          name: `📱 QR Code พร้อมเพย์ของ ${topCreditor.name} (${topAmount.toLocaleString()}฿)`,
+          value: `สามารถสแกน QR Code ด้านล่างเพื่อโอนเงินได้ทันที`,
+        });
+        files.push(qrAttachment);
+      }
+    }
+
+    await context.editReply({
+      content: matchSummary,
+      embeds: [embed],
+      files,
+    });
+    return;
+  }
+
+  await context.editReply({
+    content: matchSummary,
+    files: [tableFile],
+  });
+  await finalizeAndDisplaySummary(context, session, activeChipsMap, imageUrl);
 }

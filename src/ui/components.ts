@@ -20,14 +20,18 @@ export function createTableActionRows(defaultBuyin: number): ActionRowBuilder<Bu
     new ButtonBuilder()
       .setCustomId('btn_poker_custom_rebuy')
       .setLabel('➕ เติมชิป (ระบุเอง)')
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId('btn_poker_leave')
+      .setLabel('🏃 ขอออกก่อน')
       .setStyle(ButtonStyle.Secondary)
   );
 
   const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
-      .setCustomId('btn_poker_leave')
-      .setLabel('🏃 ขอออกก่อน (Cash-out)')
-      .setStyle(ButtonStyle.Secondary),
+      .setCustomId('btn_poker_ai_scan')
+      .setLabel('📸 คิดเงินด้วย AI (สแกนรูป)')
+      .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setCustomId('btn_poker_preview')
       .setLabel('🧮 คิดเงิน (ไม่ปิดโต๊ะ)')
@@ -178,3 +182,21 @@ export function createRecalculateModal(
 
   return modal;
 }
+
+export function createAiScanPromptRow(
+  sessionId: number,
+  isHostOrAdmin: boolean
+): ActionRowBuilder<ButtonBuilder> {
+  return new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`btn_poker_ai_prompt_preview_${sessionId}`)
+      .setLabel('🧮 สแกนคิดเงิน (ไม่ปิดโต๊ะ)')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId(`btn_poker_ai_prompt_end_${sessionId}`)
+      .setLabel('🏁 สแกนคิดเงิน & ปิดโต๊ะ')
+      .setStyle(ButtonStyle.Danger)
+      .setDisabled(!isHostOrAdmin)
+  );
+}
+

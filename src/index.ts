@@ -2,6 +2,7 @@ import {
   Client,
   GatewayIntentBits,
   Interaction,
+  Message,
   PermissionFlagsBits,
 } from 'discord.js';
 import dotenv from 'dotenv';
@@ -15,6 +16,7 @@ import {
   createCustomRebuyModal,
   createLeaveModal,
   createEndSessionModal,
+  createAiScanPromptRow,
 } from './ui/components';
 
 import http from 'http';
@@ -35,8 +37,11 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.MessageContent,
   ],
 });
+
+const pendingScanCollectors = new Map<string, any>();
 
 import { registerSlashCommands } from './register-commands';
 
@@ -257,6 +262,138 @@ client.on('interactionCreate', async (interaction: Interaction) => {
       if (interaction.customId === 'btn_poker_refresh') {
         await refreshTableMessage(interaction, session);
         await interaction.reply({ content: '🔄 รีเฟรชสถานะโต๊ะล่าสุดแล้ว', ephemeral: true });
+        return;
+      }
+
+      // AI Scan button -> Show prompt (Preview vs End Session)
+      if (interaction.customId === 'btn_poker_ai_scan') {
+        const isHostOrAdmin =
+          interaction.user.id === session.host_id ||
+          !!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild);
+
+        await interaction.reply({
+          content:
+            `📸 **คิดเงินอัตโนมัติด้วย AI (Gemini Vision)**\n` +
+            `เลือกรูปแบบที่คุณต้องการคำนวณ:\n\n` +
+            `• **🧮 สแกนคิดเงิน (ไม่ปิดโต๊ะ):** AI อ่านชิป สรุปยอดกำไร/ขาดทุน และสร้าง QR พร้อมเพย์ให้ดูทันที แต่ยังคงเปิดโต๊ะให้เล่นต่อตามปกติ *(ทุกคนกดได้)*\n` +
+            `• **🏁 สแกนคิดเงิน & ปิดโต๊ะ:** คำนวณเงินพร้อมบันทึกสถิติและปิดโต๊ะ เพื่อเตรียมเริ่มรอบถัดไป *(เฉพาะ Host/Admin)*`,
+          components: [createAiScanPromptRow(session.id, isHostOrAdmin)],
+          ephemeral: true,
+        });
+        return;
+      }
+
+      // AI Scan Prompt choices (Preview or End)
+      if (
+        interaction.customId.startsWith('btn_poker_ai_prompt_preview_') ||
+        interaction.customId.startsWith('btn_poker_ai_prompt_end_')
+      ) {
+        const isPreview = interaction.customId.startsWith('btn_poker_ai_prompt_preview_');
+        const isHostOrAdmin =
+          interaction.user.id === session.host_id ||
+          !!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild);
+
+        if (!isPreview && !isHostOrAdmin) {
+          await interaction.reply({
+            content: '❌ เฉพาะ Host ของโต๊ะนี้เท่านั้นที่สามารถเลือกสแกนและปิดโต๊ะได้ครับ',
+            ephemeral: true,
+          });
+          return;
+        }
+
+        const channel = interaction.channel;
+        if (!channel || !('createMessageCollector' in channel)) {
+          await interaction.reply({
+            content: '❌ ไม่สามารถสร้างตัวรับรูปภาพในห้องนี้ได้',
+            ephemeral: true,
+          });
+          return;
+        }
+
+        await interaction.update({
+          content:
+            `📸 **โหมดสแกน AI (${isPreview ? '🧮 ไม่ปิดโต๊ะ' : '🏁 ปิดโต๊ะและจบเกม'}):**\n` +
+            `⏳ **กรุณาแนบและส่งรูปภาพหน้าจอโต๊ะ Poker เข้ามาในห้องแชทนี้ได้เลยครับ!**\n` +
+            `*(มีเวลารับรูปภาพ 60 วินาที — แนบรูปในแชทปกติแล้วส่งได้ทันที บอทจะเริ่มสแกนและคำนวณเงินให้อัตโนมัติ)*\n` +
+            `💡 *หากบอทไม่อ่านรูป สามารถพิมพ์ @บอท พร้อมแนบรูปภาพได้ครับ*`,
+          components: [],
+        });
+
+        // Cancel previous collector if existing for this user
+        if (pendingScanCollectors.has(user.id)) {
+          try {
+            pendingScanCollectors.get(user.id)?.stop('replaced');
+          } catch {}
+          pendingScanCollectors.delete(user.id);
+        }
+
+        const filter = (m: Message) => m.author.id === user.id && m.attachments.size > 0;
+        const collector = channel.createMessageCollector({ filter, max: 1, time: 60000 });
+        pendingScanCollectors.set(user.id, collector);
+
+        collector.on('collect', async (msg: Message) => {
+          pendingScanCollectors.delete(user.id);
+
+          const attachment = msg.attachments.first();
+          if (!attachment || !attachment.contentType?.startsWith('image/')) {
+            await msg.reply('⚠️ ไฟล์ที่แนบต้องเป็นรูปภาพครับ กรุณาลองกดปุ่มสแกนใหม่อีกครั้ง');
+            return;
+          }
+
+          const statusMsg = await msg.reply({
+            content: `🔍 **AI กำลังสแกนรูปภาพและคำนวณเงิน (${isPreview ? 'แบบไม่ปิดโต๊ะ' : 'แบบปิดโต๊ะ'})...** ⏳ กรุณารอสักครู่`,
+          });
+
+          const replyAdapter = {
+            channel: msg.channel,
+            replied: true,
+            deferred: true,
+            editReply: async (data: any) => {
+              return await statusMsg.edit(data);
+            },
+            followUp: async (data: any) => {
+              return await (msg.channel as any).send(data);
+            },
+            reply: async (data: any) => {
+              return await msg.reply(data);
+            },
+          };
+
+          try {
+            const { processTableScan } = await import('./commands/poker');
+            await processTableScan(
+              replyAdapter,
+              session,
+              attachment.url,
+              attachment.name || 'scanned-table.png',
+              isPreview
+            );
+          } catch (err: any) {
+            console.error('Failed to parse poker screenshot via button collector:', err);
+            if (err.message?.includes('GEMINI_API_KEY')) {
+              await statusMsg.edit({
+                content: '❌ ยังไม่ได้ตั้งค่า `GEMINI_API_KEY` ในไฟล์ `.env` ครับ!\n💡 คุณสามารถรับ API Key ได้ฟรีที่: https://aistudio.google.com/apikey',
+              });
+            } else {
+              await statusMsg.edit({
+                content: `⚠️ เกิดข้อผิดพลาดในการวิเคราะห์รูปภาพ: ${err.message}`,
+              });
+            }
+          }
+        });
+
+        collector.on('end', async (_collected, reason) => {
+          pendingScanCollectors.delete(user.id);
+          if (reason === 'time') {
+            try {
+              await interaction.followUp({
+                content: '⏰ หมดเวลารอรับรูปภาพ (60 วินาที) หากต้องการสแกน กรุณากดปุ่ม [📸 คิดเงินด้วย AI] ใหม่อีกครั้งครับ',
+                ephemeral: true,
+              });
+            } catch {}
+          }
+        });
+
         return;
       }
 
