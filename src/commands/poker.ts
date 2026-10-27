@@ -375,8 +375,12 @@ export const pokerCommand = {
       return;
     }
 
-    // For other subcommands, get active session
-    const session = await repo.getActiveSession(channelId);
+    // For other subcommands, get active session (or last session for set-chips)
+    let session = await repo.getActiveSession(channelId);
+    if (!session && subcommand === 'set-chips') {
+      session = await repo.getLastSession(channelId);
+    }
+
     if (!session) {
       await interaction.reply({
         content: '❌ ยังไม่มีโต๊ะ Poker ที่กำลังเล่นอยู่ในห้องนี้! พิมพ์ `/poker start` หรือ `/poker start-voice` เพื่อเปิดโต๊ะ',
@@ -713,6 +717,19 @@ export const pokerCommand = {
         return;
       }
 
+      if (session.status === 'completed') {
+        const players = await repo.getSessionPlayers(session.id);
+        const activeChipsMap: Record<string, number> = {};
+        for (const p of players) {
+          activeChipsMap[p.user_id] = p.user_id === targetPlayer.id ? chips : (p.cash_out ?? 0);
+        }
+        await interaction.reply({
+          content: `🔧 Host ได้แก้ไขชิปของ <@${targetPlayer.id}> เป็น **${chips.toLocaleString()} บาท** และคำนวณยอดเงินใหม่:`,
+        });
+        await finalizeAndDisplaySummary(interaction, session, activeChipsMap);
+        return;
+      }
+
       await interaction.reply({
         content: `🔧 Host ได้ตั้งค่าชิปคงเหลือของ <@${targetPlayer.id}> เป็น **${chips.toLocaleString()} บาท** เรียบร้อยแล้ว`,
       });
@@ -816,7 +833,7 @@ export async function finalizeAndDisplaySummary(
   }
 
   const { createNextRoundActionRow } = await import('../ui/components');
-  const actionRow = createNextRoundActionRow(session.id);
+  const actionRow = createNextRoundActionRow(session.id, false, settlement.isBalanced);
 
   if (interaction.replied || interaction.deferred) {
     await interaction.followUp({ embeds: [embed], files, components: [actionRow] });

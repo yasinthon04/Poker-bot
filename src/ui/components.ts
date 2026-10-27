@@ -133,13 +133,47 @@ export function createPreviewSessionModal(
 
 export function createNextRoundActionRow(
   sessionId: number,
-  disabled: boolean = false
+  disabled: boolean = false,
+  isBalanced: boolean = true
 ): ActionRowBuilder<ButtonBuilder> {
   return new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId(`btn_poker_next_round_${sessionId}`)
       .setLabel('🔄 เริ่มรอบใหม่ (ดึงผู้เล่นเดิมเข้าโต๊ะ)')
       .setStyle(ButtonStyle.Success)
+      .setDisabled(disabled),
+    new ButtonBuilder()
+      .setCustomId(`btn_poker_recalc_${sessionId}`)
+      .setLabel(isBalanced ? '🧮 คำนวณใหม่ (แก้ไขชิป)' : '⚠️ คำนวณใหม่ (ยอดไม่บาลานซ์)')
+      .setStyle(isBalanced ? ButtonStyle.Secondary : ButtonStyle.Danger)
       .setDisabled(disabled)
   );
+}
+
+export function createRecalculateModal(
+  sessionId: number,
+  players: { user_id: string; username: string; display_name: string | null; cash_out: number | null }[]
+): ModalBuilder {
+  const modal = new ModalBuilder()
+    .setCustomId(`modal_poker_recalc_${sessionId}`)
+    .setTitle('🧮 แก้ไขชิปและคำนวณเงินใหม่');
+
+  // Discord modal allows max 5 TextInput components
+  const limitedPlayers = players.slice(0, 5);
+
+  for (const player of limitedPlayers) {
+    const name = player.display_name || player.username;
+    const currentVal = player.cash_out !== null && player.cash_out !== undefined ? String(player.cash_out) : '0';
+    const input = new TextInputBuilder()
+      .setCustomId(`recalc_${player.user_id}`)
+      .setLabel(`ชิปของ ${name.substring(0, 25)}`)
+      .setStyle(TextInputStyle.Short)
+      .setValue(currentVal)
+      .setPlaceholder('ใส่จำนวนชิปที่ถูกต้อง (เช่น 200 หรือ 0)')
+      .setRequired(true);
+
+    modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(input));
+  }
+
+  return modal;
 }

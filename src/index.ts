@@ -143,6 +143,46 @@ client.on('interactionCreate', async (interaction: Interaction) => {
         return;
       }
 
+      // Recalculate button (can be clicked on completed session summary)
+      if (interaction.customId.startsWith('btn_poker_recalc_')) {
+        const parts = interaction.customId.split('_');
+        const targetSessionId = parseInt(parts[parts.length - 1], 10);
+
+        const targetSession = await repo.getSessionById(targetSessionId);
+        if (!targetSession) {
+          await interaction.reply({
+            content: '❌ ไม่พบข้อมูลโต๊ะ Poker นี้ครับ',
+            ephemeral: true,
+          });
+          return;
+        }
+
+        // Host or Admin permission
+        if (
+          interaction.user.id !== targetSession.host_id &&
+          !interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)
+        ) {
+          await interaction.reply({
+            content: '❌ เฉพาะ Host ของโต๊ะนี้เท่านั้นที่สามารถกดคำนวณใหม่ได้ครับ',
+            ephemeral: true,
+          });
+          return;
+        }
+
+        const players = await repo.getSessionPlayers(targetSessionId);
+        if (players.length > 5) {
+          await interaction.reply({
+            content: `⚠️ โต๊ะนี้มีผู้เล่นถึง ${players.length} คน (เกินขีดจำกัด 5 ช่องของ Discord Modal)\n💡 กรุณาใช้คำสั่ง \`/poker set-chips @ผู้เล่น [ชิป]\` เพื่อแก้ไขชิปทีละคน หรือใช้ \`/poker scan-table <รูปภาพ>\` เพื่อสแกนใหม่ครับ`,
+            ephemeral: true,
+          });
+          return;
+        }
+
+        const { createRecalculateModal } = await import('./ui/components');
+        await interaction.showModal(createRecalculateModal(targetSessionId, players));
+        return;
+      }
+
       const session = await repo.getActiveSession(channelId);
 
       if (!session) {
@@ -297,6 +337,37 @@ client.on('interactionCreate', async (interaction: Interaction) => {
       const channelId = interaction.channelId;
       if (!channelId) return;
       const user = interaction.user;
+      // Recalculate Modal Submit (handles completed or active session)
+      if (interaction.customId.startsWith('modal_poker_recalc_')) {
+        const parts = interaction.customId.split('_');
+        const targetSessionId = parseInt(parts[parts.length - 1], 10);
+
+        const targetSession = await repo.getSessionById(targetSessionId);
+        if (!targetSession) {
+          await interaction.reply({
+            content: '❌ ไม่พบข้อมูลโต๊ะ Poker นี้ครับ',
+            ephemeral: true,
+          });
+          return;
+        }
+
+        const players = await repo.getSessionPlayers(targetSessionId);
+        const activeChipsMap: Record<string, number> = {};
+
+        for (const player of players) {
+          try {
+            const raw = interaction.fields.getTextInputValue(`recalc_${player.user_id}`);
+            const chips = parseFloat(raw);
+            activeChipsMap[player.user_id] = isNaN(chips) ? 0 : chips;
+          } catch {
+            activeChipsMap[player.user_id] = player.cash_out ?? 0;
+          }
+        }
+
+        await finalizeAndDisplaySummary(interaction, targetSession, activeChipsMap);
+        return;
+      }
+
       const session = await repo.getActiveSession(channelId);
 
       if (!session) {
