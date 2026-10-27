@@ -40,9 +40,10 @@ Example:
 
   const modelsToTry = [
     process.env.GEMINI_MODEL,
+    'gemini-3.5-flash-lite',
+    'gemini-flash-lite-latest',
+    'gemini-3.5-flash',
     'gemini-3.8-flash',
-    'gemini-2.0-flash',
-    'gemini-1.5-flash',
   ].filter(Boolean) as string[];
 
   let result: any = null;
@@ -50,7 +51,13 @@ Example:
 
   for (const modelName of modelsToTry) {
     try {
-      result = await ai.models.generateContent({
+      // 10-second timeout per model to prevent hanging on overloaded models
+      let timeoutId: any;
+      const timeoutPromise = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error(`Timeout after 10000ms on ${modelName}`)), 10000);
+      });
+
+      const generatePromise = ai.models.generateContent({
         model: modelName,
         contents: [
           {
@@ -66,11 +73,17 @@ Example:
             ],
           },
         ],
+        config: {
+          maxOutputTokens: 500,
+          responseMimeType: 'application/json',
+        },
       });
+
+      result = await Promise.race([generatePromise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
       if (result) break;
     } catch (err: any) {
       lastError = err;
-      console.warn(`Model ${modelName} failed, trying next model:`, err.message || err);
+      console.warn(`Model ${modelName} failed or timed out, trying next:`, err.message || err);
     }
   }
 
@@ -81,14 +94,19 @@ Example:
   const responseText = result.text || '';
 
   // 3. Clean and parse JSON
-  const jsonMatch = responseText.match(/\[\s*\{[\s\S]*\}\s*\]/);
-  if (!jsonMatch) {
-    throw new Error('Could not parse player chips from image. AI response: ' + responseText);
+  let parsed: DetectedPlayer[] = [];
+  try {
+    parsed = JSON.parse(responseText.trim());
+  } catch {
+    const jsonMatch = responseText.match(/\[\s*\{[\s\S]*\}\s*\]/);
+    if (!jsonMatch) {
+      throw new Error('Could not parse player chips from image. AI response: ' + responseText);
+    }
+    parsed = JSON.parse(jsonMatch[0]);
   }
 
-  const parsed: DetectedPlayer[] = JSON.parse(jsonMatch[0]);
   return parsed.map(p => ({
-    name: String(p.name).trim(),
+    name: String(p.name).replace(/^@/, '').trim(),
     chips: typeof p.chips === 'number' ? p.chips : parseFloat(String(p.chips).replace(/[^0-9.]/g, '')) || 0,
   }));
 }
