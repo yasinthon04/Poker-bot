@@ -17,6 +17,7 @@ import {
   createLeaveModal,
   createEndSessionModal,
   createAiScanPromptRow,
+  createPreviewActionRow,
 } from './ui/components';
 
 import http from 'http';
@@ -265,6 +266,26 @@ client.on('interactionCreate', async (interaction: Interaction) => {
         return;
       }
 
+      // Check Status button
+      if (interaction.customId === 'btn_poker_status') {
+        await refreshTableMessage(interaction, session);
+        const players = await repo.getSessionPlayers(session.id);
+        const { createTableEmbed } = await import('./ui/embeds');
+        const embed = createTableEmbed(session, players);
+
+        const currentPlayer = players.find(p => p.user_id === user.id && p.status === 'playing');
+        const personalNote = currentPlayer
+          ? `\n👤 สถานะของคุณ: **กำลังเล่นอยู่** (ยอด Buy-in รวม: **${currentPlayer.buy_in.toLocaleString()}฿**)`
+          : '';
+
+        await interaction.reply({
+          content: `📊 **สถานะโต๊ะ Poker ล่าสุด (Session #${session.id}):**${personalNote}`,
+          embeds: [embed],
+          ephemeral: true,
+        });
+        return;
+      }
+
       // AI Scan button -> Show prompt (Preview vs End Session)
       if (interaction.customId === 'btn_poker_ai_scan') {
         const isHostOrAdmin =
@@ -448,6 +469,7 @@ client.on('interactionCreate', async (interaction: Interaction) => {
             content: `🧮 **<@${user.id}> ได้คำนวณเงินปัจจุบัน (โต๊ะยังคงเปิดอยู่ตามปกติ ไม่ได้ปิดโต๊ะ):**`,
             embeds: [embed],
             files,
+            components: [createPreviewActionRow(session.id)],
           });
           return;
         }
@@ -668,6 +690,7 @@ client.on('interactionCreate', async (interaction: Interaction) => {
           content: `🧮 **<@${user.id}> ได้คำนวณเงินปัจจุบัน (โต๊ะยังคงเปิดอยู่ตามปกติ ไม่ได้ปิดโต๊ะ):**`,
           embeds: [embed],
           files,
+          components: [createPreviewActionRow(session.id)],
         });
         return;
       }

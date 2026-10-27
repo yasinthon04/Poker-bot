@@ -487,7 +487,12 @@ export const pokerCommand = {
           }
         }
 
-        await interaction.reply({ embeds: [embed], files });
+        const { createPreviewActionRow } = await import('../ui/components');
+        await interaction.reply({
+          embeds: [embed],
+          files,
+          components: [createPreviewActionRow(session.id)],
+        });
         return;
       }
 
@@ -502,7 +507,8 @@ export const pokerCommand = {
       const players = await repo.getSessionPlayers(session.id);
       const embed = createTableEmbed(session, players);
       const rows = createTableActionRows(session.default_buyin);
-      await interaction.reply({ embeds: [embed], components: rows });
+      const reply = await interaction.reply({ embeds: [embed], components: rows, fetchReply: true });
+      await repo.updateSessionMessageId(session.id, reply.id);
       return;
     }
 
@@ -877,10 +883,12 @@ export async function processTableScan(
       }
     }
 
+    const { createPreviewActionRow } = await import('../ui/components');
     await context.editReply({
       content: matchSummary,
       embeds: [embed],
       files,
+      components: [createPreviewActionRow(session.id)],
     });
     return;
   }

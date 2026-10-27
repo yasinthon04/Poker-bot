@@ -41,6 +41,10 @@ export function createTableActionRows(defaultBuyin: number): ActionRowBuilder<Bu
       .setLabel('🏁 ปิดโต๊ะ / จบเกม')
       .setStyle(ButtonStyle.Danger),
     new ButtonBuilder()
+      .setCustomId('btn_poker_status')
+      .setLabel('📊 เช็คสถานะ')
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
       .setCustomId('btn_poker_refresh')
       .setLabel('🔄 รีเฟรช')
       .setStyle(ButtonStyle.Secondary)
@@ -199,4 +203,18 @@ export function createAiScanPromptRow(
       .setDisabled(!isHostOrAdmin)
   );
 }
+
+export function createPreviewActionRow(sessionId: number): ActionRowBuilder<ButtonBuilder> {
+  return new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId('btn_poker_status')
+      .setLabel('📊 เช็คสถานะโต๊ะ')
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId('btn_poker_ai_scan')
+      .setLabel('📸 สแกนใหม่ด้วย AI')
+      .setStyle(ButtonStyle.Success)
+  );
+}
+
 
