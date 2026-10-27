@@ -139,22 +139,29 @@ export async function getSessionPlayers(sessionId: number): Promise<SessionPlaye
   });
 }
 
-export async function addOrRebuyPlayer(
+/**
+ * Join table. If player is already playing, do NOT add buy-in again.
+ */
+export async function joinPlayer(
   sessionId: number,
   userId: string,
   amount: number
-): Promise<{ isRebuy: boolean; totalBuyIn: number }> {
+): Promise<{ success: boolean; alreadyPlaying?: boolean; isRejoin?: boolean; totalBuyIn: number }> {
   const db = getMemoryDb();
   const existing = Object.values(db.session_players).find(
     p => p.session_id === sessionId && p.user_id === userId
   );
 
   if (existing) {
+    if (existing.status === 'playing') {
+      return { success: false, alreadyPlaying: true, totalBuyIn: existing.buy_in };
+    }
+    // Was 'left', rejoining table
     existing.buy_in += amount;
     existing.status = 'playing';
     existing.left_at = null;
     persistDb();
-    return { isRebuy: true, totalBuyIn: existing.buy_in };
+    return { success: true, isRejoin: true, totalBuyIn: existing.buy_in };
   } else {
     const newId = ++db.counters.sessionPlayerId;
     db.session_players[String(newId)] = {
@@ -168,8 +175,66 @@ export async function addOrRebuyPlayer(
       created_at: new Date().toISOString(),
     };
     persistDb();
-    return { isRebuy: false, totalBuyIn: amount };
+    return { success: true, isRejoin: false, totalBuyIn: amount };
   }
+}
+
+/**
+ * Rebuy chips for a currently playing player.
+ */
+export async function rebuyPlayer(
+  sessionId: number,
+  userId: string,
+  amount: number
+): Promise<{ success: boolean; notPlaying?: boolean; totalBuyIn: number }> {
+  const db = getMemoryDb();
+  const existing = Object.values(db.session_players).find(
+    p => p.session_id === sessionId && p.user_id === userId
+  );
+
+  if (!existing || existing.status !== 'playing') {
+    return { success: false, notPlaying: true, totalBuyIn: 0 };
+  }
+
+  existing.buy_in += amount;
+  persistDb();
+  return { success: true, totalBuyIn: existing.buy_in };
+}
+
+/**
+ * Correct/Set a player's buy-in (for Host fixes).
+ */
+export async function setPlayerBuyIn(
+  sessionId: number,
+  userId: string,
+  amount: number
+): Promise<{ success: boolean; totalBuyIn: number }> {
+  const db = getMemoryDb();
+  const existing = Object.values(db.session_players).find(
+    p => p.session_id === sessionId && p.user_id === userId
+  );
+
+  if (!existing) {
+    return { success: false, totalBuyIn: 0 };
+  }
+
+  existing.buy_in = amount;
+  persistDb();
+  return { success: true, totalBuyIn: existing.buy_in };
+}
+
+// Keep backward compatibility if anything still calls addOrRebuyPlayer
+export async function addOrRebuyPlayer(
+  sessionId: number,
+  userId: string,
+  amount: number
+): Promise<{ isRebuy: boolean; totalBuyIn: number }> {
+  const res = await joinPlayer(sessionId, userId, amount);
+  if (res.alreadyPlaying) {
+    const rebuyRes = await rebuyPlayer(sessionId, userId, amount);
+    return { isRebuy: true, totalBuyIn: rebuyRes.totalBuyIn };
+  }
+  return { isRebuy: res.isRejoin || false, totalBuyIn: res.totalBuyIn };
 }
 
 export async function playerLeaveSession(

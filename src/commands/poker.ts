@@ -57,6 +57,15 @@ export const pokerCommand = {
     )
     .addSubcommand(sub =>
       sub
+        .setName('set-buyin')
+        .setDescription('[Host] แก้ไขยอดเงิน Buy-in ของผู้เล่น (เผื่อกด Rebuy พลาด)')
+        .addUserOption(opt => opt.setName('player').setDescription('ผู้เล่น').setRequired(true))
+        .addNumberOption(opt =>
+          opt.setName('amount').setDescription('ยอดเงิน Buy-in ใหม่').setRequired(true).setMinValue(0)
+        )
+    )
+    .addSubcommand(sub =>
+      sub
         .setName('end')
         .setDescription('ปิดโต๊ะและคำนวณเงินเคลียร์หนี้')
     )
@@ -106,7 +115,7 @@ export const pokerCommand = {
       const session = await repo.createSession(guildId, channelId, user.id, defaultBuyin);
 
       // Auto-add the host as the first player
-      await repo.addOrRebuyPlayer(session.id, user.id, defaultBuyin);
+      await repo.joinPlayer(session.id, user.id, defaultBuyin);
       const players = await repo.getSessionPlayers(session.id);
 
       const embed = createTableEmbed(session, players);
@@ -141,13 +150,21 @@ export const pokerCommand = {
       return;
     }
 
-    // 3. JOIN / REBUY
-    if (subcommand === 'join' || subcommand === 'rebuy') {
+    // 3. JOIN
+    if (subcommand === 'join') {
       const amount = interaction.options.getNumber('amount') ?? session.default_buyin;
-      const result = await repo.addOrRebuyPlayer(session.id, user.id, amount);
+      const result = await repo.joinPlayer(session.id, user.id, amount);
 
-      const actionText = result.isRebuy
-        ? `🔄 <@${user.id}> เติมชิปเพิ่ม **+${amount.toLocaleString()} บาท** (ยอดรวม ${result.totalBuyIn.toLocaleString()}฿)`
+      if (result.alreadyPlaying) {
+        await interaction.reply({
+          content: `⚠️ คุณ <@${user.id}> อยู่ในโต๊ะนี้แล้วครับ (ยอดเงินปัจจุบัน: **${result.totalBuyIn.toLocaleString()}฿**)\nหากต้องการซื้อชิปเพิ่ม กรุณาใช้คำสั่ง \`/poker rebuy\` หรือกดปุ่ม [🔄 Rebuy] แทนครับ`,
+          ephemeral: true,
+        });
+        return;
+      }
+
+      const actionText = result.isRejoin
+        ? `🔄 <@${user.id}> กลับเข้าโต๊ะอีกครั้งด้วยเงิน **${amount.toLocaleString()} บาท** (ยอดรวม ${result.totalBuyIn.toLocaleString()}฿)`
         : `🟢 <@${user.id}> เข้าร่วมโต๊ะด้วยเงิน **${amount.toLocaleString()} บาท**`;
 
       await interaction.reply({ content: actionText });
@@ -155,7 +172,54 @@ export const pokerCommand = {
       return;
     }
 
-    // 4. LEAVE (Early Cashout)
+    // 4. REBUY
+    if (subcommand === 'rebuy') {
+      const amount = interaction.options.getNumber('amount') ?? session.default_buyin;
+      const result = await repo.rebuyPlayer(session.id, user.id, amount);
+
+      if (result.notPlaying) {
+        await interaction.reply({
+          content: `❌ คุณยังไม่ได้เข้าร่วมโต๊ะนี้ กรุณาใช้คำสั่ง \`/poker join\` หรือกดปุ่ม [🟢 เข้าร่วม] ก่อนครับ`,
+          ephemeral: true,
+        });
+        return;
+      }
+
+      await interaction.reply({
+        content: `🔄 <@${user.id}> เติมชิปเพิ่ม **+${amount.toLocaleString()} บาท** (ยอดรวม ${result.totalBuyIn.toLocaleString()}฿)`,
+      });
+      await refreshTableMessage(interaction, session);
+      return;
+    }
+
+    // 5. SET-BUYIN (Host correction)
+    if (subcommand === 'set-buyin') {
+      if (
+        interaction.user.id !== session.host_id &&
+        !interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)
+      ) {
+        await interaction.reply({ content: '❌ เฉพาะ Host ของโต๊ะนี้เท่านั้นที่สามารถแก้ไขยอดเงินได้', ephemeral: true });
+        return;
+      }
+
+      const targetPlayer = interaction.options.getUser('player', true);
+      const amount = interaction.options.getNumber('amount', true);
+
+      const result = await repo.setPlayerBuyIn(session.id, targetPlayer.id, amount);
+      if (!result.success) {
+        await interaction.reply({ content: `❌ ผู้เล่น <@${targetPlayer.id}> ไม่อยู่ในโต๊ะนี้`, ephemeral: true });
+        return;
+      }
+
+      await interaction.reply({
+        content: `🔧 Host ได้แก้ไขยอด Buy-in ของ <@${targetPlayer.id}> เป็น **${amount.toLocaleString()} บาท** เรียบร้อยแล้ว`,
+      });
+
+      await refreshTableMessage(interaction, session);
+      return;
+    }
+
+    // 6. LEAVE (Early Cashout)
     if (subcommand === 'leave') {
       const chips = interaction.options.getNumber('chips', true);
       const leaveResult = await repo.playerLeaveSession(session.id, user.id, chips);
@@ -175,7 +239,7 @@ export const pokerCommand = {
       return;
     }
 
-    // 5. SET-CHIPS (Host override)
+    // 7. SET-CHIPS (Host override for cashout)
     if (subcommand === 'set-chips') {
       if (
         interaction.user.id !== session.host_id &&
@@ -204,7 +268,7 @@ export const pokerCommand = {
       return;
     }
 
-    // 6. CANCEL
+    // 8. CANCEL
     if (subcommand === 'cancel') {
       if (
         interaction.user.id !== session.host_id &&
@@ -219,7 +283,7 @@ export const pokerCommand = {
       return;
     }
 
-    // 7. END SESSION
+    // 9. END SESSION
     if (subcommand === 'end') {
       const players = await repo.getSessionPlayers(session.id);
       const activePlayers = players.filter(p => p.status === 'playing');
@@ -232,12 +296,9 @@ export const pokerCommand = {
         return;
       }
 
-      // If active players <= 5, prompt end modal or finish if 0 active players
       if (activePlayers.length === 0) {
-        // All players already cashed out!
         await finalizeAndDisplaySummary(interaction, session, {});
       } else {
-        // Show modal to host/user to fill in remaining chips
         const { createEndSessionModal } = await import('../ui/components');
         const modal = createEndSessionModal(activePlayers);
         await interaction.showModal(modal);
@@ -284,7 +345,6 @@ export async function finalizeAndDisplaySummary(
   const files = [];
 
   if (topCreditor && ppMap[topCreditor.userId]) {
-    // Generate QR for top winner
     const topAmount = topCreditor.net;
     const qrAttachment = await generatePromptPayAttachment(ppMap[topCreditor.userId]!, topAmount);
     if (qrAttachment) {

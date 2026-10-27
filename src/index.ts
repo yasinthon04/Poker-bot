@@ -82,9 +82,17 @@ client.on('interactionCreate', async (interaction: Interaction) => {
 
       // Join button
       if (interaction.customId === 'btn_poker_join') {
-        const result = await repo.addOrRebuyPlayer(session.id, user.id, session.default_buyin);
-        const actionText = result.isRebuy
-          ? `🔄 <@${user.id}> เติมชิปเพิ่ม **+${session.default_buyin.toLocaleString()} บาท** (ยอดรวม ${result.totalBuyIn.toLocaleString()}฿)`
+        const result = await repo.joinPlayer(session.id, user.id, session.default_buyin);
+        if (result.alreadyPlaying) {
+          await interaction.reply({
+            content: `⚠️ คุณ <@${user.id}> อยู่ในโต๊ะนี้แล้วครับ (ยอดเงินปัจจุบัน: **${result.totalBuyIn.toLocaleString()}฿**)\nหากต้องการซื้อชิปเพิ่ม กรุณากดปุ่ม **[🔄 Rebuy]** แทนครับ`,
+            ephemeral: true,
+          });
+          return;
+        }
+
+        const actionText = result.isRejoin
+          ? `🔄 <@${user.id}> กลับเข้าโต๊ะอีกครั้งด้วยเงิน **${session.default_buyin.toLocaleString()} บาท** (ยอดรวม ${result.totalBuyIn.toLocaleString()}฿)`
           : `🟢 <@${user.id}> เข้าร่วมโต๊ะด้วยเงิน **${session.default_buyin.toLocaleString()} บาท**`;
 
         await interaction.reply({ content: actionText });
@@ -94,7 +102,15 @@ client.on('interactionCreate', async (interaction: Interaction) => {
 
       // Rebuy default button
       if (interaction.customId === 'btn_poker_rebuy') {
-        const result = await repo.addOrRebuyPlayer(session.id, user.id, session.default_buyin);
+        const result = await repo.rebuyPlayer(session.id, user.id, session.default_buyin);
+        if (result.notPlaying) {
+          await interaction.reply({
+            content: `❌ คุณยังไม่ได้เข้าร่วมโต๊ะนี้ กรุณากดปุ่ม **[🟢 เข้าร่วม]** ก่อนครับ`,
+            ephemeral: true,
+          });
+          return;
+        }
+
         await interaction.reply({
           content: `🔄 <@${user.id}> เติมชิปเพิ่ม **+${session.default_buyin.toLocaleString()} บาท** (ยอดรวม ${result.totalBuyIn.toLocaleString()}฿)`,
         });
@@ -180,7 +196,15 @@ client.on('interactionCreate', async (interaction: Interaction) => {
           return;
         }
 
-        const result = await repo.addOrRebuyPlayer(session.id, user.id, amount);
+        const result = await repo.rebuyPlayer(session.id, user.id, amount);
+        if (result.notPlaying) {
+          await interaction.reply({
+            content: `❌ คุณยังไม่ได้เข้าร่วมโต๊ะนี้ กรุณากดปุ่ม **[🟢 เข้าร่วม]** ก่อนครับ`,
+            ephemeral: true,
+          });
+          return;
+        }
+
         await interaction.reply({
           content: `➕ <@${user.id}> เติมชิปเพิ่ม **+${amount.toLocaleString()} บาท** (ยอดรวม ${result.totalBuyIn.toLocaleString()}฿)`,
         });
