@@ -159,7 +159,8 @@ export function createRecalculateModal(
     .setTitle('🧮 แก้ไขชิปและคำนวณเงินใหม่');
 
   // Discord modal allows max 5 TextInput components
-  const limitedPlayers = players.slice(0, 5);
+  const uniquePlayers = Array.from(new Map(players.map(p => [p.user_id, p])).values());
+  const limitedPlayers = uniquePlayers.slice(0, 5);
 
   for (const player of limitedPlayers) {
     const name = player.display_name || player.username;

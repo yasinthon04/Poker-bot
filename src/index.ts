@@ -115,7 +115,8 @@ client.on('interactionCreate', async (interaction: Interaction) => {
           oldSession.default_buyin
         );
 
-        for (const p of oldPlayers) {
+        const uniqueOldPlayers = Array.from(new Map(oldPlayers.map(p => [p.user_id, p])).values());
+        for (const p of uniqueOldPlayers) {
           await repo.upsertUser(p.user_id, p.username, p.display_name);
           await repo.joinPlayer(newSession.id, p.user_id, oldSession.default_buyin);
         }
@@ -214,7 +215,7 @@ client.on('interactionCreate', async (interaction: Interaction) => {
         }
 
         const actionText = result.isRejoin
-          ? `🔄 <@${user.id}> กลับเข้าโต๊ะมาเล่นต่อแล้ว (ยอดเงิน Buy-in เดิม: **${result.totalBuyIn.toLocaleString()} บาท**)`
+          ? `🔄 <@${user.id}> กลับเข้าโต๊ะมา Buy-in เล่นรอบใหม่ด้วยเงิน **${session.default_buyin.toLocaleString()} บาท** (ยอดออกก่อนหน้ายังคงเดิม)`
           : `🟢 <@${user.id}> เข้าร่วมโต๊ะด้วยเงิน **${session.default_buyin.toLocaleString()} บาท**`;
 
         await interaction.reply({ content: actionText });
@@ -476,7 +477,7 @@ client.on('interactionCreate', async (interaction: Interaction) => {
           userId: p.user_id,
           name: p.display_name || p.username,
           buyIn: p.buy_in,
-          cashOut: activeChipsMap[p.user_id] ?? (p.cash_out ?? 0),
+          cashOut: p.status === 'playing' ? (activeChipsMap[p.user_id] ?? 0) : (p.cash_out ?? 0),
         }));
         const { calculateSettlements } = await import('./services/settlement');
         const settlement = calculateSettlements(playerInputs);

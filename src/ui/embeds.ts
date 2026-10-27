@@ -7,6 +7,8 @@ export function createTableEmbed(session: SessionRow, players: SessionPlayerRow[
   const activePlayers = players.filter(p => p.status === 'playing');
   const leftPlayers = players.filter(p => p.status === 'left');
 
+  const uniqueUsers = new Set(players.map(p => p.user_id));
+
   const embed = new EmbedBuilder()
     .setTitle(`🃏 โต๊ะ Poker Session #${session.id}`)
     .setColor(0x2ecc71) // Nice poker table green
@@ -14,7 +16,7 @@ export function createTableEmbed(session: SessionRow, players: SessionPlayerRow[
       `**Host:** <@${session.host_id}>\n` +
       `**ชิปเริ่มต้น:** ${session.default_buyin.toLocaleString()} บาท\n` +
       `**💰 กองกลางรวม (Total Pot):** ${totalBuyIn.toLocaleString()} บาท\n` +
-      `**ผู้เล่นทั้งหมด:** ${players.length} คน (กำลังเล่น ${activePlayers.length} คน, ออกแล้ว ${leftPlayers.length} คน)\n\n` +
+      `**ผู้เล่นทั้งหมด:** ${uniqueUsers.size} คน (กำลังเล่น ${activePlayers.length} คน, ออกแล้ว ${leftPlayers.length} คน)\n\n` +
       `──────────────────────────────`
     );
 

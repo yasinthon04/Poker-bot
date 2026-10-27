@@ -164,35 +164,35 @@ export async function joinPlayer(
   amount: number
 ): Promise<{ success: boolean; alreadyPlaying?: boolean; isRejoin?: boolean; totalBuyIn: number }> {
   const db = getMemoryDb();
-  const existing = Object.values(db.session_players).find(
-    p => p.session_id === sessionId && p.user_id === userId
+  const currentlyPlaying = Object.values(db.session_players).find(
+    p => p.session_id === sessionId && p.user_id === userId && p.status === 'playing'
   );
 
-  if (existing) {
-    if (existing.status === 'playing') {
-      return { success: false, alreadyPlaying: true, totalBuyIn: existing.buy_in };
-    }
-    // Was 'left', rejoining table to resume playing
-    existing.status = 'playing';
-    existing.cash_out = null;
-    existing.left_at = null;
-    persistDb();
-    return { success: true, isRejoin: true, totalBuyIn: existing.buy_in };
-  } else {
-    const newId = ++db.counters.sessionPlayerId;
-    db.session_players[String(newId)] = {
-      id: newId,
-      session_id: sessionId,
-      user_id: userId,
-      buy_in: amount,
-      cash_out: null,
-      status: 'playing',
-      left_at: null,
-      created_at: new Date().toISOString(),
-    };
-    persistDb();
-    return { success: true, isRejoin: false, totalBuyIn: amount };
+  if (currentlyPlaying) {
+    return { success: false, alreadyPlaying: true, totalBuyIn: currentlyPlaying.buy_in };
   }
+
+  // Check if player previously left this session early
+  const previouslyLeft = Object.values(db.session_players).filter(
+    p => p.session_id === sessionId && p.user_id === userId && p.status === 'left'
+  );
+  const isRejoin = previouslyLeft.length > 0;
+
+  // Create a brand new active record so the previous early-leaver record and profit are preserved!
+  const newId = ++db.counters.sessionPlayerId;
+  db.session_players[String(newId)] = {
+    id: newId,
+    session_id: sessionId,
+    user_id: userId,
+    buy_in: amount,
+    cash_out: null,
+    status: 'playing',
+    left_at: null,
+    created_at: new Date().toISOString(),
+  };
+  persistDb();
+
+  return { success: true, isRejoin, totalBuyIn: amount };
 }
 
 /**
@@ -205,10 +205,10 @@ export async function rebuyPlayer(
 ): Promise<{ success: boolean; notPlaying?: boolean; totalBuyIn: number }> {
   const db = getMemoryDb();
   const existing = Object.values(db.session_players).find(
-    p => p.session_id === sessionId && p.user_id === userId
+    p => p.session_id === sessionId && p.user_id === userId && p.status === 'playing'
   );
 
-  if (!existing || existing.status !== 'playing') {
+  if (!existing) {
     return { success: false, notPlaying: true, totalBuyIn: 0 };
   }
 
@@ -227,7 +227,7 @@ export async function setPlayerBuyIn(
 ): Promise<{ success: boolean; totalBuyIn: number }> {
   const db = getMemoryDb();
   const existing = Object.values(db.session_players).find(
-    p => p.session_id === sessionId && p.user_id === userId
+    p => p.session_id === sessionId && p.user_id === userId && p.status === 'playing'
   );
 
   if (!existing) {
@@ -260,7 +260,7 @@ export async function playerLeaveSession(
 ): Promise<{ success: boolean; net: number }> {
   const db = getMemoryDb();
   const player = Object.values(db.session_players).find(
-    p => p.session_id === sessionId && p.user_id === userId
+    p => p.session_id === sessionId && p.user_id === userId && p.status === 'playing'
   );
 
   if (!player) {
@@ -287,9 +287,10 @@ export async function finalizeSession(
 
   // Update remaining active players
   for (const [userId, chips] of Object.entries(activeChipsMap)) {
-    const player = Object.values(db.session_players).find(
+    const userRecords = Object.values(db.session_players).filter(
       p => p.session_id === sessionId && p.user_id === userId
     );
+    const player = userRecords.find(p => p.status === 'playing') || userRecords[userRecords.length - 1];
     if (player) {
       player.cash_out = Math.round(chips * 100) / 100;
     }
@@ -342,7 +343,17 @@ export async function getUserStats(userId: string): Promise<UserStats> {
     return session && session.status === 'completed';
   });
 
-  let gamesPlayed = records.length;
+  // Group by session so multiple stints in the same session count as 1 game
+  const sessionMap: Record<number, { buyIn: number; cashOut: number }> = {};
+  for (const r of records) {
+    if (!sessionMap[r.session_id]) {
+      sessionMap[r.session_id] = { buyIn: 0, cashOut: 0 };
+    }
+    sessionMap[r.session_id].buyIn += r.buy_in;
+    sessionMap[r.session_id].cashOut += (r.cash_out ?? 0);
+  }
+
+  let gamesPlayed = Object.keys(sessionMap).length;
   let totalBuyIn = 0;
   let totalCashOut = 0;
   let wins = 0;
@@ -350,10 +361,10 @@ export async function getUserStats(userId: string): Promise<UserStats> {
   let biggestWin = 0;
   let biggestLoss = 0;
 
-  for (const r of records) {
-    totalBuyIn += r.buy_in;
-    totalCashOut += r.cash_out!;
-    const net = r.cash_out! - r.buy_in;
+  for (const s of Object.values(sessionMap)) {
+    totalBuyIn += s.buyIn;
+    totalCashOut += s.cashOut;
+    const net = Math.round((s.cashOut - s.buyIn) * 100) / 100;
     if (net > 0) {
       wins++;
       if (net > biggestWin) biggestWin = net;
@@ -403,10 +414,10 @@ export async function getRankedStats(
     validSessionIds.add(session.id);
   }
 
-  // Aggregate stats per user
-  const userMap: Record<
+  // Aggregate stats per user by session
+  const userSessionMap: Record<
     string,
-    { games: number; buyIn: number; cashOut: number; profit: number; wins: number }
+    Record<number, { buyIn: number; cashOut: number }>
   > = {};
 
   for (const player of Object.values(db.session_players)) {
@@ -414,28 +425,41 @@ export async function getRankedStats(
       continue;
     }
     const uId = player.user_id;
-    if (!userMap[uId]) {
-      userMap[uId] = { games: 0, buyIn: 0, cashOut: 0, profit: 0, wins: 0 };
+    if (!userSessionMap[uId]) {
+      userSessionMap[uId] = {};
     }
-    userMap[uId].games++;
-    userMap[uId].buyIn += player.buy_in;
-    userMap[uId].cashOut += player.cash_out;
-    const net = player.cash_out - player.buy_in;
-    userMap[uId].profit += net;
-    if (net > 0) userMap[uId].wins++;
+    if (!userSessionMap[uId][player.session_id]) {
+      userSessionMap[uId][player.session_id] = { buyIn: 0, cashOut: 0 };
+    }
+    userSessionMap[uId][player.session_id].buyIn += player.buy_in;
+    userSessionMap[uId][player.session_id].cashOut += player.cash_out;
   }
 
-  const results: RankedPlayerStats[] = Object.entries(userMap).map(([userId, s]) => {
+  const results: RankedPlayerStats[] = Object.entries(userSessionMap).map(([userId, sessions]) => {
     const user = db.users[userId];
+    const sessionList = Object.values(sessions);
+    const gamesPlayed = sessionList.length;
+    let totalBuyIn = 0;
+    let totalCashOut = 0;
+    let wins = 0;
+
+    for (const s of sessionList) {
+      totalBuyIn += s.buyIn;
+      totalCashOut += s.cashOut;
+      if (s.cashOut - s.buyIn > 0.01) wins++;
+    }
+
+    const totalProfit = Math.round((totalCashOut - totalBuyIn) * 100) / 100;
+
     return {
       userId,
       username: user ? user.username : 'Unknown',
       displayName: user ? user.display_name : null,
-      gamesPlayed: s.games,
-      totalBuyIn: Math.round(s.buyIn * 100) / 100,
-      totalCashOut: Math.round(s.cashOut * 100) / 100,
-      totalProfit: Math.round(s.profit * 100) / 100,
-      winRate: s.games > 0 ? Math.round((s.wins / s.games) * 100) : 0,
+      gamesPlayed,
+      totalBuyIn: Math.round(totalBuyIn * 100) / 100,
+      totalCashOut: Math.round(totalCashOut * 100) / 100,
+      totalProfit,
+      winRate: gamesPlayed > 0 ? Math.round((wins / gamesPlayed) * 100) : 0,
     };
   });
 

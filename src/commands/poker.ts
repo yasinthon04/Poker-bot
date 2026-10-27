@@ -355,7 +355,8 @@ export const pokerCommand = {
       const defaultBuyin = interaction.options.getNumber('buyin') ?? lastSession.default_buyin;
       const newSession = await repo.createSession(guildId, channelId, user.id, defaultBuyin);
 
-      for (const p of lastPlayers) {
+      const uniqueLastPlayers = Array.from(new Map(lastPlayers.map(p => [p.user_id, p])).values());
+      for (const p of uniqueLastPlayers) {
         await repo.upsertUser(p.user_id, p.username, p.display_name);
         await repo.joinPlayer(newSession.id, p.user_id, defaultBuyin);
       }
@@ -621,7 +622,7 @@ export const pokerCommand = {
       }
 
       const actionText = result.isRejoin
-        ? `🔄 <@${user.id}> กลับเข้าโต๊ะมาเล่นต่อแล้ว (ยอดเงิน Buy-in เดิม: **${result.totalBuyIn.toLocaleString()} บาท**)`
+        ? `🔄 <@${user.id}> กลับเข้าโต๊ะมา Buy-in เล่นรอบใหม่ด้วยเงิน **${amount.toLocaleString()} บาท** (ยอดออกก่อนหน้ายังคงเดิม)`
         : `🟢 <@${user.id}> เข้าร่วมโต๊ะด้วยเงิน **${amount.toLocaleString()} บาท**`;
 
       await interaction.reply({ content: actionText });

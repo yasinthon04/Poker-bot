@@ -30,7 +30,23 @@ export interface SettlementResult {
 export function calculateSettlements(
   playerInputs: { userId: string; name: string; buyIn: number; cashOut: number }[]
 ): SettlementResult {
-  const players: PlayerBalance[] = playerInputs.map(p => ({
+  // Aggregate multiple records for the same user (e.g. Early Leaver who bought in again)
+  const userMap: Record<string, { userId: string; name: string; buyIn: number; cashOut: number }> = {};
+  for (const p of playerInputs) {
+    if (!userMap[p.userId]) {
+      userMap[p.userId] = {
+        userId: p.userId,
+        name: p.name,
+        buyIn: 0,
+        cashOut: 0,
+      };
+    }
+    userMap[p.userId].buyIn += p.buyIn;
+    userMap[p.userId].cashOut += p.cashOut;
+    if (p.name) userMap[p.userId].name = p.name;
+  }
+
+  const players: PlayerBalance[] = Object.values(userMap).map(p => ({
     userId: p.userId,
     name: p.name,
     buyIn: Math.round(p.buyIn * 100) / 100,
