@@ -15,6 +15,11 @@ export const profileCommand = {
             .setDescription('เบอร์โทรศัพท์ (เช่น 0812345678) หรือเลขบัตร ปชช. (13 หลัก)')
             .setRequired(true)
         )
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('clear-promptpay')
+        .setDescription('ลบข้อมูลพร้อมเพย์ / ยกเลิกการสร้าง QR Code อัตโนมัติ')
     ),
 
   async execute(interaction: ChatInputCommandInteraction) {
@@ -39,6 +44,15 @@ export const profileCommand = {
       await repo.setUserPromptPay(user.id, clean);
       await interaction.reply({
         content: `✅ บันทึกเบอร์พร้อมเพย์ \`${clean}\` สำเร็จแล้ว! เมื่อคุณชนะในเกม บอทจะช่วยแนบ QR Code พร้อมเพย์ให้เพื่อนสแกนจ่ายได้ทันที`,
+        ephemeral: true,
+      });
+      return;
+    }
+
+    if (subcommand === 'clear-promptpay') {
+      await repo.clearUserPromptPay(user.id);
+      await interaction.reply({
+        content: '🗑️ ลบข้อมูลพร้อมเพย์ของคุณเรียบร้อยแล้ว! บอทจะไม่สร้าง QR Code ให้คุณเมื่อจบเกม',
         ephemeral: true,
       });
       return;

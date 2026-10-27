@@ -68,6 +68,14 @@ export async function setUserPromptPay(userId: string, promptPay: string): Promi
   }
 }
 
+export async function clearUserPromptPay(userId: string): Promise<void> {
+  const db = getMemoryDb();
+  if (db.users[userId]) {
+    db.users[userId].promptpay = null;
+    persistDb();
+  }
+}
+
 // Session Operations
 export async function getActiveSession(channelId: string): Promise<SessionRow | undefined> {
   const db = getMemoryDb();
