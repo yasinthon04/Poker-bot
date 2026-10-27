@@ -63,14 +63,14 @@ export function createSummaryEmbed(
   const embed = new EmbedBuilder()
     .setTitle(
       isPreview
-        ? `🔍 พรีวิวสรุปผล Poker Session #${session.id} (ยังไม่ปิดโต๊ะ)`
+        ? `🧮 คิดเงิน Poker Session #${session.id} (ยังไม่ปิดโต๊ะ)`
         : `🏁 สรุปผล Poker Session #${session.id}`
     )
     .setColor(isPreview ? 0xf1c40f : settlement.isBalanced ? 0x3498db : 0xe74c3c);
 
   if (isPreview) {
     embed.setDescription(
-      '💡 **โหมดพรีวิว:** คำนวณยอดเงินและกำไร/ขาดทุนให้ดูชั่วคราว **โต๊ะยังคงเปิดอยู่ตามปกติ** สามารถเล่นต่อ หรือปิดโต๊ะจริงได้ตลอดเวลา'
+      '💡 **คิดเงินแบบไม่ปิดโต๊ะ:** คำนวณยอดเงินและรายการโอนเงินให้เรียบร้อย **โต๊ะยังคงเปิดอยู่ตามปกติ** สามารถเล่นต่อ หรือปิดโต๊ะจริงได้ตลอดเวลา'
     );
   }
 
@@ -96,7 +96,7 @@ export function createSummaryEmbed(
     });
 
     embed.addFields({
-      name: isPreview ? '💸 พรีวิวรายการโอนเงิน (หากปิดโต๊ะตอนนี้)' : '💸 รายการโอนเงิน (เคลียร์หนี้ให้น้อยรอบที่สุด)',
+      name: isPreview ? '💸 รายการโอนเงิน (โต๊ะยังไม่ปิด)' : '💸 รายการโอนเงิน (เคลียร์หนี้ให้น้อยรอบที่สุด)',
       value: txLines.join('\n\n'),
     });
   } else {

@@ -30,11 +30,11 @@ export function createTableActionRows(defaultBuyin: number): ActionRowBuilder<Bu
       .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId('btn_poker_preview')
-      .setLabel('🔍 ดูยอดตอนนี้ (Preview)')
+      .setLabel('🧮 คิดเงิน (ไม่ปิดโต๊ะ)')
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId('btn_poker_end')
-      .setLabel('🏁 ปิดโต๊ะ / คิดเงิน')
+      .setLabel('🏁 ปิดโต๊ะ / จบเกม')
       .setStyle(ButtonStyle.Danger),
     new ButtonBuilder()
       .setCustomId('btn_poker_refresh')
@@ -111,7 +111,7 @@ export function createPreviewSessionModal(
 ): ModalBuilder {
   const modal = new ModalBuilder()
     .setCustomId('modal_poker_preview_chips')
-    .setTitle('🔍 พรีวิวยอดเงิน (ไม่ปิดโต๊ะ)');
+    .setTitle('🧮 คิดเงิน (ไม่ปิดโต๊ะ)');
 
   // Discord modal allows max 5 TextInput components
   const limitedPlayers = activePlayers.slice(0, 5);

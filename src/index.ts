@@ -290,7 +290,28 @@ client.on('interactionCreate', async (interaction: Interaction) => {
 
           const { createSummaryEmbed } = await import('./ui/embeds');
           const embed = createSummaryEmbed(session, settlement, ppMap, true);
-          await interaction.reply({ embeds: [embed] });
+          const files = [];
+
+          const topCreditor = settlement.players.find(p => p.net > 0 && ppMap[p.userId]);
+          if (topCreditor && ppMap[topCreditor.userId]) {
+            const topAmount = topCreditor.net;
+            const { generatePromptPayAttachment } = await import('./services/qr');
+            const qrAttachment = await generatePromptPayAttachment(ppMap[topCreditor.userId]!, topAmount);
+            if (qrAttachment) {
+              embed.setImage('attachment://promptpay-qr.png');
+              embed.addFields({
+                name: `📱 QR Code พร้อมเพย์ของ ${topCreditor.name} (${topAmount.toLocaleString()}฿)`,
+                value: `สามารถสแกน QR Code ด้านล่างเพื่อโอนเงินได้ทันที`,
+              });
+              files.push(qrAttachment);
+            }
+          }
+
+          await interaction.reply({
+            content: `🧮 **<@${user.id}> ได้คำนวณเงินปัจจุบัน (โต๊ะยังคงเปิดอยู่ตามปกติ ไม่ได้ปิดโต๊ะ):**`,
+            embeds: [embed],
+            files,
+          });
           return;
         }
 
@@ -489,9 +510,27 @@ client.on('interactionCreate', async (interaction: Interaction) => {
 
         const { createSummaryEmbed } = await import('./ui/embeds');
         const embed = createSummaryEmbed(session, settlement, ppMap, true);
+        const files = [];
+
+        const topCreditor = settlement.players.find(p => p.net > 0 && ppMap[p.userId]);
+        if (topCreditor && ppMap[topCreditor.userId]) {
+          const topAmount = topCreditor.net;
+          const { generatePromptPayAttachment } = await import('./services/qr');
+          const qrAttachment = await generatePromptPayAttachment(ppMap[topCreditor.userId]!, topAmount);
+          if (qrAttachment) {
+            embed.setImage('attachment://promptpay-qr.png');
+            embed.addFields({
+              name: `📱 QR Code พร้อมเพย์ของ ${topCreditor.name} (${topAmount.toLocaleString()}฿)`,
+              value: `สามารถสแกน QR Code ด้านล่างเพื่อโอนเงินได้ทันที`,
+            });
+            files.push(qrAttachment);
+          }
+        }
+
         await interaction.reply({
-          content: `🔍 **<@${user.id}> ได้เปิดดูพรีวิวสรุปยอดเงินปัจจุบัน (โต๊ะยังเปิดอยู่ ไม่ได้ปิดโต๊ะ):**`,
+          content: `🧮 **<@${user.id}> ได้คำนวณเงินปัจจุบัน (โต๊ะยังคงเปิดอยู่ตามปกติ ไม่ได้ปิดโต๊ะ):**`,
           embeds: [embed],
+          files,
         });
         return;
       }

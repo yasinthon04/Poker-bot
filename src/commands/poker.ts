@@ -522,7 +522,7 @@ export const pokerCommand = {
             userId: p.user_id,
             name: p.display_name || p.username,
             buyIn: p.buy_in,
-            cashOut: activeChipsMap[p.user_id] ?? (p.cash_out ?? 0),
+            cashOut: p.status === 'playing' ? (activeChipsMap[p.user_id] ?? 0) : (p.cash_out ?? 0),
           }));
           const settlement = calculateSettlements(playerInputs);
 
@@ -532,10 +532,27 @@ export const pokerCommand = {
           }
 
           const embed = createSummaryEmbed(session, settlement, ppMap, true);
+          const files: any[] = [tableFile];
+
+          const topCreditor = settlement.players.find(p => p.net > 0 && ppMap[p.userId]);
+          if (topCreditor && ppMap[topCreditor.userId]) {
+            const topAmount = topCreditor.net;
+            const { generatePromptPayAttachment } = await import('../services/qr');
+            const qrAttachment = await generatePromptPayAttachment(ppMap[topCreditor.userId]!, topAmount);
+            if (qrAttachment) {
+              embed.setImage('attachment://promptpay-qr.png');
+              embed.addFields({
+                name: `📱 QR Code พร้อมเพย์ของ ${topCreditor.name} (${topAmount.toLocaleString()}฿)`,
+                value: `สามารถสแกน QR Code ด้านล่างเพื่อโอนเงินได้ทันที`,
+              });
+              files.push(qrAttachment);
+            }
+          }
+
           await interaction.editReply({
             content: matchSummary,
             embeds: [embed],
-            files: [tableFile],
+            files,
           });
           return;
         }
@@ -589,7 +606,24 @@ export const pokerCommand = {
         }
 
         const embed = createSummaryEmbed(session, settlement, ppMap, true);
-        await interaction.reply({ embeds: [embed] });
+        const files: any[] = [];
+
+        const topCreditor = settlement.players.find(p => p.net > 0 && ppMap[p.userId]);
+        if (topCreditor && ppMap[topCreditor.userId]) {
+          const topAmount = topCreditor.net;
+          const { generatePromptPayAttachment } = await import('../services/qr');
+          const qrAttachment = await generatePromptPayAttachment(ppMap[topCreditor.userId]!, topAmount);
+          if (qrAttachment) {
+            embed.setImage('attachment://promptpay-qr.png');
+            embed.addFields({
+              name: `📱 QR Code พร้อมเพย์ของ ${topCreditor.name} (${topAmount.toLocaleString()}฿)`,
+              value: `สามารถสแกน QR Code ด้านล่างเพื่อโอนเงินได้ทันที`,
+            });
+            files.push(qrAttachment);
+          }
+        }
+
+        await interaction.reply({ embeds: [embed], files });
         return;
       }
 
