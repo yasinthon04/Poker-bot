@@ -1,7 +1,7 @@
 {
   "name": "poker-bot",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
     "dev": "tsx src/index.ts",
     "register": "tsx src/register-commands.ts",
@@ -13,16 +13,14 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@types/node": "^26.6.5",
+    "@types/qrcode": "^1.5.6",
     "discord.js": "^14.27.0",
     "dotenv": "^18.0.9",
     "promptpay-qr": "^0.5.0",
     "qrcode": "^1.5.4",
     "sqlite": "^5.1.1",
-    "sqlite3": "^6.0.1"
-  },
-  "devDependencies": {
-    "@types/node": "^26.6.5",
-    "@types/qrcode": "^1.5.6",
+    "sqlite3": "^6.0.1",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
   }
