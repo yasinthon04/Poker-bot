@@ -38,23 +38,45 @@ Example:
 ]
 `;
 
-  const result = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
-    contents: [
-      {
-        role: 'user',
-        parts: [
-          { text: prompt },
+  const modelsToTry = [
+    process.env.GEMINI_MODEL,
+    'gemini-3.8-flash',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash',
+  ].filter(Boolean) as string[];
+
+  let result: any = null;
+  let lastError: any = null;
+
+  for (const modelName of modelsToTry) {
+    try {
+      result = await ai.models.generateContent({
+        model: modelName,
+        contents: [
           {
-            inlineData: {
-              data: base64Data,
-              mimeType: mimeType.split(';')[0],
-            },
+            role: 'user',
+            parts: [
+              { text: prompt },
+              {
+                inlineData: {
+                  data: base64Data,
+                  mimeType: mimeType.split(';')[0],
+                },
+              },
+            ],
           },
         ],
-      },
-    ],
-  });
+      });
+      if (result) break;
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`Model ${modelName} failed, trying next model:`, err.message || err);
+    }
+  }
+
+  if (!result) {
+    throw lastError || new Error('All Gemini models failed to generate content');
+  }
 
   const responseText = result.text || '';
 
