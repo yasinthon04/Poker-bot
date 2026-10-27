@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import { pokerCommand } from './commands/poker';
 import { statsCommand, leaderboardCommand } from './commands/stats';
 import { profileCommand } from './commands/profile';
+import { clearCommand } from './commands/clear';
 
 dotenv.config();
 
@@ -21,6 +22,7 @@ const commands = [
   statsCommand.data.toJSON(),
   leaderboardCommand.data.toJSON(),
   profileCommand.data.toJSON(),
+  clearCommand.data.toJSON(),
 ];
 
 const rest = new REST({ version: '10' }).setToken(token);

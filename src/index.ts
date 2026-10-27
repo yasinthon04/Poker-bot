@@ -8,6 +8,7 @@ import dotenv from 'dotenv';
 import { pokerCommand, refreshTableMessage, finalizeAndDisplaySummary } from './commands/poker';
 import { statsCommand, leaderboardCommand } from './commands/stats';
 import { profileCommand } from './commands/profile';
+import { clearCommand } from './commands/clear';
 import * as repo from './database/repo';
 import {
   createCustomRebuyModal,
@@ -53,6 +54,8 @@ client.on('interactionCreate', async (interaction: Interaction) => {
         await leaderboardCommand.execute(interaction);
       } else if (commandName === 'profile') {
         await profileCommand.execute(interaction);
+      } else if (commandName === 'clear') {
+        await clearCommand.execute(interaction);
       }
       return;
     }
