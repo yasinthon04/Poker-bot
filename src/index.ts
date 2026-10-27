@@ -72,6 +72,77 @@ client.on('interactionCreate', async (interaction: Interaction) => {
     if (interaction.isButton()) {
       const channelId = interaction.channelId;
       const user = interaction.user;
+
+      // Next Round button (can be clicked on completed session summary)
+      if (interaction.customId.startsWith('btn_poker_next_round_')) {
+        const parts = interaction.customId.split('_');
+        const oldSessionId = parseInt(parts[parts.length - 1], 10);
+
+        const activeSession = await repo.getActiveSession(channelId);
+        if (activeSession) {
+          await interaction.reply({
+            content: `⚠️ มีโต๊ะ Poker Session #${activeSession.id} กำลังเล่นอยู่ในห้องนี้อยู่แล้ว! กรุณาเล่นให้จบหรือกดยกเลิกก่อน`,
+            ephemeral: true,
+          });
+          return;
+        }
+
+        const oldSession = await repo.getSessionById(oldSessionId);
+        if (!oldSession) {
+          await interaction.reply({
+            content: '❌ ไม่พบข้อมูลโต๊ะรอบที่แล้วครับ',
+            ephemeral: true,
+          });
+          return;
+        }
+
+        const oldPlayers = await repo.getSessionPlayers(oldSessionId);
+        if (oldPlayers.length === 0) {
+          await interaction.reply({
+            content: '❌ ไม่พบรายชื่อผู้เล่นจากโต๊ะรอบที่แล้วครับ',
+            ephemeral: true,
+          });
+          return;
+        }
+
+        const guildId = interaction.guildId;
+        if (!guildId) return;
+
+        const newSession = await repo.createSession(
+          guildId,
+          channelId,
+          user.id,
+          oldSession.default_buyin
+        );
+
+        for (const p of oldPlayers) {
+          await repo.upsertUser(p.user_id, p.username, p.display_name);
+          await repo.joinPlayer(newSession.id, p.user_id, oldSession.default_buyin);
+        }
+
+        const newPlayers = await repo.getSessionPlayers(newSession.id);
+        const { createTableEmbed } = await import('./ui/embeds');
+        const { createTableActionRows, createNextRoundActionRow } = await import('./ui/components');
+
+        // Disable button on old summary message
+        try {
+          await interaction.update({ components: [createNextRoundActionRow(oldSessionId, true)] });
+        } catch {}
+
+        const embed = createTableEmbed(newSession, newPlayers);
+        const rows = createTableActionRows(newSession.default_buyin);
+
+        const reply = await interaction.followUp({
+          content: `🎉 **เริ่มรอบใหม่ (Session #${newSession.id}) เรียบร้อยแล้ว!** ดึงผู้เล่นเดิม **${newPlayers.length} คน** เข้าโต๊ะอัตโนมัติ (Buy-in: **${newSession.default_buyin}฿**)`,
+          embeds: [embed],
+          components: rows,
+          fetchReply: true,
+        });
+
+        await repo.updateSessionMessageId(newSession.id, reply.id);
+        return;
+      }
+
       const session = await repo.getActiveSession(channelId);
 
       if (!session) {
@@ -145,6 +216,45 @@ client.on('interactionCreate', async (interaction: Interaction) => {
       if (interaction.customId === 'btn_poker_refresh') {
         await refreshTableMessage(interaction, session);
         await interaction.reply({ content: '🔄 รีเฟรชสถานะโต๊ะล่าสุดแล้ว', ephemeral: true });
+        return;
+      }
+
+      // Preview button -> Show modal or calculate immediately
+      if (interaction.customId === 'btn_poker_preview') {
+        const players = await repo.getSessionPlayers(session.id);
+        const activePlayers = players.filter(p => p.status === 'playing');
+
+        if (activePlayers.length > 5) {
+          await interaction.reply({
+            content: `⚠️ โต๊ะนี้ยังมีผู้เล่นที่ยังไม่ Cash-out ถึง ${activePlayers.length} คน (เกิน 5 คน)\n💡 **แนะนำ:** ใช้คำสั่ง \`/poker scan-table <รูปภาพ> preview:True\` เพื่อให้ AI อ่านชิปทุกคนจากรูปภาพและพรีวิวยอดโอนเงินทันทีโดยไม่ต้องปิดโต๊ะครับ!`,
+            ephemeral: true,
+          });
+          return;
+        }
+
+        if (activePlayers.length === 0) {
+          const playerInputs = players.map(p => ({
+            userId: p.user_id,
+            name: p.display_name || p.username,
+            buyIn: p.buy_in,
+            cashOut: p.cash_out ?? 0,
+          }));
+          const { calculateSettlements } = await import('./services/settlement');
+          const settlement = calculateSettlements(playerInputs);
+
+          const ppMap: Record<string, string | null> = {};
+          for (const p of players) {
+            ppMap[p.user_id] = p.promptpay;
+          }
+
+          const { createSummaryEmbed } = await import('./ui/embeds');
+          const embed = createSummaryEmbed(session, settlement, ppMap, true);
+          await interaction.reply({ embeds: [embed] });
+          return;
+        }
+
+        const { createPreviewSessionModal } = await import('./ui/components');
+        await interaction.showModal(createPreviewSessionModal(activePlayers));
         return;
       }
 
@@ -272,6 +382,45 @@ client.on('interactionCreate', async (interaction: Interaction) => {
         }
 
         await finalizeAndDisplaySummary(interaction, session, activeChipsMap);
+        return;
+      }
+
+      // Preview Session Chips Submit
+      if (interaction.customId === 'modal_poker_preview_chips') {
+        const players = await repo.getSessionPlayers(session.id);
+        const activePlayers = players.filter(p => p.status === 'playing');
+
+        const activeChipsMap: Record<string, number> = {};
+        for (const player of activePlayers) {
+          try {
+            const raw = interaction.fields.getTextInputValue(`preview_chips_${player.user_id}`);
+            const chips = parseFloat(raw);
+            activeChipsMap[player.user_id] = isNaN(chips) ? 0 : chips;
+          } catch {
+            activeChipsMap[player.user_id] = 0;
+          }
+        }
+
+        const playerInputs = players.map(p => ({
+          userId: p.user_id,
+          name: p.display_name || p.username,
+          buyIn: p.buy_in,
+          cashOut: activeChipsMap[p.user_id] ?? (p.cash_out ?? 0),
+        }));
+        const { calculateSettlements } = await import('./services/settlement');
+        const settlement = calculateSettlements(playerInputs);
+
+        const ppMap: Record<string, string | null> = {};
+        for (const p of players) {
+          ppMap[p.user_id] = p.promptpay;
+        }
+
+        const { createSummaryEmbed } = await import('./ui/embeds');
+        const embed = createSummaryEmbed(session, settlement, ppMap, true);
+        await interaction.reply({
+          content: `🔍 **<@${user.id}> ได้เปิดดูพรีวิวสรุปยอดเงินปัจจุบัน (โต๊ะยังเปิดอยู่ ไม่ได้ปิดโต๊ะ):**`,
+          embeds: [embed],
+        });
         return;
       }
     }

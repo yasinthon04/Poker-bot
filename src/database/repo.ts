@@ -85,6 +85,14 @@ export async function getActiveSession(channelId: string): Promise<SessionRow | 
   return active[0];
 }
 
+export async function getLastSession(channelId: string): Promise<SessionRow | undefined> {
+  const db = getMemoryDb();
+  const sessions = Object.values(db.sessions)
+    .filter(s => s.channel_id === channelId)
+    .sort((a, b) => b.id - a.id);
+  return sessions[0];
+}
+
 export async function getSessionById(sessionId: number): Promise<SessionRow | undefined> {
   const db = getMemoryDb();
   return db.sessions[String(sessionId)];

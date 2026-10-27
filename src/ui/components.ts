@@ -29,6 +29,10 @@ export function createTableActionRows(defaultBuyin: number): ActionRowBuilder<Bu
       .setLabel('🏃 ขอออกก่อน (Cash-out)')
       .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
+      .setCustomId('btn_poker_preview')
+      .setLabel('🔍 ดูยอดตอนนี้ (Preview)')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
       .setCustomId('btn_poker_end')
       .setLabel('🏁 ปิดโต๊ะ / คิดเงิน')
       .setStyle(ButtonStyle.Danger),
@@ -100,4 +104,42 @@ export function createEndSessionModal(
   }
 
   return modal;
+}
+
+export function createPreviewSessionModal(
+  activePlayers: { user_id: string; username: string; display_name: string | null }[]
+): ModalBuilder {
+  const modal = new ModalBuilder()
+    .setCustomId('modal_poker_preview_chips')
+    .setTitle('🔍 พรีวิวยอดเงิน (ไม่ปิดโต๊ะ)');
+
+  // Discord modal allows max 5 TextInput components
+  const limitedPlayers = activePlayers.slice(0, 5);
+
+  for (const player of limitedPlayers) {
+    const name = player.display_name || player.username;
+    const input = new TextInputBuilder()
+      .setCustomId(`preview_chips_${player.user_id}`)
+      .setLabel(`ชิปของ ${name.substring(0, 25)}`)
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('ใส่จำนวนชิปปัจจุบัน (เช่น 200 หรือ 0)')
+      .setRequired(true);
+
+    modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(input));
+  }
+
+  return modal;
+}
+
+export function createNextRoundActionRow(
+  sessionId: number,
+  disabled: boolean = false
+): ActionRowBuilder<ButtonBuilder> {
+  return new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`btn_poker_next_round_${sessionId}`)
+      .setLabel('🔄 เริ่มรอบใหม่ (ดึงผู้เล่นเดิมเข้าโต๊ะ)')
+      .setStyle(ButtonStyle.Success)
+      .setDisabled(disabled)
+  );
 }

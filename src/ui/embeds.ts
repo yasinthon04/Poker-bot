@@ -55,11 +55,22 @@ export function createTableEmbed(session: SessionRow, players: SessionPlayerRow[
 export function createSummaryEmbed(
   session: SessionRow,
   settlement: SettlementResult,
-  userPromptPayMap?: Record<string, string | null>
+  userPromptPayMap?: Record<string, string | null>,
+  isPreview: boolean = false
 ): EmbedBuilder {
   const embed = new EmbedBuilder()
-    .setTitle(`🏁 สรุปผล Poker Session #${session.id}`)
-    .setColor(settlement.isBalanced ? 0x3498db : 0xe74c3c);
+    .setTitle(
+      isPreview
+        ? `🔍 พรีวิวสรุปผล Poker Session #${session.id} (ยังไม่ปิดโต๊ะ)`
+        : `🏁 สรุปผล Poker Session #${session.id}`
+    )
+    .setColor(isPreview ? 0xf1c40f : settlement.isBalanced ? 0x3498db : 0xe74c3c);
+
+  if (isPreview) {
+    embed.setDescription(
+      '💡 **โหมดพรีวิว:** คำนวณยอดเงินและกำไร/ขาดทุนให้ดูชั่วคราว **โต๊ะยังคงเปิดอยู่ตามปกติ** สามารถเล่นต่อ หรือปิดโต๊ะจริงได้ตลอดเวลา'
+    );
+  }
 
   // 1. Profit / Loss section
   const playerLines = settlement.players.map((p, idx) => {
@@ -83,7 +94,7 @@ export function createSummaryEmbed(
     });
 
     embed.addFields({
-      name: '💸 รายการโอนเงิน (เคลียร์หนี้ให้น้อยรอบที่สุด)',
+      name: isPreview ? '💸 พรีวิวรายการโอนเงิน (หากปิดโต๊ะตอนนี้)' : '💸 รายการโอนเงิน (เคลียร์หนี้ให้น้อยรอบที่สุด)',
       value: txLines.join('\n\n'),
     });
   } else {
@@ -101,7 +112,11 @@ export function createSummaryEmbed(
       value: `ยอดชิปบนโต๊ะไม่ตรงกับเงิน Buy-in อยู่ **${sign}${settlement.discrepancy.toLocaleString()} บาท**\n(Total Buy-in: ${settlement.totalBuyIn}฿ vs Total Cash-out: ${settlement.totalCashOut}฿)\nกรุณาตรวจสอบว่ามีใครจำเลขผิดหรือลืมบันทึก Rebuy หรือไม่`,
     });
   } else {
-    embed.setFooter({ text: `✅ ยอดเงินลงตัวสมบูรณ์ (Total Pot: ${settlement.totalBuyIn.toLocaleString()}฿)` });
+    embed.setFooter({
+      text: isPreview
+        ? `🔍 พรีวิวยอดเงินลงตัวสมบูรณ์ (Total Pot: ${settlement.totalBuyIn.toLocaleString()}฿) • โต๊ะยังไม่ปิด`
+        : `✅ ยอดเงินลงตัวสมบูรณ์ (Total Pot: ${settlement.totalBuyIn.toLocaleString()}฿)`,
+    });
   }
 
   embed.setTimestamp();

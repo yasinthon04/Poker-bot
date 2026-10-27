@@ -55,6 +55,29 @@ export const pokerCommand = {
             .setDescription('รูปภาพแคปหน้าจอโต๊ะโป๊กเกอร์ตอนจบเกม')
             .setRequired(true)
         )
+        .addBooleanOption(opt =>
+          opt
+            .setName('preview')
+            .setDescription('ดูผลคำนวณอย่างเดียวโดยไม่ต้องปิดโต๊ะ (ค่าเริ่มต้น: false)')
+            .setRequired(false)
+        )
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('preview')
+        .setDescription('ดูสรุปยอดเงินและกำไร/ขาดทุนปัจจุบันโดยไม่ต้องปิดโต๊ะ')
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('next-round')
+        .setDescription('เริ่มรอบใหม่ทันทีโดยดึงผู้เล่นจากรอบล่าสุดเข้าโต๊ะอัตโนมัติ')
+        .addNumberOption(opt =>
+          opt
+            .setName('buyin')
+            .setDescription('ค่า Buy-in สำหรับรอบใหม่ (ไม่ใส่จะใช้เท่าเดิม)')
+            .setRequired(false)
+            .setMinValue(1)
+        )
     )
     .addSubcommand(sub =>
       sub
@@ -286,6 +309,58 @@ export const pokerCommand = {
       return;
     }
 
+    // NEXT-ROUND (Start next round with players from previous session)
+    if (subcommand === 'next-round') {
+      const activeSession = await repo.getActiveSession(channelId);
+      if (activeSession) {
+        await interaction.reply({
+          content: `⚠️ มีโต๊ะ Poker Session #${activeSession.id} กำลังเล่นอยู่ในห้องนี้อยู่แล้ว! กรุณาเล่นให้จบหรือกดยกเลิกก่อน`,
+          ephemeral: true,
+        });
+        return;
+      }
+
+      const lastSession = await repo.getLastSession(channelId);
+      if (!lastSession) {
+        await interaction.reply({
+          content: '❌ ยังไม่มีประวัติการเล่นโต๊ะ Poker ในห้องนี้มาก่อนครับ ให้ใช้ `/poker start` หรือ `/poker start-voice` เพื่อเริ่มโต๊ะแรก',
+          ephemeral: true,
+        });
+        return;
+      }
+
+      const lastPlayers = await repo.getSessionPlayers(lastSession.id);
+      if (lastPlayers.length === 0) {
+        await interaction.reply({
+          content: '❌ ไม่พบรายชื่อผู้เล่นจากโต๊ะรอบที่แล้วครับ',
+          ephemeral: true,
+        });
+        return;
+      }
+
+      const defaultBuyin = interaction.options.getNumber('buyin') ?? lastSession.default_buyin;
+      const newSession = await repo.createSession(guildId, channelId, user.id, defaultBuyin);
+
+      for (const p of lastPlayers) {
+        await repo.upsertUser(p.user_id, p.username, p.display_name);
+        await repo.joinPlayer(newSession.id, p.user_id, defaultBuyin);
+      }
+
+      const players = await repo.getSessionPlayers(newSession.id);
+      const embed = createTableEmbed(newSession, players);
+      const rows = createTableActionRows(newSession.default_buyin);
+
+      const reply = await interaction.reply({
+        content: `🎉 **เริ่มรอบใหม่ (Session #${newSession.id}) เรียบร้อยแล้ว!** ดึงผู้เล่นเดิม **${players.length} คน** เข้าโต๊ะอัตโนมัติ (Buy-in: **${newSession.default_buyin}฿**)`,
+        embeds: [embed],
+        components: rows,
+        fetchReply: true,
+      });
+
+      await repo.updateSessionMessageId(newSession.id, reply.id);
+      return;
+    }
+
     // For other subcommands, get active session
     const session = await repo.getActiveSession(channelId);
     if (!session) {
@@ -298,11 +373,14 @@ export const pokerCommand = {
 
     // 3. SCAN-TABLE (AI Vision auto-cashout from screenshot)
     if (subcommand === 'scan-table') {
+      const isPreview = interaction.options.getBoolean('preview') ?? false;
+
       if (
+        !isPreview &&
         interaction.user.id !== session.host_id &&
         !interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)
       ) {
-        await interaction.reply({ content: '❌ เฉพาะ Host ของโต๊ะนี้เท่านั้นที่สามารถใช้คำสั่งสแกนปิดโต๊ะได้', ephemeral: true });
+        await interaction.reply({ content: '❌ เฉพาะ Host ของโต๊ะนี้เท่านั้นที่สามารถใช้คำสั่งสแกนปิดโต๊ะได้ (หรือใช้ `preview:True` เพื่อดูยอดโดยไม่ปิดโต๊ะ)', ephemeral: true });
         return;
       }
 
@@ -351,13 +429,36 @@ export const pokerCommand = {
           }
         }
 
-        let matchSummary = `🤖 **AI สแกนรูปภาพสำเร็จ (${matched.length} คน):**\n`;
+        let matchSummary = isPreview
+          ? `🔍 **AI สแกนพรีวิวรูปภาพสำเร็จ (${matched.length} คน - โต๊ะยังไม่ปิด):**\n`
+          : `🤖 **AI สแกนรูปภาพสำเร็จ (${matched.length} คน):**\n`;
+
         matchSummary += matched
           .map(m => `✅ **${m.discordName}** (ในรูป: \`${m.detectedName}\`) ➔ ชิป **${m.chips.toLocaleString()}฿**`)
           .join('\n');
 
         if (unmatchedDiscord.length > 0) {
           matchSummary += `\n⚠️ *ไม่พบชื่อในรูปภาพ คิดเป็น 0฿: ${unmatchedDiscord.map(u => u.name).join(', ')}*`;
+        }
+
+        if (isPreview) {
+          const { calculateSettlements } = await import('../services/settlement');
+          const playerInputs = players.map(p => ({
+            userId: p.user_id,
+            name: p.display_name || p.username,
+            buyIn: p.buy_in,
+            cashOut: activeChipsMap[p.user_id] ?? (p.cash_out ?? 0),
+          }));
+          const settlement = calculateSettlements(playerInputs);
+
+          const ppMap: Record<string, string | null> = {};
+          for (const p of players) {
+            ppMap[p.user_id] = p.promptpay;
+          }
+
+          const embed = createSummaryEmbed(session, settlement, ppMap, true);
+          await interaction.editReply({ content: matchSummary, embeds: [embed] });
+          return;
         }
 
         await interaction.editReply({ content: matchSummary });
@@ -374,6 +475,45 @@ export const pokerCommand = {
           });
         }
       }
+      return;
+    }
+
+    // 3.1 PREVIEW (Check current debts without ending session)
+    if (subcommand === 'preview') {
+      const players = await repo.getSessionPlayers(session.id);
+      const activePlayers = players.filter(p => p.status === 'playing');
+
+      if (activePlayers.length > 5) {
+        await interaction.reply({
+          content: `⚠️ โต๊ะนี้ยังมีผู้เล่นที่ยังไม่ Cash-out ถึง ${activePlayers.length} คน (เกิน 5 คน)\n💡 **แนะนำ:** ใช้คำสั่ง \`/poker scan-table <รูปภาพ> preview:True\` เพื่อให้ AI อ่านชิปทุกคนจากรูปภาพและพรีวิวยอดโอนเงินทันทีโดยไม่ต้องปิดโต๊ะครับ!`,
+          ephemeral: true,
+        });
+        return;
+      }
+
+      if (activePlayers.length === 0) {
+        const playerInputs = players.map(p => ({
+          userId: p.user_id,
+          name: p.display_name || p.username,
+          buyIn: p.buy_in,
+          cashOut: p.cash_out ?? 0,
+        }));
+        const { calculateSettlements } = await import('../services/settlement');
+        const settlement = calculateSettlements(playerInputs);
+
+        const ppMap: Record<string, string | null> = {};
+        for (const p of players) {
+          ppMap[p.user_id] = p.promptpay;
+        }
+
+        const embed = createSummaryEmbed(session, settlement, ppMap, true);
+        await interaction.reply({ embeds: [embed] });
+        return;
+      }
+
+      const { createPreviewSessionModal } = await import('../ui/components');
+      const modal = createPreviewSessionModal(activePlayers);
+      await interaction.showModal(modal);
       return;
     }
 
@@ -593,9 +733,12 @@ export async function finalizeAndDisplaySummary(
     }
   }
 
+  const { createNextRoundActionRow } = await import('../ui/components');
+  const actionRow = createNextRoundActionRow(session.id);
+
   if (interaction.replied || interaction.deferred) {
-    await interaction.followUp({ embeds: [embed], files });
+    await interaction.followUp({ embeds: [embed], files, components: [actionRow] });
   } else {
-    await interaction.reply({ embeds: [embed], files });
+    await interaction.reply({ embeds: [embed], files, components: [actionRow] });
   }
 }
