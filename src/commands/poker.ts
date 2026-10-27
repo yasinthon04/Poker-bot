@@ -3,6 +3,7 @@ import {
   SlashCommandBuilder,
   PermissionFlagsBits,
   GuildMember,
+  ChannelType,
 } from 'discord.js';
 import * as repo from '../database/repo';
 import { createTableEmbed, createSummaryEmbed } from '../ui/embeds';
@@ -35,6 +36,13 @@ export const pokerCommand = {
             .setDescription('ค่า Buy-in เริ่มต้น (ค่าเริ่มต้น 100 บาท)')
             .setRequired(false)
             .setMinValue(1)
+        )
+        .addChannelOption(opt =>
+          opt
+            .setName('channel')
+            .setDescription('เลือกห้องเสียง (ไม่ระบุ = ตรวจจับห้องเสียงที่คุณกำลังอยู่โดยอัตโนมัติ)')
+            .addChannelTypes(ChannelType.GuildVoice, ChannelType.GuildStageVoice)
+            .setRequired(false)
         )
     )
     .addSubcommand(sub =>
@@ -178,20 +186,79 @@ export const pokerCommand = {
         return;
       }
 
-      const member = interaction.member as GuildMember;
-      if (!member || !member.voice?.channel) {
+      const guild = interaction.guild;
+      if (!guild) {
         await interaction.reply({
-          content: '❌ คุณต้องอยู่ในห้อง Voice Call (ห้องพูดคุย) ก่อนใช้คำสั่งนี้ เพื่อให้บอทดึงเพื่อนในห้องเข้ามาได้ครับ',
+          content: '❌ คำสั่งนี้ใช้ได้เฉพาะใน Discord Server เท่านั้นครับ',
           ephemeral: true,
         });
         return;
       }
 
-      const voiceChannel = member.voice.channel;
-      const voiceMembers = voiceChannel.members.filter(m => !m.user.bot);
+      // 1. Check explicit channel option
+      const explicitChannel = interaction.options.getChannel('channel');
+      let targetChannelId: string | null | undefined = explicitChannel?.id;
 
-      if (voiceMembers.size === 0) {
-        await interaction.reply({ content: '❌ ไม่พบผู้เล่นในห้องเสียงของคุณ', ephemeral: true });
+      // 2. If no explicit channel, check caller member's voice state
+      if (!targetChannelId) {
+        const callerMember =
+          (interaction.member as GuildMember) ||
+          (await guild.members.fetch(user.id).catch(() => null));
+        targetChannelId =
+          callerMember?.voice?.channelId ||
+          guild.voiceStates.cache.get(user.id)?.channelId;
+      }
+
+      if (!targetChannelId) {
+        await interaction.reply({
+          content:
+            '❌ คุณต้องอยู่ในห้อง Voice Call (ห้องพูดคุย) ก่อนใช้คำสั่งนี้ หรือเลือกห้องเสียงในตัวเลือก `channel` เพื่อให้บอทดึงเพื่อนในห้องเข้ามาได้ครับ',
+          ephemeral: true,
+        });
+        return;
+      }
+
+      const voiceChannel = (await guild.channels.fetch(targetChannelId).catch(() => null)) as any;
+      if (
+        !voiceChannel ||
+        (voiceChannel.type !== ChannelType.GuildVoice &&
+          voiceChannel.type !== ChannelType.GuildStageVoice)
+      ) {
+        await interaction.reply({
+          content: '❌ ไม่พบห้องเสียง หรือห้องที่เลือกไม่ใช่ห้อง Voice Call ครับ',
+          ephemeral: true,
+        });
+        return;
+      }
+
+      // Collect all non-bot members in this voice channel
+      const memberMap = new Map<string, GuildMember>();
+
+      // From guild.voiceStates cache
+      const voiceStates = guild.voiceStates.cache.filter(vs => vs.channelId === voiceChannel.id);
+      for (const [memberId, vs] of voiceStates) {
+        const m = vs.member || (await guild.members.fetch(memberId).catch(() => null));
+        if (m && !m.user.bot) {
+          memberMap.set(m.id, m);
+        }
+      }
+
+      // From channel.members if available
+      if (voiceChannel.members) {
+        for (const [, m] of voiceChannel.members) {
+          if (!m.user.bot && !memberMap.has(m.id)) {
+            memberMap.set(m.id, m);
+          }
+        }
+      }
+
+      const voiceMembers = Array.from(memberMap.values());
+
+      if (voiceMembers.length === 0) {
+        await interaction.reply({
+          content: `❌ ไม่พบผู้เล่น (ที่ไม่ใช่บอท) ในห้องเสียง **${voiceChannel.name}** ครับ`,
+          ephemeral: true,
+        });
         return;
       }
 
@@ -199,7 +266,7 @@ export const pokerCommand = {
       const session = await repo.createSession(guildId, channelId, user.id, defaultBuyin);
 
       // Add all voice members
-      for (const [, vm] of voiceMembers) {
+      for (const vm of voiceMembers) {
         await repo.upsertUser(vm.user.id, vm.user.username, vm.displayName);
         await repo.joinPlayer(session.id, vm.user.id, defaultBuyin);
       }
