@@ -15,7 +15,18 @@ import {
   createEndSessionModal,
 } from './ui/components';
 
+import http from 'http';
+
 dotenv.config();
+
+// Koyeb / Cloud health check server
+const port = process.env.PORT || 8000;
+http.createServer((_req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+  res.end('🃏 Poker Bot is online and healthy!\n');
+}).listen(port, () => {
+  console.log(`🌐 Health check server listening on port ${port}`);
+});
 
 const client = new Client({
   intents: [
