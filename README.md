@@ -1,91 +1,56 @@
 # 🃏 Poker Settlement & Stats Discord Bot
 
-บอทจัดการโต๊ะโป๊กเกอร์ สรุปยอดเงิน เคลียร์หนี้อัตโนมัติ (ใครต้องโอนให้ใครด้วยจำนวนครั้งที่น้อยที่สุด) รองรับคนออกกลางคัน และสรุปสถิติรายเดือน/รายปี พร้อมสร้าง QR Code พร้อมเพย์ให้สแกนจ่ายได้ทันที
+บอทจัดการโต๊ะโป๊กเกอร์ สรุปยอดเงิน เคลียร์หนี้อัตโนมัติ (ใครต้องโอนให้ใครด้วยจำนวนครั้งที่น้อยที่สุด) รองรับคนออกกลางคัน สรุปสถิติรายเดือน/รายปี พร้อมระบบ **AI สแกนรูปภาพหน้าจอโต๊ะคิดเงินอัตโนมัติ** และระบบ **ดึงเพื่อนจากห้อง Voice Call เข้าโต๊ะทันที** 
 
 ---
 
-## ✨ ฟีเจอร์หลัก (Features)
+## ✨ ฟีเจอร์หลัก (Key Features)
 
-1. **ระบบโต๊ะแบบ Interactive (Embed + Buttons + Modals)**:
+1. **🎙️ Auto Voice Join (`/poker start-voice`)**:
+   - ดึงทุกคนที่กำลังนั่งอยู่ในห้อง Voice Call เข้าโต๊ะให้อัตโนมัติทันที ทุกคนไม่ต้องกดปุ่ม Join เอง
+2. **📸 AI Vision Auto-Cashout (`/poker scan-table`)**:
+   - ขับเคลื่อนด้วย **Google Gemini AI** แค่แคปรูปหน้าจอโต๊ะโป๊กเกอร์ตอนจบเกมส่งให้บอท AI จะอ่านชื่อผู้เล่นและจำนวนชิปที่เหลือของทุกคนบนโต๊ะให้เอง และออกบิลเคลียร์หนี้ทันทีโดยไม่ต้องพิมพ์ตัวเลขแม้แต่ตัวเดียว!
+3. **ระบบโต๊ะแบบ Interactive (Embed + Buttons + Modals)**:
    - มีปุ่ม **🟢 เข้าร่วมโต๊ะ**, **🔄 เติมชิป (Rebuy)**, **➕ เติมชิป (ระบุเอง)**, **🏃 ขอออกก่อน**, **🏁 ปิดโต๊ะ/คิดเงิน**
-   - อัปเดตยอดชิปกองกลาง (Total Pot) และรายชื่อคนบนโต๊ะแบบ Real-time
-2. **แก้ปัญหาคนออกกลางคัน (Early Cash-out)**:
+   - อัปเดตยอดชิปกองกลาง (Total Pot) และรายชื่อคนบนโต๊ะแบบ Real-time พร้อมระบบกันกดเข้าร่วมซ้ำ
+4. **แก้ปัญหาคนออกกลางคัน (Early Cash-out)**:
    - คนที่ขอตัวไปนอนหรือเลิกก่อน สามารถกดปุ่ม **[🏃 ขอออกก่อน]** หรือพิมพ์ `/poker leave [ชิป]`
    - บอทจะแช่แข็งยอดไว้ แล้วนำมาคำนวณเคลียร์หนี้พร้อมกันตอนจบโต๊ะ
-3. **อัลกอริทึมเคลียร์หนี้ (Minimum Cash Flow Algorithm)**:
-   - ตรวจสอบยอดเงิน Zero-sum ($\sum \text{Buy-in} = \sum \text{Cash-out}$) ป้องกันชิปหาย
+5. **อัลกอริทึมเคลียร์หนี้ (Minimum Cash Flow Algorithm)**:
+   - ตรวจสอบยอดเงิน Zero-sum ($\sum \text{Buy-in} = \sum \text{Cash-out}$) ป้องกันชิปตกหล่น
    - จับคู่โอนเงินให้เหลือน้อยรอบที่สุด (เช่น B และ C ขาดทุนคนละ 50 ➜ โอนตรงให้ A 100 บาทคนเดียว)
-4. **สร้าง PromptPay QR Code อัตโนมัติ**:
-   - ถ้าผู้ชนะลงทะเบียนเบอร์พร้อมเพย์ไว้ บอทจะแนบรูป QR Code ยอดเงินที่ต้องรับให้อัตโนมัติ
-5. **ระบบสถิติและทำเนียบเซียน (Stats & Leaderboard)**:
+6. **สร้าง PromptPay QR Code อัตโนมัติ**:
+   - ถ้าผู้ชนะลงทะเบียนเบอร์พร้อมเพย์ไว้ บอทจะแนบรูป QR Code ยอดเงินที่ต้องรับให้อัตโนมัติใน Discord
+7. **ระบบสถิติและทำเนียบเซียน (Stats & Leaderboard)**:
    - สรุปสถิติส่วนบุคคล (Win Rate, กำไรสะสม, Best Win/Loss)
    - สรุปผลประจำเดือน และประจำปี
    - แจกฉายา **🦈 The Shark** (คนกวาดกำไรสูงสุด) และ **🐟 The Sponsor** (ผู้สนับสนุนหลัก เสียเยอะสุด)
+8. **🧹 ระบบเคลียร์ห้องแชท (`/clear`)**:
+   - ลบข้อความทดสอบและสลิปในห้องแชทได้ครั้งละ 1 - 100 ข้อความอย่างรวดเร็ว
 
 ---
 
-## 🚀 วิธีติดตั้งและเปิดใช้งาน (Setup Guide)
-
-### 1. สร้าง Bot ใน Discord Developer Portal
-1. เข้าไปที่ [Discord Developer Portal](https://discord.com/developers/applications)
-2. กด **New Application** ตั้งชื่อบอท
-3. ไปที่แท็บ **Bot**:
-   - กด **Reset Token** แล้วคัดลอก Token ไว้
-   - เลื่อนลงมาเปิด **Privileged Gateway Intents**:
-     - ✅ **Server Members Intent** (ถ้าต้องการ)
-     - ✅ **Message Content Intent**
-4. ไปที่แท็บ **OAuth2 ➔ URL Generator**:
-   - ติ๊ก `bot` และ `application.commands`
-   - ใน Bot Permissions ติ๊ก:
-     - `Send Messages`
-     - `Embed Links`
-     - `Attach Files`
-     - `Use External Emojis`
-   - คัดลอก URL ด้านล่างไปเปิดในเบราว์เซอร์ เพื่อเชิญบอทเข้าเซิร์ฟเวอร์ของคุณ
-
-### 2. ตั้งค่าโปรเจกต์
-คัดลอกไฟล์ `.env.example` เป็น `.env`:
-```bash
-cp .env.example .env
-```
-เปิดไฟล์ `.env` แล้วใส่ค่า:
-```env
-DISCORD_TOKEN=โทเคนบอทของคุณ
-CLIENT_ID=Application_ID_ของคุณ
-GUILD_ID=Server_ID_ของคุณ  # ใส่เพื่อให้อัปเดตคำสั่ง Slash Command ทันทีไม่ต้องรอ
-```
-
-### 3. ติดตั้ง Dependencies และลงทะเบียนคำสั่ง
-```bash
-npm install
-npm run register   # ลงทะเบียน Slash Commands เข้า Discord
-```
-
-### 4. รันบอท
-```bash
-# โหมดพัฒนา (Development)
-npm run dev
-
-# หรือ Build แล้วรัน Production
-npm run build
-npm start
-```
-
----
-
-## 📖 คู่มือการใช้งานคำสั่ง (Commands)
+## 📖 คู่มือการใช้งานคำสั่ง (Commands List)
 
 ### 🃏 จัดการโต๊ะ Poker (`/poker`)
 | คำสั่ง | คำอธิบาย |
 |---|---|
-| `/poker start [buyin]` | เปิดโต๊ะใหม่ในห้องนี้ (ค่าเริ่มต้น 100 บาท) |
+| `/poker start-voice [buyin]` | 🌟 **(แนะนำ)** เปิดโต๊ะและดึงทุกคนในห้อง Voice Call เข้าโต๊ะอัตโนมัติ |
+| `/poker scan-table <image>` | 🌟 **(เด็ดสุด)** แนบรูปแคปหน้าจอโต๊ะโป๊กเกอร์ ให้ AI อ่านชิปและคิดเงินอัตโนมัติ |
+| `/poker start [buyin]` | เปิดโต๊ะใหม่แบบปกติในห้องนี้ (ค่าเริ่มต้น 100 บาท) |
 | `/poker join [amount]` | ซื้อชิปเข้าร่วมโต๊ะ |
 | `/poker rebuy [amount]` | เติมชิปเพิ่มเมื่อหมดตัว |
+| `/poker set-buyin @player <amount>` | [Host] แก้ไขยอดเงิน Buy-in ของผู้เล่น (เผื่อกด Rebuy พลาด) |
 | `/poker leave <chips>` | ขอออกก่อน (Early Cash-out) ใส่ชิปที่เหลือ หรือใส่ 0 ถ้าหมดตัว |
-| `/poker set-chips @player <chips>` | [Host] ตั้งค่าชิปให้เพื่อน เผื่อมีคนปิดคอมหนีไปก่อน |
-| `/poker end` | ปิดโต๊ะและคำนวณเงินเคลียร์หนี้ |
+| `/poker set-chips @player <chips>` | [Host] ตั้งค่าชิปตอนจบให้เพื่อน เผื่อมีคนปิดคอมหนีไปก่อน |
+| `/poker end` | ปิดโต๊ะและคำนวณเงินเคลียร์หนี้ (แบบกรอกตัวเลขด้วยตนเอง) |
 | `/poker status` | แสดงสถานะโต๊ะปัจจุบัน |
 | `/poker cancel` | [Host] ยกเลิกโต๊ะที่กำลังเล่นอยู่ |
+
+### 🧹 จัดการข้อความ (`/clear`)
+| คำสั่ง | คำอธิบาย |
+|---|---|
+| `/clear [amount]` | ลบข้อความในห้องแชท (1 - 100 ข้อความ, ค่าเริ่มต้น 10) |
 
 ### 📊 สถิติและอันดับ (`/stats`, `/leaderboard`)
 | คำสั่ง | คำอธิบาย |
@@ -99,11 +64,64 @@ npm start
 | คำสั่ง | คำอธิบาย |
 |---|---|
 | `/profile set-promptpay <number>` | บันทึกเบอร์พร้อมเพย์ (10 หลัก) หรือบัตร ปชช. (13 หลัก) สำหรับสร้าง QR Code อัตโนมัติ |
+| `/profile clear-promptpay` | ลบข้อมูลพร้อมเพย์ / ปิดการสร้าง QR Code อัตโนมัติ |
 
 ---
 
-## 🗄️ โครงสร้างฐานข้อมูล (SQLite)
-ข้อมูลทั้งหมดถูกบันทึกไว้ใน `data/poker.db` โดยอัตโนมัติ:
+## 🚀 วิธีติดตั้งและเปิดใช้งาน (Setup Guide)
+
+### 1. การตั้งค่าตัวแปรในไฟล์ `.env`
+คัดลอกไฟล์ `.env.example` เป็น `.env`:
+```bash
+cp .env.example .env
+```
+ใส่ค่าในไฟล์ `.env`:
+```env
+DISCORD_TOKEN=โทเคนบอทของคุณ (ได้จาก Discord Developer Portal > Bot)
+CLIENT_ID=เลข_Application_ID (ได้จาก Discord Developer Portal > General Information)
+GUILD_ID=เลข_Server_ID (คลิกขวาที่ชื่อ Discord Server > Copy Server ID)
+GEMINI_API_KEY=รหัสคีย์_Gemini_AI (รับฟรีได้ที่ https://aistudio.google.com/apikey)
+```
+
+### 2. ลงทะเบียนคำสั่ง Slash Command
+```bash
+npm install
+npm run register
+```
+
+---
+
+## 🌐 ตัวเลือกการเปิดบอท (Deployment)
+
+### ตัวเลือกที่ 1: รันบน Cloud ฟรี 24 ชม. (Render.com)
+บอทจะออนไลน์ตลอด 24 ชั่วโมงแม้คุณจะปิดคอมพิวเตอร์:
+1. นำโค้ดขึ้น GitHub ของคุณ
+2. เข้าเว็บ [Render.com](https://render.com/) ➔ กด **New Web Service** ➔ เลือก Repo `Poker-bot`
+3. ตั้งค่า:
+   - **Build Command:** `npm install && npm run build`
+   - **Start Command:** `npm start`
+   - **Instance Type:** `Free`
+4. ใส่ตัวแปรในแท็บ **Environment Variables**:
+   - `DISCORD_TOKEN`
+   - `CLIENT_ID`
+   - `GUILD_ID`
+   - `GEMINI_API_KEY` (สำหรับระบบสแกนรูป)
+5. กด Deploy เสร็จสิ้น!
+
+### ตัวเลือกที่ 2: รันในเครื่อง Mac ด้วย PM2 (เปิดคอมมา บอทรันเองอัตโนมัติ)
+```bash
+npm install -g pm2
+npm run build
+pm2 start dist/index.js --name "poker-bot"
+pm2 startup
+pm2 save
+```
+
+---
+
+## 🗄️ โครงสร้างฐานข้อมูล (Pure JavaScript JSON Database)
+ข้อมูลทั้งหมดถูกบันทึกไว้ใน `data/poker-data.json` โดยอัตโนมัติ:
+- **ไม่ต้องพึ่งพา C++ Binaries ใดๆ**: หมดปัญหาเรื่อง GLIBC mismatch หรือความเข้ากันไม่ได้ของระบบปฏิบัติการ
 - `users`: ข้อมูลผู้เล่น และเบอร์พร้อมเพย์
 - `sessions`: ข้อมูลโต๊ะ ประวัติเวลาเริ่ม-จบ โฮสต์
 - `session_players`: รายการซื้อชิป (Buy-in / Rebuy) และชิปตอนจบ (Cash-out)
