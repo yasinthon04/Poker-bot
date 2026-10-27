@@ -4,6 +4,7 @@ import {
   PermissionFlagsBits,
   GuildMember,
   ChannelType,
+  AttachmentBuilder,
 } from 'discord.js';
 import * as repo from '../database/repo';
 import { createTableEmbed, createSummaryEmbed } from '../ui/embeds';
@@ -441,6 +442,10 @@ export const pokerCommand = {
           matchSummary += `\n⚠️ *ไม่พบชื่อในรูปภาพ คิดเป็น 0฿: ${unmatchedDiscord.map(u => u.name).join(', ')}*`;
         }
 
+        const tableFile = new AttachmentBuilder(attachment.url, {
+          name: attachment.name || 'scanned-table.png',
+        });
+
         if (isPreview) {
           const { calculateSettlements } = await import('../services/settlement');
           const playerInputs = players.map(p => ({
@@ -457,12 +462,19 @@ export const pokerCommand = {
           }
 
           const embed = createSummaryEmbed(session, settlement, ppMap, true);
-          await interaction.editReply({ content: matchSummary, embeds: [embed] });
+          await interaction.editReply({
+            content: matchSummary,
+            embeds: [embed],
+            files: [tableFile],
+          });
           return;
         }
 
-        await interaction.editReply({ content: matchSummary });
-        await finalizeAndDisplaySummary(interaction, session, activeChipsMap);
+        await interaction.editReply({
+          content: matchSummary,
+          files: [tableFile],
+        });
+        await finalizeAndDisplaySummary(interaction, session, activeChipsMap, attachment.url);
       } catch (err: any) {
         console.error('Failed to parse poker screenshot:', err);
         if (err.message?.includes('GEMINI_API_KEY')) {
@@ -703,7 +715,8 @@ export async function refreshTableMessage(interaction: any, session: repo.Sessio
 export async function finalizeAndDisplaySummary(
   interaction: any,
   session: repo.SessionRow,
-  activeChipsMap: Record<string, number>
+  activeChipsMap: Record<string, number>,
+  sourceImageUrl?: string
 ) {
   const { settlement } = await repo.finalizeSession(session.id, activeChipsMap);
   const players = await repo.getSessionPlayers(session.id);
@@ -715,6 +728,10 @@ export async function finalizeAndDisplaySummary(
   }
 
   const embed = createSummaryEmbed(session, settlement, ppMap);
+
+  if (sourceImageUrl) {
+    embed.setThumbnail(sourceImageUrl);
+  }
 
   // Find biggest winner to generate QR code if PromptPay is configured
   const topCreditor = settlement.players.find(p => p.net > 0 && ppMap[p.userId]);
