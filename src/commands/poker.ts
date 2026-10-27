@@ -62,6 +62,19 @@ export const pokerCommand = {
             .setDescription('ดูผลคำนวณอย่างเดียวโดยไม่ต้องปิดโต๊ะ (ค่าเริ่มต้น: false)')
             .setRequired(false)
         )
+        .addUserOption(opt =>
+          opt
+            .setName('leaver')
+            .setDescription('ผู้เล่นที่ออกจากโต๊ะไปก่อน (ถ้ามี)')
+            .setRequired(false)
+        )
+        .addNumberOption(opt =>
+          opt
+            .setName('leaver_chips')
+            .setDescription('จำนวนชิปของคนที่ออกไปก่อน (ถ้าไม่ใส่ บอทจะคำนวณจากกองกลางให้อัตโนมัติ)')
+            .setRequired(false)
+            .setMinValue(0)
+        )
     )
     .addSubcommand(sub =>
       sub
@@ -417,17 +430,66 @@ export const pokerCommand = {
           return;
         }
 
+        const explicitLeaver = interaction.options.getUser('leaver');
+        const explicitLeaverChips = interaction.options.getNumber('leaver_chips');
+
         // Apply chips to matched players
         const activeChipsMap: Record<string, number> = {};
         for (const m of matched) {
           activeChipsMap[m.userId] = m.chips;
         }
 
-        // Active players not found in screenshot default to 0
-        if (unmatchedDiscord.length > 0) {
-          for (const ud of unmatchedDiscord) {
-            activeChipsMap[ud.userId] = 0;
+        // Apply explicit leaver if specified
+        if (explicitLeaver && explicitLeaverChips !== null && explicitLeaverChips !== undefined) {
+          activeChipsMap[explicitLeaver.id] = explicitLeaverChips;
+        }
+
+        // Remaining active players in Discord not in screenshot and not explicitly set
+        const remainingUnmatched = activePlayers.filter(
+          p => !matched.some(m => m.userId === p.user_id) && activeChipsMap[p.user_id] === undefined
+        );
+
+        // Calculate total buyin and accounted chips to deduce remaining pot
+        const totalSessionBuyIn = players.reduce((sum, p) => sum + p.buy_in, 0);
+        let accountedChips = 0;
+
+        // Already cashed out early ('left')
+        for (const p of players) {
+          if (p.status === 'left') {
+            accountedChips += p.cash_out ?? 0;
           }
+        }
+        // Matched by AI or explicitly set
+        for (const chips of Object.values(activeChipsMap)) {
+          accountedChips += chips;
+        }
+
+        const remainingPot = Math.max(0, Math.round((totalSessionBuyIn - accountedChips) * 100) / 100);
+        let leaverNote = '';
+
+        if (explicitLeaver && (explicitLeaverChips === null || explicitLeaverChips === undefined)) {
+          // Explicit leaver without chips -> assign remaining pot
+          activeChipsMap[explicitLeaver.id] = remainingPot;
+          leaverNote += `\n💡 **<@${explicitLeaver.id}>** ออกจากโต๊ะไปก่อน ➔ บอทคำนวณชิปคงเหลือจากกองกลางให้อัตโนมัติ: **${remainingPot.toLocaleString()}฿**`;
+        } else if (remainingUnmatched.length === 1) {
+          // Exactly 1 missing player -> automatically assign remaining pot!
+          const singleLeaver = remainingUnmatched[0];
+          activeChipsMap[singleLeaver.user_id] = remainingPot;
+          leaverNote += `\n💡 **<@${singleLeaver.user_id}>** ออกจากโต๊ะไปก่อน (ไม่ได้กดขอออกก่อน) ➔ บอทคำนวณชิปคงเหลือจากกองกลางให้อัตโนมัติ: **${remainingPot.toLocaleString()}฿** *(ยอดเงินลงตัวพอดี)*`;
+        } else if (remainingUnmatched.length > 1) {
+          // Multiple missing players -> split remaining pot equally
+          const splitChips = Math.round((remainingPot / remainingUnmatched.length) * 100) / 100;
+          for (const u of remainingUnmatched) {
+            activeChipsMap[u.user_id] = splitChips;
+          }
+          leaverNote += `\n⚠️ ตรวจพบผู้เล่นที่ไม่อยู่ในรูปภาพ ${remainingUnmatched.length} คน: ${remainingUnmatched.map(u => `<@${u.user_id}>`).join(', ')} ➔ บอทเฉลี่ยชิปที่เหลือจากกองกลางคนละ **${splitChips.toLocaleString()}฿** *(สามารถใช้ /poker set-chips เพื่อแก้ไขได้)*`;
+        }
+
+        // Show early cash-out players if any
+        const earlyLeavers = players.filter(p => p.status === 'left');
+        let earlyLeaverNote = '';
+        if (earlyLeavers.length > 0) {
+          earlyLeaverNote = '\n' + earlyLeavers.map(el => `🏃 **<@${el.user_id}>** ขอออกก่อนไว้แล้ว ➔ ชิปคงเหลือ **${(el.cash_out ?? 0).toLocaleString()}฿**`).join('\n');
         }
 
         let matchSummary = isPreview
@@ -438,8 +500,11 @@ export const pokerCommand = {
           .map(m => `✅ **${m.discordName}** (ในรูป: \`${m.detectedName}\`) ➔ ชิป **${m.chips.toLocaleString()}฿**`)
           .join('\n');
 
-        if (unmatchedDiscord.length > 0) {
-          matchSummary += `\n⚠️ *ไม่พบชื่อในรูปภาพ คิดเป็น 0฿: ${unmatchedDiscord.map(u => u.name).join(', ')}*`;
+        if (leaverNote) {
+          matchSummary += leaverNote;
+        }
+        if (earlyLeaverNote) {
+          matchSummary += earlyLeaverNote;
         }
 
         const tableFile = new AttachmentBuilder(attachment.url, {
