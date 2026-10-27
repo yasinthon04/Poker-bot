@@ -50,7 +50,7 @@ client.on('interactionCreate', async (interaction: Interaction) => {
     if (interaction.isButton()) {
       const channelId = interaction.channelId;
       const user = interaction.user;
-      const session = repo.getActiveSession(channelId);
+      const session = await repo.getActiveSession(channelId);
 
       if (!session) {
         await interaction.reply({
@@ -61,7 +61,7 @@ client.on('interactionCreate', async (interaction: Interaction) => {
       }
 
       // Upsert user
-      repo.upsertUser(
+      await repo.upsertUser(
         user.id,
         user.username,
         interaction.member && 'displayName' in interaction.member
@@ -71,7 +71,7 @@ client.on('interactionCreate', async (interaction: Interaction) => {
 
       // Join button
       if (interaction.customId === 'btn_poker_join') {
-        const result = repo.addOrRebuyPlayer(session.id, user.id, session.default_buyin);
+        const result = await repo.addOrRebuyPlayer(session.id, user.id, session.default_buyin);
         const actionText = result.isRebuy
           ? `🔄 <@${user.id}> เติมชิปเพิ่ม **+${session.default_buyin.toLocaleString()} บาท** (ยอดรวม ${result.totalBuyIn.toLocaleString()}฿)`
           : `🟢 <@${user.id}> เข้าร่วมโต๊ะด้วยเงิน **${session.default_buyin.toLocaleString()} บาท**`;
@@ -83,7 +83,7 @@ client.on('interactionCreate', async (interaction: Interaction) => {
 
       // Rebuy default button
       if (interaction.customId === 'btn_poker_rebuy') {
-        const result = repo.addOrRebuyPlayer(session.id, user.id, session.default_buyin);
+        const result = await repo.addOrRebuyPlayer(session.id, user.id, session.default_buyin);
         await interaction.reply({
           content: `🔄 <@${user.id}> เติมชิปเพิ่ม **+${session.default_buyin.toLocaleString()} บาท** (ยอดรวม ${result.totalBuyIn.toLocaleString()}฿)`,
         });
@@ -123,7 +123,7 @@ client.on('interactionCreate', async (interaction: Interaction) => {
           return;
         }
 
-        const players = repo.getSessionPlayers(session.id);
+        const players = await repo.getSessionPlayers(session.id);
         const activePlayers = players.filter(p => p.status === 'playing');
 
         if (activePlayers.length > 5) {
@@ -149,7 +149,7 @@ client.on('interactionCreate', async (interaction: Interaction) => {
       const channelId = interaction.channelId;
       if (!channelId) return;
       const user = interaction.user;
-      const session = repo.getActiveSession(channelId);
+      const session = await repo.getActiveSession(channelId);
 
       if (!session) {
         await interaction.reply({
@@ -169,7 +169,7 @@ client.on('interactionCreate', async (interaction: Interaction) => {
           return;
         }
 
-        const result = repo.addOrRebuyPlayer(session.id, user.id, amount);
+        const result = await repo.addOrRebuyPlayer(session.id, user.id, amount);
         await interaction.reply({
           content: `➕ <@${user.id}> เติมชิปเพิ่ม **+${amount.toLocaleString()} บาท** (ยอดรวม ${result.totalBuyIn.toLocaleString()}฿)`,
         });
@@ -190,7 +190,7 @@ client.on('interactionCreate', async (interaction: Interaction) => {
           return;
         }
 
-        const leaveResult = repo.playerLeaveSession(session.id, user.id, chips);
+        const leaveResult = await repo.playerLeaveSession(session.id, user.id, chips);
         if (!leaveResult.success) {
           await interaction.reply({
             content: '❌ คุณไม่ได้อยู่ในโต๊ะนี้ หรือออกจากโต๊ะไปแล้ว',
@@ -211,7 +211,7 @@ client.on('interactionCreate', async (interaction: Interaction) => {
 
       // End Session Chips Submit
       if (interaction.customId === 'modal_poker_end_chips') {
-        const players = repo.getSessionPlayers(session.id);
+        const players = await repo.getSessionPlayers(session.id);
         const activePlayers = players.filter(p => p.status === 'playing');
 
         const activeChipsMap: Record<string, number> = {};
@@ -241,8 +241,8 @@ client.on('interactionCreate', async (interaction: Interaction) => {
 });
 
 const token = process.env.DISCORD_TOKEN;
-if (token) {
+if (token && token !== 'your_bot_token_here') {
   client.login(token);
 } else {
-  console.log('⚠️ Warning: DISCORD_TOKEN is not set in .env. Bot is not running yet.');
+  console.log('⚠️ Warning: DISCORD_TOKEN is not set or still default in .env. Bot is not logged in yet.');
 }

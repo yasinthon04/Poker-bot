@@ -8,10 +8,11 @@ dotenv.config();
 
 const token = process.env.DISCORD_TOKEN;
 const clientId = process.env.CLIENT_ID;
-const guildId = process.env.GUILD_ID; // Optional: specify guildId for instant testing
+const guildId = process.env.GUILD_ID;
 
-if (!token || !clientId) {
-  console.error('❌ Error: DISCORD_TOKEN and CLIENT_ID must be specified in .env');
+if (!token || !clientId || token === 'your_bot_token_here' || clientId === 'your_client_id_here') {
+  console.error('\n❌ กรุณาตั้งค่า DISCORD_TOKEN และ CLIENT_ID ในไฟล์ .env ก่อนครับ!');
+  console.error('👉 เปิดไฟล์: /Users/yasinthon/Discord-bot/Poker-Bot/.env\n');
   process.exit(1);
 }
 
@@ -26,20 +27,18 @@ const rest = new REST({ version: '10' }).setToken(token);
 
 (async () => {
   try {
-    console.log(`⏳ Registering ${commands.length} slash commands...`);
+    console.log(`⏳ กำลังลงทะเบียน ${commands.length} Slash Commands เข้า Discord...`);
 
-    if (guildId) {
-      // Fast guild registration (immediate update)
+    if (guildId && guildId !== 'your_guild_id_here') {
       await rest.put(Routes.applicationGuildCommands(clientId, guildId), {
         body: commands,
       });
-      console.log(`✅ Successfully registered commands for Guild: ${guildId}`);
+      console.log(`✅ ลงทะเบียนคำสั่งสำหรับ Server ID: ${guildId} เรียบร้อยแล้ว (อัปเดตทันที)`);
     } else {
-      // Global registration (takes up to an hour to cache globally)
       await rest.put(Routes.applicationCommands(clientId), {
         body: commands,
       });
-      console.log('✅ Successfully registered global commands');
+      console.log('✅ ลงทะเบียนคำสั่งแบบ Global เรียบร้อยแล้ว');
     }
   } catch (error) {
     console.error('❌ Failed to register commands:', error);

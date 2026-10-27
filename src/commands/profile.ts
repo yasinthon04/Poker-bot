@@ -21,7 +21,7 @@ export const profileCommand = {
     const subcommand = interaction.options.getSubcommand();
     const user = interaction.user;
 
-    repo.upsertUser(user.id, user.username, user.displayName);
+    await repo.upsertUser(user.id, user.username, user.displayName);
 
     if (subcommand === 'set-promptpay') {
       const rawPromptPay = interaction.options.getString('number', true);
@@ -36,7 +36,7 @@ export const profileCommand = {
         return;
       }
 
-      repo.setUserPromptPay(user.id, clean);
+      await repo.setUserPromptPay(user.id, clean);
       await interaction.reply({
         content: `✅ บันทึกเบอร์พร้อมเพย์ \`${clean}\` สำเร็จแล้ว! เมื่อคุณชนะในเกม บอทจะช่วยแนบ QR Code พร้อมเพย์ให้เพื่อนสแกนจ่ายได้ทันที`,
         ephemeral: true,

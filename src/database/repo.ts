@@ -1,4 +1,4 @@
-import { db } from './db';
+import { getDb } from './db';
 import { calculateSettlements, SettlementResult } from '../services/settlement';
 
 export interface UserRow {
@@ -59,139 +59,188 @@ export interface RankedPlayerStats {
 }
 
 // User Operations
-export function upsertUser(id: string, username: string, displayName?: string | null): void {
-  const stmt = db.prepare(`
+export async function upsertUser(id: string, username: string, displayName?: string | null): Promise<void> {
+  const db = await getDb();
+  await db.run(
+    `
     INSERT INTO users (id, username, display_name)
     VALUES (?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       username = excluded.username,
       display_name = coalesce(excluded.display_name, users.display_name)
-  `);
-  stmt.run(id, username, displayName || null);
+    `,
+    id,
+    username,
+    displayName || null
+  );
 }
 
-export function getUser(id: string): UserRow | undefined {
-  return db.prepare('SELECT * FROM users WHERE id = ?').get(id) as UserRow | undefined;
+export async function getUser(id: string): Promise<UserRow | undefined> {
+  const db = await getDb();
+  return db.get<UserRow>('SELECT * FROM users WHERE id = ?', id);
 }
 
-export function setUserPromptPay(userId: string, promptPay: string): void {
-  db.prepare('UPDATE users SET promptpay = ? WHERE id = ?').run(promptPay, userId);
+export async function setUserPromptPay(userId: string, promptPay: string): Promise<void> {
+  const db = await getDb();
+  await db.run('UPDATE users SET promptpay = ? WHERE id = ?', promptPay, userId);
 }
 
 // Session Operations
-export function getActiveSession(channelId: string): SessionRow | undefined {
-  return db.prepare(`
+export async function getActiveSession(channelId: string): Promise<SessionRow | undefined> {
+  const db = await getDb();
+  return db.get<SessionRow>(
+    `
     SELECT * FROM sessions 
     WHERE channel_id = ? AND status = 'active'
     ORDER BY id DESC LIMIT 1
-  `).get(channelId) as SessionRow | undefined;
+    `,
+    channelId
+  );
 }
 
-export function getSessionById(sessionId: number): SessionRow | undefined {
-  return db.prepare('SELECT * FROM sessions WHERE id = ?').get(sessionId) as SessionRow | undefined;
+export async function getSessionById(sessionId: number): Promise<SessionRow | undefined> {
+  const db = await getDb();
+  return db.get<SessionRow>('SELECT * FROM sessions WHERE id = ?', sessionId);
 }
 
-export function createSession(
+export async function createSession(
   guildId: string,
   channelId: string,
   hostId: string,
   defaultBuyin: number
-): SessionRow {
-  const stmt = db.prepare(`
+): Promise<SessionRow> {
+  const db = await getDb();
+  const result = await db.run(
+    `
     INSERT INTO sessions (guild_id, channel_id, host_id, default_buyin)
     VALUES (?, ?, ?, ?)
-  `);
-  const info = stmt.run(guildId, channelId, hostId, defaultBuyin);
-  return getSessionById(Number(info.lastInsertRowid))!;
+    `,
+    guildId,
+    channelId,
+    hostId,
+    defaultBuyin
+  );
+  const session = await getSessionById(result.lastID!);
+  return session!;
 }
 
-export function updateSessionMessageId(sessionId: number, messageId: string): void {
-  db.prepare('UPDATE sessions SET message_id = ? WHERE id = ?').run(messageId, sessionId);
+export async function updateSessionMessageId(sessionId: number, messageId: string): Promise<void> {
+  const db = await getDb();
+  await db.run('UPDATE sessions SET message_id = ? WHERE id = ?', messageId, sessionId);
 }
 
-export function cancelSession(sessionId: number): void {
-  db.prepare("UPDATE sessions SET status = 'cancelled', ended_at = CURRENT_TIMESTAMP WHERE id = ?").run(sessionId);
+export async function cancelSession(sessionId: number): Promise<void> {
+  const db = await getDb();
+  await db.run(
+    "UPDATE sessions SET status = 'cancelled', ended_at = CURRENT_TIMESTAMP WHERE id = ?",
+    sessionId
+  );
 }
 
 // Session Players Operations
-export function getSessionPlayers(sessionId: number): SessionPlayerRow[] {
-  return db.prepare(`
+export async function getSessionPlayers(sessionId: number): Promise<SessionPlayerRow[]> {
+  const db = await getDb();
+  return db.all<SessionPlayerRow[]>(
+    `
     SELECT sp.*, u.username, u.display_name, u.promptpay
     FROM session_players sp
     JOIN users u ON sp.user_id = u.id
     WHERE sp.session_id = ?
     ORDER BY sp.id ASC
-  `).all(sessionId) as SessionPlayerRow[];
+    `,
+    sessionId
+  );
 }
 
-export function addOrRebuyPlayer(
+export async function addOrRebuyPlayer(
   sessionId: number,
   userId: string,
   amount: number
-): { isRebuy: boolean; totalBuyIn: number } {
-  const existing = db.prepare(`
-    SELECT * FROM session_players WHERE session_id = ? AND user_id = ?
-  `).get(sessionId, userId) as SessionPlayerRow | undefined;
+): Promise<{ isRebuy: boolean; totalBuyIn: number }> {
+  const db = await getDb();
+  const existing = await db.get<SessionPlayerRow>(
+    'SELECT * FROM session_players WHERE session_id = ? AND user_id = ?',
+    sessionId,
+    userId
+  );
 
   if (existing) {
     const newBuyIn = existing.buy_in + amount;
-    db.prepare(`
+    await db.run(
+      `
       UPDATE session_players 
       SET buy_in = ?, status = 'playing', left_at = NULL
       WHERE id = ?
-    `).run(newBuyIn, existing.id);
+      `,
+      newBuyIn,
+      existing.id
+    );
     return { isRebuy: true, totalBuyIn: newBuyIn };
   } else {
-    db.prepare(`
+    await db.run(
+      `
       INSERT INTO session_players (session_id, user_id, buy_in, status)
       VALUES (?, ?, ?, 'playing')
-    `).run(sessionId, userId, amount);
+      `,
+      sessionId,
+      userId,
+      amount
+    );
     return { isRebuy: false, totalBuyIn: amount };
   }
 }
 
-export function playerLeaveSession(
+export async function playerLeaveSession(
   sessionId: number,
   userId: string,
   cashOut: number
-): { success: boolean; net: number } {
-  const player = db.prepare(`
-    SELECT * FROM session_players WHERE session_id = ? AND user_id = ?
-  `).get(sessionId, userId) as SessionPlayerRow | undefined;
+): Promise<{ success: boolean; net: number }> {
+  const db = await getDb();
+  const player = await db.get<SessionPlayerRow>(
+    'SELECT * FROM session_players WHERE session_id = ? AND user_id = ?',
+    sessionId,
+    userId
+  );
 
   if (!player) {
     return { success: false, net: 0 };
   }
 
   const roundedCashOut = Math.round(cashOut * 100) / 100;
-  db.prepare(`
+  await db.run(
+    `
     UPDATE session_players 
     SET cash_out = ?, status = 'left', left_at = CURRENT_TIMESTAMP
     WHERE id = ?
-  `).run(roundedCashOut, player.id);
+    `,
+    roundedCashOut,
+    player.id
+  );
 
   const net = Math.round((roundedCashOut - player.buy_in) * 100) / 100;
   return { success: true, net };
 }
 
-export function finalizeSession(
+export async function finalizeSession(
   sessionId: number,
   activeChipsMap: Record<string, number>
-): { settlement: SettlementResult; session: SessionRow } {
-  const session = getSessionById(sessionId);
+): Promise<{ settlement: SettlementResult; session: SessionRow }> {
+  const db = await getDb();
+  const session = await getSessionById(sessionId);
   if (!session) throw new Error('Session not found');
 
   // Update remaining active players
-  const updateCashOutStmt = db.prepare(`
-    UPDATE session_players SET cash_out = ? WHERE session_id = ? AND user_id = ?
-  `);
-
   for (const [userId, chips] of Object.entries(activeChipsMap)) {
-    updateCashOutStmt.run(Math.round(chips * 100) / 100, sessionId, userId);
+    await db.run(
+      'UPDATE session_players SET cash_out = ? WHERE session_id = ? AND user_id = ?',
+      Math.round(chips * 100) / 100,
+      sessionId,
+      userId
+    );
   }
 
   // Fetch all players in session
-  const players = getSessionPlayers(sessionId);
+  const players = await getSessionPlayers(sessionId);
 
   const playerInputs = players.map(p => ({
     userId: p.user_id,
@@ -202,40 +251,47 @@ export function finalizeSession(
 
   const settlement = calculateSettlements(playerInputs);
 
-  // Record settlements if balanced
-  const insertSettlementStmt = db.prepare(`
-    INSERT INTO settlements (session_id, from_user_id, to_user_id, amount)
-    VALUES (?, ?, ?, ?)
-  `);
+  // Clear previous settlements for this session if any
+  await db.run('DELETE FROM settlements WHERE session_id = ?', sessionId);
 
-  const transaction = db.transaction(() => {
-    // Clear previous settlements for this session if any
-    db.prepare('DELETE FROM settlements WHERE session_id = ?').run(sessionId);
+  for (const tx of settlement.transactions) {
+    await db.run(
+      `
+      INSERT INTO settlements (session_id, from_user_id, to_user_id, amount)
+      VALUES (?, ?, ?, ?)
+      `,
+      sessionId,
+      tx.fromUserId,
+      tx.toUserId,
+      tx.amount
+    );
+  }
 
-    for (const tx of settlement.transactions) {
-      insertSettlementStmt.run(sessionId, tx.fromUserId, tx.toUserId, tx.amount);
-    }
+  await db.run(
+    `
+    UPDATE sessions 
+    SET status = 'completed', ended_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+    `,
+    sessionId
+  );
 
-    db.prepare(`
-      UPDATE sessions 
-      SET status = 'completed', ended_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(sessionId);
-  });
-
-  transaction();
-
-  return { settlement, session: getSessionById(sessionId)! };
+  const updatedSession = await getSessionById(sessionId);
+  return { settlement, session: updatedSession! };
 }
 
 // Statistics Queries
-export function getUserStats(userId: string): UserStats {
-  const records = db.prepare(`
+export async function getUserStats(userId: string): Promise<UserStats> {
+  const db = await getDb();
+  const records = await db.all<{ buy_in: number; cash_out: number }[]>(
+    `
     SELECT sp.buy_in, sp.cash_out
     FROM session_players sp
     JOIN sessions s ON sp.session_id = s.id
     WHERE sp.user_id = ? AND s.status = 'completed' AND sp.cash_out IS NOT NULL
-  `).all(userId) as { buy_in: number; cash_out: number }[];
+    `,
+    userId
+  );
 
   let gamesPlayed = records.length;
   let totalBuyIn = 0;
@@ -274,15 +330,15 @@ export function getUserStats(userId: string): UserStats {
   };
 }
 
-export function getRankedStats(
+export async function getRankedStats(
   guildId: string,
   options?: { year?: number; month?: number }
-): RankedPlayerStats[] {
+): Promise<RankedPlayerStats[]> {
+  const db = await getDb();
   let dateFilter = '';
   const params: any[] = [guildId];
 
   if (options?.year && options?.month) {
-    // strftime format %Y-%m
     const monthStr = `${options.year}-${String(options.month).padStart(2, '0')}`;
     dateFilter = "AND strftime('%Y-%m', s.ended_at) = ?";
     params.push(monthStr);
@@ -292,7 +348,8 @@ export function getRankedStats(
     params.push(yearStr);
   }
 
-  const rows = db.prepare(`
+  const rows = await db.all<any[]>(
+    `
     SELECT 
       u.id as userId,
       u.username,
@@ -308,7 +365,9 @@ export function getRankedStats(
     WHERE s.guild_id = ? AND s.status = 'completed' AND sp.cash_out IS NOT NULL ${dateFilter}
     GROUP BY u.id
     ORDER BY totalProfit DESC
-  `).all(...params) as any[];
+    `,
+    ...params
+  );
 
   return rows.map(r => ({
     userId: r.userId,

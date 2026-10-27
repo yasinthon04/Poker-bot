@@ -83,11 +83,17 @@ export const pokerCommand = {
     }
 
     // Ensure user exists in DB
-    repo.upsertUser(user.id, user.username, interaction.member && 'displayName' in interaction.member ? (interaction.member as any).displayName : user.displayName);
+    await repo.upsertUser(
+      user.id,
+      user.username,
+      interaction.member && 'displayName' in interaction.member
+        ? (interaction.member as any).displayName
+        : user.displayName
+    );
 
     // 1. START
     if (subcommand === 'start') {
-      const activeSession = repo.getActiveSession(channelId);
+      const activeSession = await repo.getActiveSession(channelId);
       if (activeSession) {
         await interaction.reply({
           content: `⚠️ มีโต๊ะ Poker Session #${activeSession.id} กำลังเล่นอยู่ในห้องนี้แล้ว! กรุณาเล่นให้จบหรือกดยกเลิกก่อน`,
@@ -97,11 +103,11 @@ export const pokerCommand = {
       }
 
       const defaultBuyin = interaction.options.getNumber('buyin') ?? 100;
-      const session = repo.createSession(guildId, channelId, user.id, defaultBuyin);
+      const session = await repo.createSession(guildId, channelId, user.id, defaultBuyin);
 
       // Auto-add the host as the first player
-      repo.addOrRebuyPlayer(session.id, user.id, defaultBuyin);
-      const players = repo.getSessionPlayers(session.id);
+      await repo.addOrRebuyPlayer(session.id, user.id, defaultBuyin);
+      const players = await repo.getSessionPlayers(session.id);
 
       const embed = createTableEmbed(session, players);
       const rows = createTableActionRows(session.default_buyin);
@@ -112,12 +118,12 @@ export const pokerCommand = {
         fetchReply: true,
       });
 
-      repo.updateSessionMessageId(session.id, reply.id);
+      await repo.updateSessionMessageId(session.id, reply.id);
       return;
     }
 
     // For other subcommands, get active session
-    const session = repo.getActiveSession(channelId);
+    const session = await repo.getActiveSession(channelId);
     if (!session) {
       await interaction.reply({
         content: '❌ ยังไม่มีโต๊ะ Poker ที่กำลังเล่นอยู่ในห้องนี้! พิมพ์ `/poker start` เพื่อเปิดโต๊ะ',
@@ -128,7 +134,7 @@ export const pokerCommand = {
 
     // 2. STATUS
     if (subcommand === 'status') {
-      const players = repo.getSessionPlayers(session.id);
+      const players = await repo.getSessionPlayers(session.id);
       const embed = createTableEmbed(session, players);
       const rows = createTableActionRows(session.default_buyin);
       await interaction.reply({ embeds: [embed], components: rows });
@@ -138,7 +144,7 @@ export const pokerCommand = {
     // 3. JOIN / REBUY
     if (subcommand === 'join' || subcommand === 'rebuy') {
       const amount = interaction.options.getNumber('amount') ?? session.default_buyin;
-      const result = repo.addOrRebuyPlayer(session.id, user.id, amount);
+      const result = await repo.addOrRebuyPlayer(session.id, user.id, amount);
 
       const actionText = result.isRebuy
         ? `🔄 <@${user.id}> เติมชิปเพิ่ม **+${amount.toLocaleString()} บาท** (ยอดรวม ${result.totalBuyIn.toLocaleString()}฿)`
@@ -152,7 +158,7 @@ export const pokerCommand = {
     // 4. LEAVE (Early Cashout)
     if (subcommand === 'leave') {
       const chips = interaction.options.getNumber('chips', true);
-      const leaveResult = repo.playerLeaveSession(session.id, user.id, chips);
+      const leaveResult = await repo.playerLeaveSession(session.id, user.id, chips);
 
       if (!leaveResult.success) {
         await interaction.reply({ content: '❌ คุณไม่ได้อยู่ในโต๊ะนี้ หรือออกจากโต๊ะไปแล้ว', ephemeral: true });
@@ -171,7 +177,10 @@ export const pokerCommand = {
 
     // 5. SET-CHIPS (Host override)
     if (subcommand === 'set-chips') {
-      if (interaction.user.id !== session.host_id && !interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+      if (
+        interaction.user.id !== session.host_id &&
+        !interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)
+      ) {
         await interaction.reply({ content: '❌ เฉพาะ Host ของโต๊ะนี้เท่านั้นที่สามารถตั้งค่าชิปได้', ephemeral: true });
         return;
       }
@@ -179,8 +188,8 @@ export const pokerCommand = {
       const targetPlayer = interaction.options.getUser('player', true);
       const chips = interaction.options.getNumber('chips', true);
 
-      repo.upsertUser(targetPlayer.id, targetPlayer.username);
-      const leaveResult = repo.playerLeaveSession(session.id, targetPlayer.id, chips);
+      await repo.upsertUser(targetPlayer.id, targetPlayer.username);
+      const leaveResult = await repo.playerLeaveSession(session.id, targetPlayer.id, chips);
 
       if (!leaveResult.success) {
         await interaction.reply({ content: `❌ ผู้เล่น <@${targetPlayer.id}> ไม่อยู่ในโต๊ะนี้`, ephemeral: true });
@@ -197,19 +206,22 @@ export const pokerCommand = {
 
     // 6. CANCEL
     if (subcommand === 'cancel') {
-      if (interaction.user.id !== session.host_id && !interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+      if (
+        interaction.user.id !== session.host_id &&
+        !interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)
+      ) {
         await interaction.reply({ content: '❌ เฉพาะ Host ของโต๊ะนี้เท่านั้นที่สามารถยกเลิกโต๊ะได้', ephemeral: true });
         return;
       }
 
-      repo.cancelSession(session.id);
+      await repo.cancelSession(session.id);
       await interaction.reply({ content: `🛑 โต๊ะ Poker Session #${session.id} ถูกยกเลิกเรียบร้อยแล้ว` });
       return;
     }
 
     // 7. END SESSION
     if (subcommand === 'end') {
-      const players = repo.getSessionPlayers(session.id);
+      const players = await repo.getSessionPlayers(session.id);
       const activePlayers = players.filter(p => p.status === 'playing');
 
       if (activePlayers.length > 5) {
@@ -241,7 +253,7 @@ export async function refreshTableMessage(interaction: any, session: repo.Sessio
     const msg = await interaction.channel.messages.fetch(session.message_id).catch(() => null);
     if (!msg) return;
 
-    const players = repo.getSessionPlayers(session.id);
+    const players = await repo.getSessionPlayers(session.id);
     const embed = createTableEmbed(session, players);
     const rows = createTableActionRows(session.default_buyin);
 
@@ -256,8 +268,8 @@ export async function finalizeAndDisplaySummary(
   session: repo.SessionRow,
   activeChipsMap: Record<string, number>
 ) {
-  const { settlement } = repo.finalizeSession(session.id, activeChipsMap);
-  const players = repo.getSessionPlayers(session.id);
+  const { settlement } = await repo.finalizeSession(session.id, activeChipsMap);
+  const players = await repo.getSessionPlayers(session.id);
 
   // Map PromptPay IDs
   const ppMap: Record<string, string | null> = {};

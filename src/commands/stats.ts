@@ -49,9 +49,9 @@ export const statsCommand = {
 
     if (subcommand === 'user') {
       const targetUser = interaction.options.getUser('player') || interaction.user;
-      repo.upsertUser(targetUser.id, targetUser.username, targetUser.displayName);
+      await repo.upsertUser(targetUser.id, targetUser.username, targetUser.displayName);
 
-      const stats = repo.getUserStats(targetUser.id);
+      const stats = await repo.getUserStats(targetUser.id);
       if (stats.gamesPlayed === 0) {
         await interaction.reply({
           content: `📊 <@${targetUser.id}> ยังไม่มีประวัติการเล่น Poker ในบอทนี้`,
@@ -68,7 +68,7 @@ export const statsCommand = {
       const month = interaction.options.getInteger('month') || now.getMonth() + 1;
       const year = interaction.options.getInteger('year') || now.getFullYear();
 
-      const statsList = repo.getRankedStats(guildId, { year, month });
+      const statsList = await repo.getRankedStats(guildId, { year, month });
       const monthNamesThai = [
         'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
         'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
@@ -81,7 +81,7 @@ export const statsCommand = {
 
     if (subcommand === 'yearly') {
       const year = interaction.options.getInteger('year') || now.getFullYear();
-      const statsList = repo.getRankedStats(guildId, { year });
+      const statsList = await repo.getRankedStats(guildId, { year });
       const title = `🏆 สรุปผล Poker ประจำปี ${year}`;
       const embed = createRankedLeaderboardEmbed(title, statsList);
       await interaction.reply({ embeds: [embed] });
@@ -102,7 +102,7 @@ export const leaderboardCommand = {
       return;
     }
 
-    const statsList = repo.getRankedStats(guildId);
+    const statsList = await repo.getRankedStats(guildId);
     const embed = createRankedLeaderboardEmbed('🌟 ทำเนียบเซียน Poker (All-time Leaderboard)', statsList);
     await interaction.reply({ embeds: [embed] });
   },
