@@ -154,7 +154,11 @@ export function createNextRoundActionRow(
       .setCustomId(`btn_poker_recalc_${sessionId}`)
       .setLabel(isBalanced ? '🧮 คำนวณใหม่ (แก้ไขชิป)' : '⚠️ คำนวณใหม่ (ยอดไม่บาลานซ์)')
       .setStyle(isBalanced ? ButtonStyle.Secondary : ButtonStyle.Danger)
-      .setDisabled(disabled)
+      .setDisabled(disabled),
+    new ButtonBuilder()
+      .setCustomId('btn_poker_leaderboard')
+      .setLabel('🏆 ดูอันดับ (Leaderboard)')
+      .setStyle(ButtonStyle.Primary)
   );
 }
 

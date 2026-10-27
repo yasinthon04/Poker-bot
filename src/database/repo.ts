@@ -296,6 +296,13 @@ export async function finalizeSession(
     }
   }
 
+  // Ensure all players in this session have a non-null cash_out (default to 0 if still null)
+  for (const player of Object.values(db.session_players)) {
+    if (player.session_id === sessionId && player.cash_out === null) {
+      player.cash_out = 0;
+    }
+  }
+
   // Fetch all players in session
   const players = await getSessionPlayers(sessionId);
 

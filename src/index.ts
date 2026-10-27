@@ -190,6 +190,21 @@ client.on('interactionCreate', async (interaction: Interaction) => {
         return;
       }
 
+      // Leaderboard button (from completed session summary)
+      if (interaction.customId === 'btn_poker_leaderboard') {
+        const guildId = interaction.guildId;
+        if (!guildId) {
+          await interaction.reply({ content: '❌ คำสั่งนี้ใช้ได้เฉพาะใน Server เท่านั้น', ephemeral: true });
+          return;
+        }
+
+        const statsList = await repo.getRankedStats(guildId);
+        const { createRankedLeaderboardEmbed } = await import('./ui/embeds');
+        const embed = createRankedLeaderboardEmbed('🌟 ทำเนียบเซียน Poker (All-time Leaderboard)', statsList);
+        await interaction.reply({ embeds: [embed] });
+        return;
+      }
+
       const session = await repo.getActiveSession(channelId);
 
       if (!session) {
