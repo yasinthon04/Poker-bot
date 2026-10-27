@@ -2,6 +2,7 @@ import {
   ChatInputCommandInteraction,
   SlashCommandBuilder,
   PermissionFlagsBits,
+  GuildMember,
 } from 'discord.js';
 import * as repo from '../database/repo';
 import { createTableEmbed, createSummaryEmbed } from '../ui/embeds';
@@ -22,6 +23,29 @@ export const pokerCommand = {
             .setDescription('ค่า Buy-in เริ่มต้น (ค่าเริ่มต้น 100 บาท)')
             .setRequired(false)
             .setMinValue(1)
+        )
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('start-voice')
+        .setDescription('เปิดโต๊ะและดึงทุกคนในห้อง Voice Call เข้าโต๊ะอัตโนมัติ')
+        .addNumberOption(opt =>
+          opt
+            .setName('buyin')
+            .setDescription('ค่า Buy-in เริ่มต้น (ค่าเริ่มต้น 100 บาท)')
+            .setRequired(false)
+            .setMinValue(1)
+        )
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('scan-table')
+        .setDescription('สแกนรูปภาพหน้าจอโต๊ะโป๊กเกอร์ (AI อ่านชื่อและชิปทุกคนเพื่อคิดเงินอัตโนมัติ)')
+        .addAttachmentOption(opt =>
+          opt
+            .setName('image')
+            .setDescription('รูปภาพแคปหน้าจอโต๊ะโป๊กเกอร์ตอนจบเกม')
+            .setRequired(true)
         )
     )
     .addSubcommand(sub =>
@@ -100,7 +124,7 @@ export const pokerCommand = {
         : user.displayName
     );
 
-    // 1. START
+    // 1. START (Standard)
     if (subcommand === 'start') {
       const activeSession = await repo.getActiveSession(channelId);
       if (activeSession) {
@@ -131,17 +155,150 @@ export const pokerCommand = {
       return;
     }
 
+    // 2. START-VOICE (Auto-join everyone in voice channel)
+    if (subcommand === 'start-voice') {
+      const activeSession = await repo.getActiveSession(channelId);
+      if (activeSession) {
+        await interaction.reply({
+          content: `⚠️ มีโต๊ะ Poker Session #${activeSession.id} กำลังเล่นอยู่ในห้องนี้แล้ว! กรุณาเล่นให้จบหรือกดยกเลิกก่อน`,
+          ephemeral: true,
+        });
+        return;
+      }
+
+      const member = interaction.member as GuildMember;
+      if (!member || !member.voice?.channel) {
+        await interaction.reply({
+          content: '❌ คุณต้องอยู่ในห้อง Voice Call (ห้องพูดคุย) ก่อนใช้คำสั่งนี้ เพื่อให้บอทดึงเพื่อนในห้องเข้ามาได้ครับ',
+          ephemeral: true,
+        });
+        return;
+      }
+
+      const voiceChannel = member.voice.channel;
+      const voiceMembers = voiceChannel.members.filter(m => !m.user.bot);
+
+      if (voiceMembers.size === 0) {
+        await interaction.reply({ content: '❌ ไม่พบผู้เล่นในห้องเสียงของคุณ', ephemeral: true });
+        return;
+      }
+
+      const defaultBuyin = interaction.options.getNumber('buyin') ?? 100;
+      const session = await repo.createSession(guildId, channelId, user.id, defaultBuyin);
+
+      // Add all voice members
+      for (const [, vm] of voiceMembers) {
+        await repo.upsertUser(vm.user.id, vm.user.username, vm.displayName);
+        await repo.joinPlayer(session.id, vm.user.id, defaultBuyin);
+      }
+
+      const players = await repo.getSessionPlayers(session.id);
+      const embed = createTableEmbed(session, players);
+      const rows = createTableActionRows(session.default_buyin);
+
+      const reply = await interaction.reply({
+        content: `🎙️ ตรวจพบห้องเสียง **${voiceChannel.name}** ดึงผู้เล่นเข้าโต๊ะอัตโนมัติ **${players.length} คน** เรียบร้อยแล้ว!`,
+        embeds: [embed],
+        components: rows,
+        fetchReply: true,
+      });
+
+      await repo.updateSessionMessageId(session.id, reply.id);
+      return;
+    }
+
     // For other subcommands, get active session
     const session = await repo.getActiveSession(channelId);
     if (!session) {
       await interaction.reply({
-        content: '❌ ยังไม่มีโต๊ะ Poker ที่กำลังเล่นอยู่ในห้องนี้! พิมพ์ `/poker start` เพื่อเปิดโต๊ะ',
+        content: '❌ ยังไม่มีโต๊ะ Poker ที่กำลังเล่นอยู่ในห้องนี้! พิมพ์ `/poker start` หรือ `/poker start-voice` เพื่อเปิดโต๊ะ',
         ephemeral: true,
       });
       return;
     }
 
-    // 2. STATUS
+    // 3. SCAN-TABLE (AI Vision auto-cashout from screenshot)
+    if (subcommand === 'scan-table') {
+      if (
+        interaction.user.id !== session.host_id &&
+        !interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)
+      ) {
+        await interaction.reply({ content: '❌ เฉพาะ Host ของโต๊ะนี้เท่านั้นที่สามารถใช้คำสั่งสแกนปิดโต๊ะได้', ephemeral: true });
+        return;
+      }
+
+      const attachment = interaction.options.getAttachment('image', true);
+      if (!attachment.contentType?.startsWith('image/')) {
+        await interaction.reply({ content: '❌ ไฟล์ที่แนบต้องเป็นไฟล์รูปภาพเท่านั้นครับ', ephemeral: true });
+        return;
+      }
+
+      await interaction.deferReply();
+
+      try {
+        const { parsePokerScreenshot, matchPlayersWithDiscord } = await import('../services/vision');
+        const detected = await parsePokerScreenshot(attachment.url);
+
+        if (detected.length === 0) {
+          await interaction.editReply({
+            content: '⚠️ AI ไม่พบชื่อหรือชิปผู้เล่นในรูปภาพ กรุณาลองแคปรูปใหม่ที่เห็นชื่อและยอดเงินชัดเจนครับ',
+          });
+          return;
+        }
+
+        const players = await repo.getSessionPlayers(session.id);
+        const activePlayers = players.filter(p => p.status === 'playing');
+
+        const { matched, unmatchedDiscord } = matchPlayersWithDiscord(detected, activePlayers);
+
+        if (matched.length === 0) {
+          const detectedList = detected.map(d => `• ${d.name}: ${d.chips}฿`).join('\n');
+          await interaction.editReply({
+            content: `⚠️ AI อ่านรายชื่อบนโต๊ะได้:\n${detectedList}\n\nแต่ชื่อไม่ตรงกับผู้เล่นใน Discord สักคน กรุณาตรวจสอบชื่อผู้เล่นบนโต๊ะ หรือกรอกชิปด้วยมือครับ`,
+          });
+          return;
+        }
+
+        // Apply chips to matched players
+        const activeChipsMap: Record<string, number> = {};
+        for (const m of matched) {
+          activeChipsMap[m.userId] = m.chips;
+        }
+
+        // Active players not found in screenshot default to 0
+        if (unmatchedDiscord.length > 0) {
+          for (const ud of unmatchedDiscord) {
+            activeChipsMap[ud.userId] = 0;
+          }
+        }
+
+        let matchSummary = `🤖 **AI สแกนรูปภาพสำเร็จ (${matched.length} คน):**\n`;
+        matchSummary += matched
+          .map(m => `✅ **${m.discordName}** (ในรูป: \`${m.detectedName}\`) ➔ ชิป **${m.chips.toLocaleString()}฿**`)
+          .join('\n');
+
+        if (unmatchedDiscord.length > 0) {
+          matchSummary += `\n⚠️ *ไม่พบชื่อในรูปภาพ คิดเป็น 0฿: ${unmatchedDiscord.map(u => u.name).join(', ')}*`;
+        }
+
+        await interaction.editReply({ content: matchSummary });
+        await finalizeAndDisplaySummary(interaction, session, activeChipsMap);
+      } catch (err: any) {
+        console.error('Failed to parse poker screenshot:', err);
+        if (err.message?.includes('GEMINI_API_KEY')) {
+          await interaction.editReply({
+            content: '❌ ยังไม่ได้ตั้งค่า `GEMINI_API_KEY` ในไฟล์ `.env` บน Render ครับ!\n💡 คุณสามารถรับ API Key ได้ฟรีที่: https://aistudio.google.com/apikey',
+          });
+        } else {
+          await interaction.editReply({
+            content: `⚠️ เกิดข้อผิดพลาดในการวิเคราะห์รูปภาพ: ${err.message}`,
+          });
+        }
+      }
+      return;
+    }
+
+    // 4. STATUS
     if (subcommand === 'status') {
       const players = await repo.getSessionPlayers(session.id);
       const embed = createTableEmbed(session, players);
@@ -150,7 +307,7 @@ export const pokerCommand = {
       return;
     }
 
-    // 3. JOIN
+    // 5. JOIN
     if (subcommand === 'join') {
       const amount = interaction.options.getNumber('amount') ?? session.default_buyin;
       const result = await repo.joinPlayer(session.id, user.id, amount);
@@ -172,7 +329,7 @@ export const pokerCommand = {
       return;
     }
 
-    // 4. REBUY
+    // 6. REBUY
     if (subcommand === 'rebuy') {
       const amount = interaction.options.getNumber('amount') ?? session.default_buyin;
       const result = await repo.rebuyPlayer(session.id, user.id, amount);
@@ -192,7 +349,7 @@ export const pokerCommand = {
       return;
     }
 
-    // 5. SET-BUYIN (Host correction)
+    // 7. SET-BUYIN (Host correction)
     if (subcommand === 'set-buyin') {
       if (
         interaction.user.id !== session.host_id &&
@@ -219,7 +376,7 @@ export const pokerCommand = {
       return;
     }
 
-    // 6. LEAVE (Early Cashout)
+    // 8. LEAVE (Early Cashout)
     if (subcommand === 'leave') {
       const chips = interaction.options.getNumber('chips', true);
       const leaveResult = await repo.playerLeaveSession(session.id, user.id, chips);
@@ -239,7 +396,7 @@ export const pokerCommand = {
       return;
     }
 
-    // 7. SET-CHIPS (Host override for cashout)
+    // 9. SET-CHIPS (Host override for cashout)
     if (subcommand === 'set-chips') {
       if (
         interaction.user.id !== session.host_id &&
@@ -268,7 +425,7 @@ export const pokerCommand = {
       return;
     }
 
-    // 8. CANCEL
+    // 10. CANCEL
     if (subcommand === 'cancel') {
       if (
         interaction.user.id !== session.host_id &&
@@ -283,14 +440,14 @@ export const pokerCommand = {
       return;
     }
 
-    // 9. END SESSION
+    // 11. END SESSION
     if (subcommand === 'end') {
       const players = await repo.getSessionPlayers(session.id);
       const activePlayers = players.filter(p => p.status === 'playing');
 
       if (activePlayers.length > 5) {
         await interaction.reply({
-          content: `⚠️ โต๊ะนี้ยังมีผู้เล่นที่ยังไม่ Cash-out ถึง ${activePlayers.length} คน (เกิน 5 คน)\nกรุณาให้ผู้เล่นกดปุ่ม **[🏃 ขอออกก่อน (Cash-out)]** หรือให้ Host ใช้คำสั่ง \`/poker set-chips @ผู้เล่น [ชิป]\` ให้เหลือไม่เกิน 5 คนก่อนปิดโต๊ะ`,
+          content: `⚠️ โต๊ะนี้ยังมีผู้เล่นที่ยังไม่ Cash-out ถึง ${activePlayers.length} คน (เกิน 5 คน)\n💡 **แนะนำ:** ใช้คำสั่ง \`/poker scan-table\` แล้วแนบรูปภาพหน้าจอโต๊ะโป๊กเกอร์ เพื่อให้ AI อ่านชิปทุกคนและคิดเงินอัตโนมัติได้ทันทีครับ!`,
           ephemeral: true,
         });
         return;
