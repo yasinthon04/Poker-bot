@@ -617,7 +617,7 @@ export const pokerCommand = {
       }
 
       const actionText = result.isRejoin
-        ? `🔄 <@${user.id}> กลับเข้าโต๊ะอีกครั้งด้วยเงิน **${amount.toLocaleString()} บาท** (ยอดรวม ${result.totalBuyIn.toLocaleString()}฿)`
+        ? `🔄 <@${user.id}> กลับเข้าโต๊ะมาเล่นต่อแล้ว (ยอดเงิน Buy-in เดิม: **${result.totalBuyIn.toLocaleString()} บาท**)`
         : `🟢 <@${user.id}> เข้าร่วมโต๊ะด้วยเงิน **${amount.toLocaleString()} บาท**`;
 
       await interaction.reply({ content: actionText });

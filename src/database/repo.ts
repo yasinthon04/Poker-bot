@@ -172,9 +172,9 @@ export async function joinPlayer(
     if (existing.status === 'playing') {
       return { success: false, alreadyPlaying: true, totalBuyIn: existing.buy_in };
     }
-    // Was 'left', rejoining table
-    existing.buy_in += amount;
+    // Was 'left', rejoining table to resume playing
     existing.status = 'playing';
+    existing.cash_out = null;
     existing.left_at = null;
     persistDb();
     return { success: true, isRejoin: true, totalBuyIn: existing.buy_in };

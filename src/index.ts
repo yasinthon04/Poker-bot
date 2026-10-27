@@ -174,7 +174,7 @@ client.on('interactionCreate', async (interaction: Interaction) => {
         }
 
         const actionText = result.isRejoin
-          ? `🔄 <@${user.id}> กลับเข้าโต๊ะอีกครั้งด้วยเงิน **${session.default_buyin.toLocaleString()} บาท** (ยอดรวม ${result.totalBuyIn.toLocaleString()}฿)`
+          ? `🔄 <@${user.id}> กลับเข้าโต๊ะมาเล่นต่อแล้ว (ยอดเงิน Buy-in เดิม: **${result.totalBuyIn.toLocaleString()} บาท**)`
           : `🟢 <@${user.id}> เข้าร่วมโต๊ะด้วยเงิน **${session.default_buyin.toLocaleString()} บาท**`;
 
         await interaction.reply({ content: actionText });
