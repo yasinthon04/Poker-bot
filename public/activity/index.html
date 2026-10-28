@@ -317,7 +317,7 @@
       </div>
 
       <div class="p-2.5 rounded-xl bg-indigo-950/60 border border-indigo-500/30 text-xs text-indigo-200 leading-relaxed">
-        💡 <strong>หมายเหตุ:</strong> เมื่อมี Bot ในโต๊ะ ระบบจะสลับเป็น <strong>โหมดเล่นสนุก (ไม่คิดเงินจริง)</strong> เพื่อความโปร่งใสและซ้อมฝีมือ
+        💡 <strong>หมายเหตุ:</strong> บอทจะร่วมเล่นและคิดเงินตามกติกาจริง (เหมาะสำหรับการเทสคนเดียว หรือซ้อมเล่น)
       </div>
 
       <div class="space-y-3 text-xs">
@@ -766,10 +766,10 @@
       modeBadge.classList.remove('hidden');
       if (state.hasBots) {
         modeBadge.className = 'px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 border bg-indigo-950/80 border-indigo-500 text-indigo-300 shadow';
-        modeBadge.innerHTML = '<span>🤖</span> โหมดเล่นสนุก (มี Bot - ไม่คิดเงินจริง)';
+        modeBadge.innerHTML = '<span>🤖</span> มี Bot ในโต๊ะ (คิดเงินตามจริง)';
       } else {
         modeBadge.className = 'px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 border bg-emerald-950/80 border-emerald-500 text-emerald-300 shadow';
-        modeBadge.innerHTML = '<span>💸</span> โหมดแข่งขัน (บันทึกสถิติ/คิดเงินจริง)';
+        modeBadge.innerHTML = '<span>💸</span> โต๊ะผู้เล่นจริง (คิดเงินตามจริง)';
       }
 
       // Render Community Cards with 3D Flip
@@ -1259,22 +1259,7 @@
       const container = document.getElementById('settleContent');
       if (!settlement) return;
 
-      const hasBots = tableState?.hasBots || false;
-
       let html = '';
-
-      if (hasBots) {
-        html += `
-          <div class="p-3 rounded-xl bg-indigo-950/80 border border-indigo-500/50 text-indigo-200">
-            <div class="font-bold flex items-center gap-1.5 mb-1 text-indigo-300">
-              <span>🤖</span> โหมดเล่นสนุก (มี Bot ในโต๊ะ)
-            </div>
-            <p class="text-[11px] leading-relaxed">
-              โต๊ะนี้มี Bot ร่วมเล่น จึง <strong>ไม่มีการทำรายการโอนเงินจริง</strong> เพื่อป้องกันการได้เปรียบเสียเปรียบและให้ทุกคนซ้อมเล่นได้สบายใจ
-            </p>
-          </div>
-        `;
-      }
 
       // Player Net Summaries
       html += `
@@ -1283,10 +1268,11 @@
           <div class="space-y-1.5">
             ${settlement.players.map(p => {
               const isPos = p.net >= 0;
+              const botBadge = p.isBot || p.userId.startsWith('bot_') ? '🤖 ' : '';
               return `
                 <div class="flex items-center justify-between p-2 rounded-lg bg-slate-950 border border-slate-800">
                   <div>
-                    <span class="font-bold text-slate-200">${p.name}</span>
+                    <span class="font-bold text-slate-200">${botBadge}${p.name}</span>
                     <span class="text-slate-500 text-[11px] ml-1">(เข้า ${p.buyIn}฿ • ออก ${p.cashOut}฿)</span>
                   </div>
                   <span class="font-mono font-bold ${isPos ? 'text-emerald-400' : 'text-rose-400'}">
@@ -1300,25 +1286,28 @@
       `;
 
       // Transactions
-      if (!hasBots && settlement.transactions.length > 0) {
+      if (settlement.transactions && settlement.transactions.length > 0) {
         html += `
           <div>
             <h4 class="font-bold text-amber-400 mb-2">รายการโอนเงินเคลียร์หนี้ (Minimum Cash Flow):</h4>
             <div class="space-y-2">
               ${settlement.transactions.map(t => {
-                const toPayment = userPayments?.[t.toId];
+                const toPayment = userPayments?.[t.toUserId || t.toId];
+                const fromLabel = (t.fromUserId || t.fromId)?.startsWith('bot_') ? `🤖 ${t.fromName} (Bot)` : t.fromName;
+                const toLabel = (t.toUserId || t.toId)?.startsWith('bot_') ? `🤖 ${t.toName} (Bot)` : t.toName;
+                const toId = t.toUserId || t.toId;
                 return `
                   <div class="p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex flex-col gap-1.5">
                     <div class="flex items-center justify-between font-bold">
-                      <span class="text-rose-300">${t.fromName}</span>
+                      <span class="text-rose-300">${fromLabel}</span>
                       <span class="text-slate-500">โอนให้ ➡️</span>
-                      <span class="text-emerald-300">${t.toName}</span>
+                      <span class="text-emerald-300">${toLabel}</span>
                       <span class="font-mono text-amber-400">${t.amount.toLocaleString()}฿</span>
                     </div>
                     ${toPayment?.promptpay ? `
                       <div class="text-[11px] text-slate-400 flex items-center justify-between border-t border-slate-800 pt-1">
                         <span>พร้อมเพย์: <strong class="text-slate-200 font-mono">${toPayment.promptpay}</strong></span>
-                        ${toPayment.hasQr ? `<a href="/data/qr_images/${t.toId}.png" target="_blank" class="text-cyan-400 hover:underline">🔍 ดูรูป QR Code</a>` : ''}
+                        ${toPayment.hasQr ? `<a href="/data/qr_images/${toId}.png" target="_blank" class="text-cyan-400 hover:underline">🔍 ดูรูป QR Code</a>` : ''}
                       </div>
                     ` : ''}
                   </div>
@@ -1327,7 +1316,7 @@
             </div>
           </div>
         `;
-      } else if (!hasBots) {
+      } else {
         html += `<div class="p-3 text-center text-slate-400 bg-slate-950 rounded-xl border border-slate-800">ทุกคนมียอดเสมอกัน ไม่ต้องมีการโอนเงิน</div>`;
       }
 

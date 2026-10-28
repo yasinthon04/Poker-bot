@@ -73,49 +73,46 @@ export function calculateSettlements(
 
   const transactions: SettlementTransaction[] = [];
 
-  // If there are bots in the game, DO NOT calculate money transfers between players!
-  if (!hasBots) {
-    // Debtors: net < 0 (they owe money)
-    // Creditors: net > 0 (they are owed money)
-    const debtors = players
-      .filter(p => p.net < -0.01)
-      .map(p => ({ ...p, remainingDebt: -p.net }))
-      .sort((a, b) => b.remainingDebt - a.remainingDebt);
+  // Debtors: net < 0 (they owe money)
+  // Creditors: net > 0 (they are owed money)
+  const debtors = players
+    .filter(p => p.net < -0.01)
+    .map(p => ({ ...p, remainingDebt: -p.net }))
+    .sort((a, b) => b.remainingDebt - a.remainingDebt);
 
-    const creditors = players
-      .filter(p => p.net > 0.01)
-      .map(p => ({ ...p, remainingCredit: p.net }))
-      .sort((a, b) => b.remainingCredit - a.remainingCredit);
+  const creditors = players
+    .filter(p => p.net > 0.01)
+    .map(p => ({ ...p, remainingCredit: p.net }))
+    .sort((a, b) => b.remainingCredit - a.remainingCredit);
 
-    let dIdx = 0;
-    let cIdx = 0;
+  let dIdx = 0;
+  let cIdx = 0;
 
-    while (dIdx < debtors.length && cIdx < creditors.length) {
-      const debtor = debtors[dIdx];
-      const creditor = creditors[cIdx];
+  while (dIdx < debtors.length && cIdx < creditors.length) {
+    const debtor = debtors[dIdx];
+    const creditor = creditors[cIdx];
 
-      const amount = Math.min(debtor.remainingDebt, creditor.remainingCredit);
-      const roundedAmount = Math.round(amount * 100) / 100;
+    const amount = Math.min(debtor.remainingDebt, creditor.remainingCredit);
+    const roundedAmount = Math.round(amount * 100) / 100;
 
-      if (roundedAmount > 0) {
-        transactions.push({
-          fromUserId: debtor.userId,
-          fromName: debtor.name,
-          toUserId: creditor.userId,
-          toName: creditor.name,
-          amount: roundedAmount,
-        });
-      }
+    if (roundedAmount > 0) {
+      transactions.push({
+        fromUserId: debtor.userId,
+        fromName: debtor.name,
+        toUserId: creditor.userId,
+        toName: creditor.name,
+        amount: roundedAmount,
+      });
+    }
 
-      debtor.remainingDebt = Math.round((debtor.remainingDebt - roundedAmount) * 100) / 100;
-      creditor.remainingCredit = Math.round((creditor.remainingCredit - roundedAmount) * 100) / 100;
+    debtor.remainingDebt = Math.round((debtor.remainingDebt - roundedAmount) * 100) / 100;
+    creditor.remainingCredit = Math.round((creditor.remainingCredit - roundedAmount) * 100) / 100;
 
-      if (debtor.remainingDebt <= 0.01) {
-        dIdx++;
-      }
-      if (creditor.remainingCredit <= 0.01) {
-        cIdx++;
-      }
+    if (debtor.remainingDebt <= 0.01) {
+      dIdx++;
+    }
+    if (creditor.remainingCredit <= 0.01) {
+      cIdx++;
     }
   }
 

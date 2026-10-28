@@ -23,7 +23,7 @@ describe('Settlement and Debt Clearance Engine', () => {
     assert.strictEqual(aliceReceives, 100);
   });
 
-  test('Bot Exclusion: No money transfer transactions when bots are present', () => {
+  test('Settlement with Bots calculates transactions properly for solo testing', () => {
     const playersWithBot = [
       { userId: 'u1', name: 'Alice', buyIn: 100, cashOut: 250, isBot: false },
       { userId: 'u2', name: 'Bob', buyIn: 100, cashOut: 0, isBot: false },
@@ -33,8 +33,8 @@ describe('Settlement and Debt Clearance Engine', () => {
     const result = calculateSettlements(playersWithBot);
     assert.strictEqual(result.isBalanced, true);
     assert.strictEqual(result.hasBots, true);
-    // Crucial rule: Transactions MUST be empty so nobody pays the bot or vice versa!
-    assert.strictEqual(result.transactions.length, 0);
+    // Transactions are calculated so single players can test settlement with bots!
+    assert.strictEqual(result.transactions.length > 0, true);
     assert.strictEqual(result.players.length, 3);
   });
 

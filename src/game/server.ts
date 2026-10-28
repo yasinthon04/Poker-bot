@@ -60,8 +60,7 @@ export class PokerGameManager {
             const winnerText = summary.winners
               .map(w => `👑 **${w.name}** ชนะ **${w.potAmount.toLocaleString()}฿** (${w.handDescription})`)
               .join(', ');
-            const botTag = summary.hasBots ? ' *(โหมดมี Bot - ไม่คิดเงินจริง)*' : '';
-            await channel.send(`🃏 **จบแฮนด์ #${currentTable.handNumber}**${botTag}: ${winnerText}`);
+            await channel.send(`🃏 **จบแฮนด์ #${currentTable.handNumber}**: ${winnerText}`);
           }
         } catch (e) {
           console.warn('Could not post hand summary to Discord channel:', e);
@@ -403,16 +402,14 @@ export class PokerGameManager {
           const embed = createSummaryEmbed(dummySession, settlement, paymentMap);
           const files: any[] = [];
 
-          // Only attach QR code if NO bots played in the table!
-          const topCreditor = !settlement.hasBots
-            ? settlement.players.find(
-                p =>
-                  p.net > 0 &&
-                  !p.isBot &&
-                  !p.userId.startsWith('bot_') &&
-                  (paymentMap[p.userId]?.qrImageUrl || paymentMap[p.userId]?.promptpay)
-              )
-            : undefined;
+          // Attach QR code for top human creditor
+          const topCreditor = settlement.players.find(
+            p =>
+              p.net > 0 &&
+              !p.isBot &&
+              !p.userId.startsWith('bot_') &&
+              (paymentMap[p.userId]?.qrImageUrl || paymentMap[p.userId]?.promptpay)
+          );
 
           if (topCreditor) {
             const pInfo = paymentMap[topCreditor.userId];

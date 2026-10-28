@@ -89,12 +89,7 @@ export function createSummaryEmbed(
   });
 
   // 2. Settlement transactions (Who pays whom)
-  if (settlement.hasBots) {
-    embed.addFields({
-      name: '🤖 โต๊ะนี้มี Bot ร่วมเล่น (โหมดเล่นสนุก / ไม่คิดเงิน)',
-      value: '🎮 **ไม่มีการคำนวณยอดเงินที่ต้องโอน** เนื่องจากมี Bot เล่นในโต๊ะนี้ (แสดงเฉพาะสรุปกำไร/ขาดทุนชิป)',
-    });
-  } else if (settlement.transactions.length > 0) {
+  if (settlement.transactions.length > 0) {
     const txLines = settlement.transactions.map((tx, idx) => {
       const entry = userPromptPayMap?.[tx.toUserId];
       let ppText = '';
@@ -109,7 +104,9 @@ export function createSummaryEmbed(
           ppText = ` 🖼️ *(มีรูป QR รับเงิน)*`;
         }
       }
-      return `**${idx + 1}.** <@${tx.fromUserId}> โอนให้ <@${tx.toUserId}> 👉 **${tx.amount.toLocaleString()} บาท**${ppText}`;
+      const fromLabel = tx.fromUserId.startsWith('bot_') ? `🤖 **${tx.fromName} (Bot)**` : `<@${tx.fromUserId}>`;
+      const toLabel = tx.toUserId.startsWith('bot_') ? `🤖 **${tx.toName} (Bot)**` : `<@${tx.toUserId}>`;
+      return `**${idx + 1}.** ${fromLabel} โอนให้ ${toLabel} 👉 **${tx.amount.toLocaleString()} บาท**${ppText}`;
     });
 
     embed.addFields({
