@@ -509,7 +509,7 @@
           <label class="font-bold text-xs text-slate-200 flex items-center gap-1.5">
             <span>💰</span> ยอดซื้อชิปเข้าโต๊ะ (Buy-in)
           </label>
-          <span class="text-[11px] text-teal-400 font-mono font-bold" id="settingsBuyInLabel">100฿</span>
+          <span class="text-[11px] text-teal-400 font-mono font-bold" id="settingsBuyInLabel">200฿</span>
         </div>
         <p class="text-[11px] text-slate-400 leading-tight">
           ยอดชิปมาตรฐานเมื่อผู้เล่นใหม่หรือบอทนั่งโต๊ะ (และใช้กำหนดค่ารีโหลดบอท)
@@ -830,7 +830,7 @@
           type: 'join_table',
           channelId: channelId,
           user: myUser,
-          buyIn: 100
+          buyIn: 200
         }));
       };
 
@@ -911,7 +911,7 @@
       if (!state) return;
 
       const blindsStr = `Blinds: ${state.smallBlind}/${state.bigBlind}฿`;
-      const buyInStr = `Buy-in: ${state.defaultBuyIn || 100}฿`;
+      const buyInStr = `Buy-in: ${state.defaultBuyIn || 200}฿`;
       const timerStr = `เวลา: ${state.turnDuration}s`;
       document.getElementById('tableSubtitle').innerText = `ห้อง: ${state.channelId} • แฮนด์ #${state.handNumber} • ${blindsStr} • ${buyInStr} • ${timerStr}`;
       document.getElementById('potAmount').innerText = `${state.totalPot.toLocaleString()}฿`;
@@ -1356,7 +1356,7 @@
 
     function sitAtSeat(seatIndex) {
       selectedSeatToSit = seatIndex;
-      const defaultBuyIn = tableState?.defaultBuyIn || 100;
+      const defaultBuyIn = tableState?.defaultBuyIn || 200;
       document.getElementById('sitDownSeatLabel').innerText = `ที่นั่งที่ ${seatIndex + 1}: เลือกจำนวนชิปที่ต้องการนำเข้าโต๊ะ`;
       document.getElementById('sitDownBuyInInput').value = defaultBuyIn;
       document.getElementById('sitDownModal').classList.remove('hidden');
@@ -1373,7 +1373,7 @@
 
     function confirmSitDown() {
       if (selectedSeatToSit === null || !ws) return;
-      const buyIn = parseInt(document.getElementById('sitDownBuyInInput').value, 10) || tableState?.defaultBuyIn || 100;
+      const buyIn = parseInt(document.getElementById('sitDownBuyInInput').value, 10) || tableState?.defaultBuyIn || 200;
       ws.send(JSON.stringify({
         type: 'sit_down',
         seatIndex: selectedSeatToSit,
@@ -1385,7 +1385,7 @@
     // Table Settings Modal Handlers
     function openSettingsModal() {
       if (!tableState) return;
-      const buyIn = tableState.defaultBuyIn || 100;
+      const buyIn = tableState.defaultBuyIn || 200;
       const timer = tableState.turnDuration || 20;
       const sb = tableState.smallBlind || 10;
       const bb = tableState.bigBlind || 20;
@@ -1430,7 +1430,7 @@
     }
 
     function saveSettings() {
-      const defaultBuyIn = parseInt(document.getElementById('settingsBuyInInput').value, 10) || 100;
+      const defaultBuyIn = parseInt(document.getElementById('settingsBuyInInput').value, 10) || 200;
       const turnDuration = parseInt(document.getElementById('settingsTimerInput').value, 10) || 20;
       const smallBlind = parseInt(document.getElementById('settingsSbInput').value, 10) || 10;
       const bigBlind = parseInt(document.getElementById('settingsBbInput').value, 10) || (smallBlind * 2);

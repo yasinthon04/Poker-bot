@@ -100,7 +100,7 @@ export class PokerTable {
   public seats: (TablePlayer | null)[] = Array(9).fill(null);
   public phase: GamePhase = 'waiting';
   public handNumber: number = 0;
-  public defaultBuyIn: number = 100;
+  public defaultBuyIn: number = 200;
   public smallBlind: number = 10;
   public bigBlind: number = 20;
   public dealerSeat: number = 0;
@@ -122,11 +122,11 @@ export class PokerTable {
   public onStateChanged?: () => void;
   public onHandFinished?: (summary: { winners: HandWinnerResult[]; hasBots: boolean }) => void;
 
-  constructor(tableId: string, channelId: string, hostId: string, buyIn: number = 100) {
+  constructor(tableId: string, channelId: string, hostId: string, buyIn: number = 200) {
     this.tableId = tableId;
     this.channelId = channelId;
     this.hostId = hostId;
-    this.defaultBuyIn = buyIn > 0 ? buyIn : 100;
+    this.defaultBuyIn = buyIn > 0 ? buyIn : 200;
     this.smallBlind = Math.max(1, Math.round(this.defaultBuyIn * 0.05));
     this.bigBlind = this.smallBlind * 2;
     this.minRaise = this.bigBlind;

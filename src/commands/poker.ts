@@ -31,7 +31,7 @@ export const pokerCommand = {
         .addNumberOption(opt =>
           opt
             .setName('buyin')
-            .setDescription('ค่า Buy-in เริ่มต้น (ค่าเริ่มต้น 100 บาท)')
+            .setDescription('ค่า Buy-in เริ่มต้น (ค่าเริ่มต้น 200 บาท)')
             .setRequired(false)
             .setMinValue(1)
         )
@@ -43,7 +43,7 @@ export const pokerCommand = {
         .addNumberOption(opt =>
           opt
             .setName('buyin')
-            .setDescription('ค่า Buy-in เริ่มต้น (ค่าเริ่มต้น 100 บาท)')
+            .setDescription('ค่า Buy-in เริ่มต้น (ค่าเริ่มต้น 200 บาท)')
             .setRequired(false)
             .setMinValue(1)
         )
@@ -64,6 +64,13 @@ export const pokerCommand = {
             .setName('image')
             .setDescription('รูปภาพแคปหน้าจอโต๊ะโป๊กเกอร์ตอนจบเกม')
             .setRequired(true)
+        )
+        .addNumberOption(opt =>
+          opt
+            .setName('buyin')
+            .setDescription('ยอด Buy-in ต่อคน (ค่าเริ่มต้น 200 บาท สำหรับกรณีที่ไม่ได้เปิดโต๊ะไว้)')
+            .setRequired(false)
+            .setMinValue(1)
         )
         .addBooleanOption(opt =>
           opt
@@ -236,7 +243,7 @@ export const pokerCommand = {
         return;
       }
 
-      const defaultBuyin = interaction.options.getNumber('buyin') ?? 100;
+      const defaultBuyin = interaction.options.getNumber('buyin') ?? 200;
       const session = await repo.createSession(guildId, channelId, user.id, defaultBuyin);
 
       // Auto-add the host as the first player
@@ -343,7 +350,7 @@ export const pokerCommand = {
         return;
       }
 
-      const defaultBuyin = interaction.options.getNumber('buyin') ?? 100;
+      const defaultBuyin = interaction.options.getNumber('buyin') ?? 200;
       const session = await repo.createSession(guildId, channelId, user.id, defaultBuyin);
 
       // Add all voice members
@@ -396,7 +403,7 @@ export const pokerCommand = {
         return;
       }
 
-      const defaultBuyin = interaction.options.getNumber('buyin') ?? lastSession.default_buyin;
+      const defaultBuyin = interaction.options.getNumber('buyin') ?? lastSession.default_buyin ?? 200;
       const newSession = await repo.createSession(guildId, channelId, user.id, defaultBuyin);
 
       const uniqueLastPlayers = Array.from(new Map(lastPlayers.map(p => [p.user_id, p])).values());
@@ -426,19 +433,12 @@ export const pokerCommand = {
       session = await repo.getLastSession(channelId);
     }
 
-    if (!session) {
-      await interaction.reply({
-        content: '❌ ยังไม่มีโต๊ะ Poker ที่กำลังเล่นอยู่ในห้องนี้! พิมพ์ `/poker start` หรือ `/poker start-voice` เพื่อเปิดโต๊ะ',
-        ephemeral: true,
-      });
-      return;
-    }
-
-    // 3. SCAN-TABLE (AI Vision auto-cashout from screenshot)
+    // 3. SCAN-TABLE (AI Vision auto-cashout from screenshot, supports scanning without open table)
     if (subcommand === 'scan-table') {
       const isPreview = interaction.options.getBoolean('preview') ?? false;
 
       if (
+        session &&
         !isPreview &&
         interaction.user.id !== session.host_id &&
         !interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)
@@ -448,6 +448,7 @@ export const pokerCommand = {
       }
 
       const attachment = interaction.options.getAttachment('image', true);
+      const buyinOption = interaction.options.getNumber('buyin') ?? 200;
       const explicitLeaver = interaction.options.getUser('leaver');
       const explicitLeaverChips = interaction.options.getNumber('leaver_chips');
 
@@ -461,12 +462,13 @@ export const pokerCommand = {
       try {
         await processTableScan(
           interaction,
-          session,
+          session ?? null,
           attachment.url,
           attachment.name || 'scanned-table.png',
           isPreview,
           explicitLeaver,
-          explicitLeaverChips
+          explicitLeaverChips,
+          buyinOption
         );
       } catch (err: any) {
         console.error('Failed to parse poker screenshot:', err);
@@ -480,6 +482,14 @@ export const pokerCommand = {
           });
         }
       }
+      return;
+    }
+
+    if (!session) {
+      await interaction.reply({
+        content: '❌ ยังไม่มีโต๊ะ Poker ที่กำลังเล่นอยู่ในห้องนี้! พิมพ์ `/poker start` หรือ `/poker start-voice` เพื่อเปิดโต๊ะ',
+        ephemeral: true,
+      });
       return;
     }
 
@@ -828,12 +838,13 @@ export async function finalizeAndDisplaySummary(
 
 export async function processTableScan(
   context: any,
-  session: repo.SessionRow,
+  session: repo.SessionRow | null,
   imageUrl: string,
   imageFileName: string,
   isPreview: boolean,
   explicitLeaver?: any,
-  explicitLeaverChips?: number | null
+  explicitLeaverChips?: number | null,
+  buyinOption: number = 200
 ) {
   const { parsePokerScreenshot, matchPlayersWithDiscord } = await import('../services/vision');
   const detected = await parsePokerScreenshot(imageUrl);
@@ -845,17 +856,175 @@ export async function processTableScan(
     return;
   }
 
-  const players = await repo.getSessionPlayers(session.id);
-  const activePlayers = players.filter(p => p.status === 'playing');
+  const isAdHoc = !session;
+  if (!session) {
+    const guildId = context.guildId || context.guild?.id || '';
+    const channelId = context.channelId || context.channel?.id || '';
+    const hostId = context.user?.id || context.member?.id || 'host';
+    session = await repo.createSession(guildId, channelId, hostId, buyinOption);
+  }
 
-  const { matched, unmatchedDiscord } = matchPlayersWithDiscord(detected, activePlayers);
+  let players = await repo.getSessionPlayers(session.id);
+  let activePlayers = players.filter(p => p.status === 'playing');
 
-  if (matched.length === 0) {
-    const detectedList = detected.map(d => `• ${d.name}: ${d.chips}฿`).join('\n');
-    await context.editReply({
-      content: `⚠️ AI อ่านรายชื่อบนโต๊ะได้:\n${detectedList}\n\nแต่ชื่อไม่ตรงกับผู้เล่นใน Discord สักคน กรุณาตรวจสอบชื่อผู้เล่นบนโต๊ะ หรือกรอกชิปด้วยมือครับ`,
-    });
-    return;
+  let matched: { userId: string; discordName: string; detectedName: string; chips: number }[] = [];
+
+  if (isAdHoc || activePlayers.length === 0) {
+    // Collect Discord candidates to match against detected player names
+    const candidatesMap = new Map<string, { user_id: string; username: string; display_name: string | null }>();
+
+    // 1. Caller
+    const callerUser = context.user;
+    if (callerUser) {
+      candidatesMap.set(callerUser.id, {
+        user_id: callerUser.id,
+        username: callerUser.username,
+        display_name:
+          context.member && 'displayName' in context.member
+            ? (context.member as any).displayName
+            : callerUser.displayName || callerUser.username,
+      });
+    }
+
+    const guild = context.guild;
+    if (guild) {
+      // 2. Caller's voice channel
+      try {
+        const callerMember =
+          (context.member as GuildMember) ||
+          (typeof guild.members?.fetch === 'function' && callerUser
+            ? await guild.members.fetch(callerUser.id).catch(() => null)
+            : null);
+        const voiceChannelId =
+          callerMember?.voice?.channelId || (callerUser ? guild.voiceStates?.cache?.get(callerUser.id)?.channelId : null);
+        if (voiceChannelId && typeof guild.channels?.fetch === 'function') {
+          const voiceChannel = (await guild.channels.fetch(voiceChannelId).catch(() => null)) as any;
+          if (voiceChannel) {
+            const vsList = guild.voiceStates?.cache?.filter((vs: any) => vs.channelId === voiceChannel.id);
+            if (vsList) {
+              for (const [mId, vs] of vsList) {
+                const m =
+                  vs.member ||
+                  (typeof guild.members?.fetch === 'function' ? await guild.members.fetch(mId).catch(() => null) : null);
+                if (m && !m.user?.bot) {
+                  candidatesMap.set(m.id, {
+                    user_id: m.id,
+                    username: m.user.username,
+                    display_name: m.displayName || m.user.username,
+                  });
+                }
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Error fetching voice channel candidates:', e);
+      }
+
+      // 3. Cached guild members
+      if (guild.members?.cache) {
+        for (const [, m] of guild.members.cache) {
+          if (!m.user?.bot && !candidatesMap.has(m.id)) {
+            candidatesMap.set(m.id, {
+              user_id: m.id,
+              username: m.user.username,
+              display_name: m.displayName || m.user.username,
+            });
+          }
+        }
+      }
+    }
+
+    // 4. Past players in this channel
+    try {
+      const lastSession = await repo.getLastSession(session.channel_id);
+      if (lastSession) {
+        const lastPlayers = await repo.getSessionPlayers(lastSession.id);
+        for (const lp of lastPlayers) {
+          if (!candidatesMap.has(lp.user_id)) {
+            candidatesMap.set(lp.user_id, {
+              user_id: lp.user_id,
+              username: lp.username,
+              display_name: lp.display_name,
+            });
+          }
+        }
+      }
+    } catch {}
+
+    const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9ก-๙]/g, '');
+    const candidateList = Array.from(candidatesMap.values());
+    const matchResult = matchPlayersWithDiscord(detected, candidateList);
+    matched = matchResult.matched;
+    const matchedUserIds = new Set(matched.map(m => m.userId));
+
+    for (const m of matched) {
+      await repo.upsertUser(m.userId, m.discordName, m.discordName);
+      await repo.joinPlayer(session.id, m.userId, buyinOption);
+    }
+
+    // Process unmatched detected players
+    for (const ud of matchResult.unmatchedDetected) {
+      let resolved = false;
+      if (guild && typeof guild.members?.search === 'function') {
+        try {
+          const searched = await guild.members.search({ query: ud.name, limit: 1 });
+          const found = searched.first();
+          if (found && !found.user?.bot && !matchedUserIds.has(found.id)) {
+            matched.push({
+              userId: found.id,
+              discordName: found.displayName,
+              detectedName: ud.name,
+              chips: ud.chips,
+            });
+            matchedUserIds.add(found.id);
+            await repo.upsertUser(found.id, found.user.username, found.displayName);
+            await repo.joinPlayer(session.id, found.id, buyinOption);
+            resolved = true;
+          }
+        } catch {}
+      }
+
+      if (!resolved) {
+        const cleanName = ud.name;
+        const normName = norm(cleanName);
+        const guestId = `guest_${normName || Math.random().toString(36).substring(2, 7)}`;
+        matched.push({
+          userId: guestId,
+          discordName: cleanName,
+          detectedName: cleanName,
+          chips: ud.chips,
+        });
+        matchedUserIds.add(guestId);
+        await repo.upsertUser(guestId, cleanName, cleanName);
+        await repo.joinPlayer(session.id, guestId, buyinOption);
+      }
+    }
+
+    // Explicit leaver
+    if (explicitLeaver) {
+      await repo.upsertUser(
+        explicitLeaver.id,
+        explicitLeaver.username,
+        (explicitLeaver as any).displayName || explicitLeaver.username
+      );
+      await repo.joinPlayer(session.id, explicitLeaver.id, buyinOption);
+    }
+
+    players = await repo.getSessionPlayers(session.id);
+    activePlayers = players.filter(p => p.status === 'playing');
+  } else {
+    // Normal flow when session already had players
+    const matchResult = matchPlayersWithDiscord(detected, activePlayers);
+    matched = matchResult.matched;
+
+    if (matched.length === 0) {
+      const detectedList = detected.map(d => `• ${d.name}: ${d.chips}฿`).join('\n');
+      await context.editReply({
+        content: `⚠️ AI อ่านรายชื่อบนโต๊ะได้:\n${detectedList}\n\nแต่ชื่อไม่ตรงกับผู้เล่นใน Discord สักคน กรุณาตรวจสอบชื่อผู้เล่นบนโต๊ะ หรือกรอกชิปด้วยมือครับ`,
+      });
+      return;
+    }
   }
 
   // Apply chips to matched players
@@ -915,8 +1084,8 @@ export async function processTableScan(
   }
 
   let matchSummary = isPreview
-    ? `🔍 **AI สแกนพรีวิวรูปภาพสำเร็จ (${matched.length} คน - โต๊ะยังไม่ปิด):**\n`
-    : `🤖 **AI สแกนรูปภาพสำเร็จ (${matched.length} คน):**\n`;
+    ? `🔍 **AI สแกนพรีวิวรูปภาพสำเร็จ (${matched.length} คน - Buy-in ${session.default_buyin}฿ - โต๊ะยังไม่ปิด):**\n`
+    : `🤖 **AI สแกนรูปภาพสำเร็จ (${matched.length} คน - Buy-in ${session.default_buyin}฿):**\n`;
 
   matchSummary += matched
     .map(m => `✅ **${m.discordName}** (ในรูป: \`${m.detectedName}\`) ➔ ชิป **${m.chips.toLocaleString()}฿**`)

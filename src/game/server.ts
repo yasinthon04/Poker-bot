@@ -38,7 +38,7 @@ export class PokerGameManager {
   public getOrCreateTable(
     channelId: string,
     hostId: string,
-    buyIn: number = 100
+    buyIn: number = 200
   ): PokerTable {
     let table = this.tables.get(channelId);
     if (!table) {
@@ -116,7 +116,7 @@ export class PokerGameManager {
         conn.displayName = user.displayName || user.username;
         conn.avatarUrl = user.avatarUrl;
 
-        const table = this.getOrCreateTable(channelId, hostId || user.id, buyIn || 100);
+        const table = this.getOrCreateTable(channelId, hostId || user.id, buyIn || 200);
 
         // Mark existing seated player as reconnected
         const seated = table.seats.find(p => p?.userId === user.id);
@@ -190,7 +190,7 @@ export class PokerGameManager {
         if (!table) return;
 
         const { amount } = msg;
-        table.rebuy(conn.userId, amount || 100);
+        table.rebuy(conn.userId, amount || table.defaultBuyIn || 200);
         break;
       }
 

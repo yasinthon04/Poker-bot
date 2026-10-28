@@ -5,7 +5,17 @@ export interface DetectedPlayer {
   chips: number;
 }
 
+let mockParser: ((imageUrl: string) => Promise<DetectedPlayer[]>) | null = null;
+
+export function setMockPokerScreenshotParser(fn: ((imageUrl: string) => Promise<DetectedPlayer[]>) | null) {
+  mockParser = fn;
+}
+
 export async function parsePokerScreenshot(imageUrl: string): Promise<DetectedPlayer[]> {
+  if (mockParser) {
+    return await mockParser(imageUrl);
+  }
+
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey || apiKey === 'your_gemini_api_key_here') {
     throw new Error('GEMINI_API_KEY is not configured in .env');
