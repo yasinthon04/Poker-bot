@@ -5,6 +5,10 @@ import {
   GuildMember,
   ChannelType,
   AttachmentBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  EmbedBuilder,
 } from 'discord.js';
 import * as repo from '../database/repo';
 import { createTableEmbed, createSummaryEmbed } from '../ui/embeds';
@@ -15,6 +19,11 @@ export const pokerCommand = {
   data: new SlashCommandBuilder()
     .setName('poker')
     .setDescription('คำสั่งจัดการโต๊ะ Poker')
+    .addSubcommand(sub =>
+      sub
+        .setName('play')
+        .setDescription('เปิดโต๊ะเล่น Poker ทันที (Discord Activity / Web Table พร้อมระบบ Bot)')
+    )
     .addSubcommand(sub =>
       sub
         .setName('start')
@@ -178,6 +187,41 @@ export const pokerCommand = {
     if (subcommand === 'help') {
       const { helpCommand } = await import('./help');
       await helpCommand.execute(interaction);
+      return;
+    }
+
+    // 0. PLAY (Discord Activity / Interactive Live Table)
+    if (subcommand === 'play') {
+      const baseUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || 8000}`;
+      const playUrl = `${baseUrl}/activity?channel_id=${channelId}&user_id=${user.id}&display_name=${encodeURIComponent(
+        user.displayName || user.username
+      )}`;
+
+      const embed = new EmbedBuilder()
+        .setTitle('🎮 โต๊ะเกม Texas Hold\'em Poker (Live Activity)')
+        .setDescription(
+          `คลิกปุ่มด้านล่างเพื่อเปิดหน้าต่างโต๊ะโป๊กเกอร์แบบสด เล่นได้ทันทีใน Discord หรือเบราว์เซอร์!\n\n` +
+          `• 👥 **เล่นกับเพื่อน:** สามารถกดลิงก์นี้เพื่อเข้าโต๊ะเดียวกันได้สูงสุด 9 คน\n` +
+          `• 🤖 **ระบบ Bot:** สามารถกดปุ่ม **[🤖 เพิ่ม Bot]** บนโต๊ะเพื่อเติมที่นั่งว่างหรือซ้อมมือได้\n` +
+          `• 🛡️ **กฎการคิดเงิน:** หากมี Bot ร่วมเล่น จะเป็น **โหมดเล่นสนุก (ไม่คิดเงินจริง)** ป้องกันหนี้มั่วอัตโนมัติ\n` +
+          `• 🏁 **จบเกม:** เมื่อเล่นเสร็จ กดปุ่ม "คิดเงิน" บนโต๊ะ บอทจะสรุปผลและส่งบิลลงห้องนี้ให้ทันที`
+        )
+        .setColor(0x2ecc71)
+        .setThumbnail('https://cdn-icons-png.flaticon.com/512/2618/2618496.png')
+        .setFooter({ text: '🃏 พัฒนาโดย Poker Bot • รองรับทั้ง PC และมือถือ' })
+        .setTimestamp();
+
+      const button = new ButtonBuilder()
+        .setLabel('🎮 เข้าโต๊ะเล่น Poker ทันที')
+        .setStyle(ButtonStyle.Link)
+        .setURL(playUrl);
+
+      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(button);
+
+      await interaction.reply({
+        embeds: [embed],
+        components: [row],
+      });
       return;
     }
 

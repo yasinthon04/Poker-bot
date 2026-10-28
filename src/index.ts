@@ -21,16 +21,33 @@ import {
 } from './ui/components';
 
 import http from 'http';
+import fs from 'fs';
+import path from 'path';
+import { PokerGameManager } from './game/server';
 
 dotenv.config();
 
-// Koyeb / Cloud health check server
+// Koyeb / Cloud health check and Activity server
 const port = process.env.PORT || 8000;
-http.createServer((_req, res) => {
+const server = http.createServer((req, res) => {
+  const url = req.url || '/';
+  if (url === '/' || url.startsWith('/activity')) {
+    const activityHtmlPath = path.join(process.cwd(), 'public', 'activity', 'index.html');
+    if (fs.existsSync(activityHtmlPath)) {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      fs.createReadStream(activityHtmlPath).pipe(res);
+      return;
+    }
+  }
+
   res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
   res.end('🃏 Poker Bot is online and healthy!\n');
-}).listen(port, () => {
-  console.log(`🌐 Health check server listening on port ${port}`);
+});
+
+PokerGameManager.getInstance().attachToHttpServer(server);
+
+server.listen(port, () => {
+  console.log(`🌐 Health check & Poker Activity server listening on port ${port}`);
 });
 
 const client = new Client({
@@ -62,6 +79,9 @@ client.once('ready', async () => {
 
   // Automatically register and sync slash commands on startup
   await registerSlashCommands();
+
+  // Attach discord client to PokerGameManager for auto-settlement channel announcements
+  PokerGameManager.getInstance().setDiscordClient(client);
 });
 
 client.on('interactionCreate', async (interaction: Interaction) => {
