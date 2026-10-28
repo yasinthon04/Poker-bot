@@ -79,7 +79,8 @@ export function createSummaryEmbed(
     const icon = p.net > 0 ? '🟢' : p.net < 0 ? '🔴' : '⚪';
     const sign = p.net > 0 ? '+' : '';
     const medal = idx === 0 && p.net > 0 ? '👑 ' : '';
-    return `${medal}${icon} <@${p.userId}> : **${sign}${p.net.toLocaleString()} บาท** *(Buy-in ${p.buyIn} ➜ เหลือ ${p.cashOut})*`;
+    const userLabel = p.isBot || p.userId.startsWith('bot_') ? `🤖 **${p.name} (Bot)**` : `<@${p.userId}>`;
+    return `${medal}${icon} ${userLabel} : **${sign}${p.net.toLocaleString()} บาท** *(Buy-in ${p.buyIn} ➜ เหลือ ${p.cashOut})*`;
   });
 
   embed.addFields({
@@ -88,7 +89,12 @@ export function createSummaryEmbed(
   });
 
   // 2. Settlement transactions (Who pays whom)
-  if (settlement.transactions.length > 0) {
+  if (settlement.hasBots) {
+    embed.addFields({
+      name: '🤖 โต๊ะนี้มี Bot ร่วมเล่น (โหมดเล่นสนุก / ไม่คิดเงิน)',
+      value: '🎮 **ไม่มีการคำนวณยอดเงินที่ต้องโอน** เนื่องจากมี Bot เล่นในโต๊ะนี้ (แสดงเฉพาะสรุปกำไร/ขาดทุนชิป)',
+    });
+  } else if (settlement.transactions.length > 0) {
     const txLines = settlement.transactions.map((tx, idx) => {
       const entry = userPromptPayMap?.[tx.toUserId];
       let ppText = '';

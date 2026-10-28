@@ -476,9 +476,15 @@ client.on('interactionCreate', async (interaction: Interaction) => {
           const embed = createSummaryEmbed(session, settlement, ppMap, true);
           const files: any[] = [];
 
-          const topCreditor = settlement.players.find(
-            p => p.net > 0 && (ppMap[p.userId]?.qrImageUrl || ppMap[p.userId]?.promptpay)
-          );
+          const topCreditor = !settlement.hasBots
+            ? settlement.players.find(
+                p =>
+                  p.net > 0 &&
+                  !p.isBot &&
+                  !p.userId.startsWith('bot_') &&
+                  (ppMap[p.userId]?.qrImageUrl || ppMap[p.userId]?.promptpay)
+              )
+            : undefined;
           if (topCreditor) {
             const pInfo = ppMap[topCreditor.userId];
             const { resolvePaymentAttachment } = await import('./services/qr');
@@ -711,9 +717,15 @@ client.on('interactionCreate', async (interaction: Interaction) => {
         const embed = createSummaryEmbed(session, settlement, ppMap, true);
         const files: any[] = [];
 
-        const topCreditor = settlement.players.find(
-          p => p.net > 0 && (ppMap[p.userId]?.qrImageUrl || ppMap[p.userId]?.promptpay)
-        );
+        const topCreditor = !settlement.hasBots
+          ? settlement.players.find(
+              p =>
+                p.net > 0 &&
+                !p.isBot &&
+                !p.userId.startsWith('bot_') &&
+                (ppMap[p.userId]?.qrImageUrl || ppMap[p.userId]?.promptpay)
+            )
+          : undefined;
         if (topCreditor) {
           const pInfo = ppMap[topCreditor.userId];
           const { resolvePaymentAttachment } = await import('./services/qr');

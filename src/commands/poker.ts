@@ -472,9 +472,15 @@ export const pokerCommand = {
         const embed = createSummaryEmbed(session, settlement, ppMap, true);
         const files: any[] = [];
 
-        const topCreditor = settlement.players.find(
-          p => p.net > 0 && (ppMap[p.userId]?.qrImageUrl || ppMap[p.userId]?.promptpay)
-        );
+        const topCreditor = !settlement.hasBots
+          ? settlement.players.find(
+              p =>
+                p.net > 0 &&
+                !p.isBot &&
+                !p.userId.startsWith('bot_') &&
+                (ppMap[p.userId]?.qrImageUrl || ppMap[p.userId]?.promptpay)
+            )
+          : undefined;
         if (topCreditor) {
           const pInfo = ppMap[topCreditor.userId];
           const qrResult = await resolvePaymentAttachment(
@@ -733,10 +739,16 @@ export async function finalizeAndDisplaySummary(
     embed.setThumbnail(sourceImageUrl);
   }
 
-  // Find biggest winner to generate QR code if PromptPay or custom QR is configured
-  const topCreditor = settlement.players.find(
-    p => p.net > 0 && (ppMap[p.userId]?.qrImageUrl || ppMap[p.userId]?.promptpay)
-  );
+  // Find biggest winner to generate QR code if PromptPay or custom QR is configured (only if no bots)
+  const topCreditor = !settlement.hasBots
+    ? settlement.players.find(
+        p =>
+          p.net > 0 &&
+          !p.isBot &&
+          !p.userId.startsWith('bot_') &&
+          (ppMap[p.userId]?.qrImageUrl || ppMap[p.userId]?.promptpay)
+      )
+    : undefined;
   const files: any[] = [];
 
   if (topCreditor) {
@@ -895,9 +907,15 @@ export async function processTableScan(
     const embed = createSummaryEmbed(session, settlement, ppMap, true);
     const files: any[] = [tableFile];
 
-    const topCreditor = settlement.players.find(
-      p => p.net > 0 && (ppMap[p.userId]?.qrImageUrl || ppMap[p.userId]?.promptpay)
-    );
+    const topCreditor = !settlement.hasBots
+      ? settlement.players.find(
+          p =>
+            p.net > 0 &&
+            !p.isBot &&
+            !p.userId.startsWith('bot_') &&
+            (ppMap[p.userId]?.qrImageUrl || ppMap[p.userId]?.promptpay)
+        )
+      : undefined;
     if (topCreditor) {
       const pInfo = ppMap[topCreditor.userId];
       const qrResult = await resolvePaymentAttachment(
