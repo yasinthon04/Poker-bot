@@ -45,10 +45,21 @@ const client = new Client({
 const pendingScanCollectors = new Map<string, any>();
 
 import { registerSlashCommands } from './register-commands';
+import { isSupabaseConfigured } from './database/supabase';
+import { autoMigrateLocalData } from './database/supabase-repo';
 
 client.once('ready', async () => {
   console.log(`🤖 Logged in as ${client.user?.tag}!`);
   console.log('🃏 Poker Bot is online and ready.');
+
+  if (isSupabaseConfigured()) {
+    console.log('⚡ Database: Connected to Supabase (Permanent Cloud Storage)');
+    await autoMigrateLocalData();
+  } else {
+    console.log('📁 Database: Using local JSON storage (data/poker-data.json)');
+    console.log('💡 Tip: Set SUPABASE_URL and SUPABASE_KEY in .env for permanent cloud storage!');
+  }
+
   // Automatically register and sync slash commands on startup
   await registerSlashCommands();
 });

@@ -117,23 +117,27 @@ npm run register
    - `CLIENT_ID`
    - `GUILD_ID`
    - `GEMINI_API_KEY` (สำหรับระบบสแกนรูป)
+   - `SUPABASE_URL` *(แนะนำ: เพื่อเก็บข้อมูลถาวร 100%)*
+   - `SUPABASE_KEY` *(แนะนำ: เพื่อเก็บข้อมูลถาวร 100%)*
 5. กด Deploy เสร็จสิ้น!
-
-### ตัวเลือกที่ 2: รันในเครื่อง Mac ด้วย PM2 (เปิดคอมมา บอทรันเองอัตโนมัติ)
-```bash
-npm install -g pm2
-npm run build
-pm2 start dist/index.js --name "poker-bot"
-pm2 startup
-pm2 save
-```
 
 ---
 
-## 🗄️ โครงสร้างฐานข้อมูล (Pure JavaScript JSON Database)
-ข้อมูลทั้งหมดถูกบันทึกไว้ใน `data/poker-data.json` โดยอัตโนมัติ:
-- **ไม่ต้องพึ่งพา C++ Binaries ใดๆ**: หมดปัญหาเรื่อง GLIBC mismatch หรือความเข้ากันไม่ได้ของระบบปฏิบัติการ
-- `users`: ข้อมูลผู้เล่น และเบอร์พร้อมเพย์
-- `sessions`: ข้อมูลโต๊ะ ประวัติเวลาเริ่ม-จบ โฮสต์
-- `session_players`: รายการซื้อชิป (Buy-in / Rebuy) และชิปตอนจบ (Cash-out)
-- `settlements`: ประวัติการจับคู่โอนเงิน
+## ⚡ ฐานข้อมูลถาวร Supabase (Permanent Cloud Database)
+เมื่อรันบน Render.com แผนฟรี หากไม่มี Database ภายนอก ข้อมูลไฟล์ในเครื่องจะถูกล้างเมื่อบอทรีสตาร์ท คุณสามารถเชื่อมต่อ **Supabase (ฟรีตลอดชีพ 500 MB)** เพื่อเก็บข้อมูลถาวรได้ใน 3 นาที:
+
+1. เข้าเว็บ [Supabase.com](https://supabase.com/) ➔ กด **New Project** ตั้งชื่อโปรเจกต์
+2. ไปที่แท็บ **SQL Editor** ด้านซ้าย ➔ กด **New query** ➔ ก๊อปปี้โค้ดจากไฟล์ [`supabase-schema.sql`](supabase-schema.sql) ทั้งหมดไปวาง ➔ กด **Run** (สร้างตารางเสร็จทันที)
+3. ไปที่ **Project Settings** ➔ **API** ➔ ก๊อปปี้:
+   - **Project URL** ➔ ใส่ใน `SUPABASE_URL`
+   - **anon public** หรือ **service_role** ➔ ใส่ใน `SUPABASE_KEY`
+4. นำทั้ง 2 ค่าไปใส่ใน Environment Variables บน Render หรือไฟล์ `.env` ในเครื่อง
+5. เมื่อบอทเริ่มทำงาน จะมีข้อความแจ้งเตือนว่าเชื่อมต่อ Supabase สำเร็จ และจะดึงข้อมูลเดิมจากไฟล์ JSON ขึ้น Supabase ให้อัตโนมัติ!
+
+---
+
+## 🗄️ โครงสร้างฐานข้อมูล (Database Architecture)
+บอทรองรับระบบ Hybrid Database อัตโนมัติ:
+- **เมื่อตั้งค่า Supabase (`SUPABASE_URL` + `SUPABASE_KEY`)**: เก็บข้อมูลบน PostgreSQL Cloud ถาวร 100% เปิดดู/แก้ไขผ่านหน้าเว็บ Supabase ได้
+- **เมื่อไม่ได้ตั้งค่า Supabase**: บอทจะบันทึกลงไฟล์ `data/poker-data.json` ในเครื่องโดยอัตโนมัติ (Zero-config สำหรับเทสในเครื่อง)
+

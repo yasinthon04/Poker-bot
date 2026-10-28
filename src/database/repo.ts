@@ -1,5 +1,7 @@
 import { getMemoryDb, persistDb, UserRecord, SessionRecord } from './db';
 import { calculateSettlements, SettlementResult } from '../services/settlement';
+import { isSupabaseConfigured } from './supabase';
+import * as supabaseRepo from './supabase-repo';
 
 export type UserRow = UserRecord;
 export type SessionRow = SessionRecord;
@@ -43,6 +45,9 @@ export interface RankedPlayerStats {
 
 // User Operations
 export async function upsertUser(id: string, username: string, displayName?: string | null): Promise<void> {
+  if (isSupabaseConfigured()) {
+    return supabaseRepo.upsertUser(id, username, displayName);
+  }
   const db = getMemoryDb();
   const existing = db.users[id];
   db.users[id] = {
@@ -56,11 +61,17 @@ export async function upsertUser(id: string, username: string, displayName?: str
 }
 
 export async function getUser(id: string): Promise<UserRow | undefined> {
+  if (isSupabaseConfigured()) {
+    return supabaseRepo.getUser(id);
+  }
   const db = getMemoryDb();
   return db.users[id];
 }
 
 export async function setUserPromptPay(userId: string, promptPay: string): Promise<void> {
+  if (isSupabaseConfigured()) {
+    return supabaseRepo.setUserPromptPay(userId, promptPay);
+  }
   const db = getMemoryDb();
   if (db.users[userId]) {
     db.users[userId].promptpay = promptPay;
@@ -69,6 +80,9 @@ export async function setUserPromptPay(userId: string, promptPay: string): Promi
 }
 
 export async function clearUserPromptPay(userId: string): Promise<void> {
+  if (isSupabaseConfigured()) {
+    return supabaseRepo.clearUserPromptPay(userId);
+  }
   const db = getMemoryDb();
   if (db.users[userId]) {
     db.users[userId].promptpay = null;
@@ -78,6 +92,9 @@ export async function clearUserPromptPay(userId: string): Promise<void> {
 
 // Session Operations
 export async function getActiveSession(channelId: string): Promise<SessionRow | undefined> {
+  if (isSupabaseConfigured()) {
+    return supabaseRepo.getActiveSession(channelId);
+  }
   const db = getMemoryDb();
   const active = Object.values(db.sessions)
     .filter(s => s.channel_id === channelId && s.status === 'active')
@@ -86,6 +103,9 @@ export async function getActiveSession(channelId: string): Promise<SessionRow | 
 }
 
 export async function getLastSession(channelId: string): Promise<SessionRow | undefined> {
+  if (isSupabaseConfigured()) {
+    return supabaseRepo.getLastSession(channelId);
+  }
   const db = getMemoryDb();
   const sessions = Object.values(db.sessions)
     .filter(s => s.channel_id === channelId)
@@ -94,6 +114,9 @@ export async function getLastSession(channelId: string): Promise<SessionRow | un
 }
 
 export async function getSessionById(sessionId: number): Promise<SessionRow | undefined> {
+  if (isSupabaseConfigured()) {
+    return supabaseRepo.getSessionById(sessionId);
+  }
   const db = getMemoryDb();
   return db.sessions[String(sessionId)];
 }
@@ -104,6 +127,9 @@ export async function createSession(
   hostId: string,
   defaultBuyin: number
 ): Promise<SessionRow> {
+  if (isSupabaseConfigured()) {
+    return supabaseRepo.createSession(guildId, channelId, hostId, defaultBuyin);
+  }
   const db = getMemoryDb();
   const newId = ++db.counters.sessionId;
   const session: SessionRecord = {
@@ -123,6 +149,9 @@ export async function createSession(
 }
 
 export async function updateSessionMessageId(sessionId: number, messageId: string): Promise<void> {
+  if (isSupabaseConfigured()) {
+    return supabaseRepo.updateSessionMessageId(sessionId, messageId);
+  }
   const db = getMemoryDb();
   if (db.sessions[String(sessionId)]) {
     db.sessions[String(sessionId)].message_id = messageId;
@@ -131,6 +160,9 @@ export async function updateSessionMessageId(sessionId: number, messageId: strin
 }
 
 export async function cancelSession(sessionId: number): Promise<void> {
+  if (isSupabaseConfigured()) {
+    return supabaseRepo.cancelSession(sessionId);
+  }
   const db = getMemoryDb();
   if (db.sessions[String(sessionId)]) {
     db.sessions[String(sessionId)].status = 'cancelled';
@@ -141,6 +173,9 @@ export async function cancelSession(sessionId: number): Promise<void> {
 
 // Session Players Operations
 export async function getSessionPlayers(sessionId: number): Promise<SessionPlayerRow[]> {
+  if (isSupabaseConfigured()) {
+    return supabaseRepo.getSessionPlayers(sessionId);
+  }
   const db = getMemoryDb();
   const players = Object.values(db.session_players).filter(p => p.session_id === sessionId);
 
@@ -163,6 +198,9 @@ export async function joinPlayer(
   userId: string,
   amount: number
 ): Promise<{ success: boolean; alreadyPlaying?: boolean; isRejoin?: boolean; totalBuyIn: number }> {
+  if (isSupabaseConfigured()) {
+    return supabaseRepo.joinPlayer(sessionId, userId, amount);
+  }
   const db = getMemoryDb();
   const currentlyPlaying = Object.values(db.session_players).find(
     p => p.session_id === sessionId && p.user_id === userId && p.status === 'playing'
@@ -203,6 +241,9 @@ export async function rebuyPlayer(
   userId: string,
   amount: number
 ): Promise<{ success: boolean; notPlaying?: boolean; totalBuyIn: number }> {
+  if (isSupabaseConfigured()) {
+    return supabaseRepo.rebuyPlayer(sessionId, userId, amount);
+  }
   const db = getMemoryDb();
   const existing = Object.values(db.session_players).find(
     p => p.session_id === sessionId && p.user_id === userId && p.status === 'playing'
@@ -225,6 +266,9 @@ export async function setPlayerBuyIn(
   userId: string,
   amount: number
 ): Promise<{ success: boolean; totalBuyIn: number }> {
+  if (isSupabaseConfigured()) {
+    return supabaseRepo.setPlayerBuyIn(sessionId, userId, amount);
+  }
   const db = getMemoryDb();
   const existing = Object.values(db.session_players).find(
     p => p.session_id === sessionId && p.user_id === userId && p.status === 'playing'
@@ -245,6 +289,9 @@ export async function addOrRebuyPlayer(
   userId: string,
   amount: number
 ): Promise<{ isRebuy: boolean; totalBuyIn: number }> {
+  if (isSupabaseConfigured()) {
+    return supabaseRepo.addOrRebuyPlayer(sessionId, userId, amount);
+  }
   const res = await joinPlayer(sessionId, userId, amount);
   if (res.alreadyPlaying) {
     const rebuyRes = await rebuyPlayer(sessionId, userId, amount);
@@ -258,6 +305,9 @@ export async function playerLeaveSession(
   userId: string,
   cashOut: number
 ): Promise<{ success: boolean; net: number }> {
+  if (isSupabaseConfigured()) {
+    return supabaseRepo.playerLeaveSession(sessionId, userId, cashOut);
+  }
   const db = getMemoryDb();
   const player = Object.values(db.session_players).find(
     p => p.session_id === sessionId && p.user_id === userId && p.status === 'playing'
@@ -281,6 +331,9 @@ export async function finalizeSession(
   sessionId: number,
   activeChipsMap: Record<string, number>
 ): Promise<{ settlement: SettlementResult; session: SessionRow }> {
+  if (isSupabaseConfigured()) {
+    return supabaseRepo.finalizeSession(sessionId, activeChipsMap);
+  }
   const db = getMemoryDb();
   const session = db.sessions[String(sessionId)];
   if (!session) throw new Error('Session not found');
@@ -343,6 +396,9 @@ export async function finalizeSession(
 
 // Statistics Queries
 export async function getUserStats(userId: string): Promise<UserStats> {
+  if (isSupabaseConfigured()) {
+    return supabaseRepo.getUserStats(userId);
+  }
   const db = getMemoryDb();
   const records = Object.values(db.session_players).filter(p => {
     if (p.user_id !== userId || p.cash_out === null) return false;
@@ -401,6 +457,9 @@ export async function getRankedStats(
   guildId: string,
   options?: { year?: number; month?: number }
 ): Promise<RankedPlayerStats[]> {
+  if (isSupabaseConfigured()) {
+    return supabaseRepo.getRankedStats(guildId, options);
+  }
   const db = getMemoryDb();
   let filterPrefix = '';
   if (options?.year && options?.month) {
