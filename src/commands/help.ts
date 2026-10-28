@@ -20,8 +20,9 @@ export const helpCommand = {
         {
           name: '🃏 จัดการโต๊ะโป๊กเกอร์ (`/poker`)',
           value: [
+            '🎮 `/poker play` : เปิดโต๊ะเล่น Texas Hold\'em แบบสด (Discord Activity / Web Table) มี Bot และตั้งค่าโต๊ะได้',
             '🌟 `/poker start-voice [buyin] [channel]` : เปิดโต๊ะและดึงทุกคนในห้องเสียงเข้าโต๊ะอัตโนมัติ (ค่าเริ่มต้น 200 บาท) *(แนะนำ)*',
-            '📸 `/poker scan-table <image> [buyin] [preview] [leaver] [leaver_chips]` : แคปหน้าจอส่ง AI อ่านชิปคิดเงิน (ค่าเริ่มต้น 200 บาท สแกนได้ทันทีโดยไม่ต้องเปิดโต๊ะไว้ก่อน)',
+            '📸 `/poker scan-table <image> [buyin] [preview] [leaver] [leaver_chips]` : สแกนรูปโต๊ะคิดเงินทันทีโดยไม่ต้องเปิดโต๊ะล่วงหน้า (ค่าเริ่มต้น 200 บาท)',
             '🔍 `/poker preview` : ดูพรีวิวยอดเงินและคำนวณหนี้ปัจจุบันโดยไม่ต้องปิดโต๊ะ',
             '🔄 `/poker next-round [buyin]` : เริ่มรอบใหม่ทันทีโดยดึงผู้เล่นจากรอบล่าสุดเข้าโต๊ะอัตโนมัติ',
             '• `/poker start [buyin]` : เปิดโต๊ะใหม่แบบปกติ (ค่าเริ่มต้น 200 บาท)',
@@ -49,15 +50,18 @@ export const helpCommand = {
           ].join('\n'),
         },
         {
-          name: '📱 ข้อมูลส่วนตัว / พร้อมเพย์ (`/profile`)',
+          name: '📱 ข้อมูลส่วนตัว / รับเงิน (`/profile`)',
           value: [
+            '• `/profile set-qr <image>` : 🖼️ อัปโหลดรูป QR Code รับเงิน (ธนาคาร หรือ พร้อมเพย์) ให้เพื่อนสแกนเมื่อชนะ',
+            '• `/profile view` : 🔍 ดูข้อมูลการรับเงินของคุณ (เบอร์พร้อมเพย์ & พรีวิวรูป QR ที่บันทึกไว้)',
+            '• `/profile clear-qr` : 🗑️ ลบรูปภาพ QR Code รับเงินออกจากระบบ',
             '• `/profile set-promptpay <number>` : บันทึกเบอร์พร้อมเพย์รับเงิน (มี QR Code อัตโนมัติ)',
             '• `/profile clear-promptpay` : ลบข้อมูลพร้อมเพย์ / ปิดการสร้าง QR Code',
           ].join('\n'),
         }
       )
       .setFooter({
-        text: '💡 ทริค: เข้าห้อง Voice ➔ /poker start-voice ➔ เล่นเสร็จแคปรูปส่ง /poker scan-table',
+        text: '💡 ทริค: เล่นสด /poker play หรือเข้า Voice ➔ /poker start-voice ➔ เล่นเสร็จแคปรูป /poker scan-table',
       })
       .setTimestamp();
 
