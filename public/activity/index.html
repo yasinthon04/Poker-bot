@@ -184,9 +184,14 @@
           <div class="w-14 h-20 sm:w-16 sm:h-24 md:w-18 md:h-26 rounded-xl border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/30 text-xs sm:text-sm font-bold">River</div>
         </div>
 
-        <!-- Action Announcement Banner -->
-        <div id="actionAnnouncement" class="text-xs px-3.5 py-1 bg-slate-950/80 rounded-full text-slate-200 border border-white/10 max-w-sm sm:max-w-md text-center truncate shadow">
-          รอผู้เล่นนั่งโต๊ะเพื่อเริ่มเกม...
+        <!-- Action Announcement Banner & Next Hand Quick Action -->
+        <div class="flex flex-col items-center gap-1.5 z-20">
+          <div id="actionAnnouncement" class="text-xs px-3.5 py-1 bg-slate-950/80 rounded-full text-slate-200 border border-white/10 max-w-sm sm:max-w-md text-center truncate shadow">
+            รอผู้เล่นนั่งโต๊ะเพื่อเริ่มเกม...
+          </div>
+          <button id="nextHandBtn" onclick="requestNextHand()" class="hidden text-xs px-3.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full font-bold shadow-xl border border-emerald-400 transition animate-bounce">
+            ▶️ แจกไพ่แฮนด์ถัดไปทันที
+          </button>
         </div>
       </div>
 
@@ -789,6 +794,16 @@
       if (isMyTurn) turnBadge.classList.remove('hidden');
       else turnBadge.classList.add('hidden');
 
+      // Next Hand Quick Action Button
+      const nextHandBtn = document.getElementById('nextHandBtn');
+      if (nextHandBtn) {
+        if (state.phase === 'hand_ended' || state.phase === 'showdown') {
+          nextHandBtn.classList.remove('hidden');
+        } else {
+          nextHandBtn.classList.add('hidden');
+        }
+      }
+
       // Render 9 Seats
       renderSeats(state);
 
@@ -1114,6 +1129,10 @@
         action,
         amount
       }));
+    }
+
+    function requestNextHand() {
+      if (ws) ws.send(JSON.stringify({ type: 'next_hand' }));
     }
 
     function setRaiseMultiplier(mult) {

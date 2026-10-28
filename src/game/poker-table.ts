@@ -270,15 +270,48 @@ export class PokerTable {
     if (!player) return false;
     player.chips += amount;
     player.totalBuyIn += amount;
+    player.isFolded = false;
+    player.isAllIn = false;
     this.lastActionMessage = `💰 ${player.displayName} เติมชิป (Rebuy) +${amount}฿`;
     this.lastEvent = { type: 'rebuy', userId, amount, timestamp: Date.now() };
     this.emitChange();
+    this.checkAutoStart();
     return true;
   }
 
-  private checkAutoStart() {
-    if (this.phase === 'waiting' && this.activePlayers.filter(p => p.chips > 0).length >= 2) {
-      setTimeout(() => this.startHand(), 2000).unref?.();
+  public checkAutoStart() {
+    if (this.phase !== 'waiting' && this.phase !== 'hand_ended' && this.phase !== 'showdown') {
+      return;
+    }
+
+    // Auto-reload bots that have 0 chips so solo testing never stops
+    for (const p of this.seats) {
+      if (p && p.isBot && p.chips <= 0) {
+        const reloadAmount = p.initialBuyIn || 200;
+        p.chips = reloadAmount;
+        p.totalBuyIn += reloadAmount;
+        p.isFolded = false;
+        p.isAllIn = false;
+      }
+    }
+
+    const eligible = this.activePlayers.filter(p => p.chips > 0);
+    if (eligible.length >= 2) {
+      if (this.phase === 'waiting') {
+        setTimeout(() => {
+          if (this.phase === 'waiting' && this.activePlayers.filter(p => p.chips > 0).length >= 2) {
+            this.startHand();
+          }
+        }, 1500).unref?.();
+      } else {
+        // Hand just finished (showdown or all others folded), start next hand
+        this.startHand();
+      }
+    } else {
+      this.phase = 'waiting';
+      this.currentTurnSeat = null;
+      this.lastActionMessage = 'รอผู้เล่นอย่างน้อย 2 คนที่มีชิปเพื่อเริ่มแฮนด์ใหม่...';
+      this.emitChange();
     }
   }
 
@@ -653,11 +686,11 @@ export class PokerTable {
       this.onHandFinished({ winners: this.handWinners, hasBots: this.hasBots });
     }
 
-    // Auto-advance to next hand after 6 seconds
+    // Auto-advance to next hand after 5 seconds
     setTimeout(() => {
       this.phase = 'hand_ended';
       this.checkAutoStart();
-    }, 6000).unref?.();
+    }, 5000).unref?.();
   }
 
   private awardPotToSingleWinner(winner: TablePlayer) {

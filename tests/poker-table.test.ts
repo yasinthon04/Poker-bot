@@ -165,4 +165,26 @@ describe('Texas Hold\'em Poker Table State Machine', () => {
     assert.strictEqual(bob.chips, 205);
     assert.strictEqual(table.lastEvent?.type, 'showdown');
   });
+
+  test('checkAutoStart advances hand_ended table to the next hand', () => {
+    const table = new PokerTable('tab10', 'chan10', 'user1', 100);
+    table.sitDown(0, { id: 'u1', username: 'alice', displayName: 'Alice' }, 200);
+    table.sitDown(1, { id: 'u2', username: 'bob', displayName: 'Bob' }, 200);
+
+    table.startHand(); // Hand 1
+    assert.strictEqual(table.handNumber, 1);
+
+    // End hand by folding
+    table.handleAction('u1', 'fold');
+    assert.strictEqual(table.phase, 'hand_ended');
+
+    // Trigger checkAutoStart (same as timer firing or user pressing Next Hand)
+    table.checkAutoStart();
+
+    // Must have advanced to Hand 2 and dealt new cards!
+    assert.strictEqual(table.handNumber, 2);
+    assert.strictEqual(table.phase, 'preflop');
+    assert.strictEqual(table.seats[0]?.holeCards.length, 2);
+    assert.strictEqual(table.seats[1]?.holeCards.length, 2);
+  });
 });
