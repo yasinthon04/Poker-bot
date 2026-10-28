@@ -135,6 +135,7 @@ export class PokerGameManager {
         if (!table) return;
 
         const { seatIndex, buyIn } = msg;
+        const actualBuyIn = buyIn && Number(buyIn) > 0 ? Number(buyIn) : table.defaultBuyIn;
         const success = table.sitDown(
           seatIndex,
           {
@@ -143,7 +144,7 @@ export class PokerGameManager {
             displayName: conn.displayName || 'Player',
             avatarUrl: conn.avatarUrl,
           },
-          buyIn || 100
+          actualBuyIn
         );
 
         if (!success) {
@@ -158,7 +159,8 @@ export class PokerGameManager {
         if (!table) return;
 
         const { seatIndex, name, difficulty, chips } = msg;
-        table.addBot(seatIndex, name || 'Bot Alpha', difficulty || 'medium', chips || 200);
+        const botChips = chips && Number(chips) > 0 ? Number(chips) : (table.defaultBuyIn * 2 || 200);
+        table.addBot(seatIndex, name || 'Bot Alpha', difficulty || 'medium', botChips);
         break;
       }
 
@@ -201,6 +203,22 @@ export class PokerGameManager {
         if (table.phase === 'waiting' || table.phase === 'hand_ended' || table.phase === 'showdown') {
           table.startHand();
         }
+        break;
+      }
+
+      case 'update_settings':
+      case 'update_table_settings': {
+        if (!conn.channelId) return;
+        const table = this.tables.get(conn.channelId);
+        if (!table) return;
+
+        const { defaultBuyIn, smallBlind, bigBlind, turnDuration } = msg;
+        table.updateSettings({
+          defaultBuyIn: defaultBuyIn !== undefined ? Number(defaultBuyIn) : undefined,
+          smallBlind: smallBlind !== undefined ? Number(smallBlind) : undefined,
+          bigBlind: bigBlind !== undefined ? Number(bigBlind) : undefined,
+          turnDuration: turnDuration !== undefined ? Number(turnDuration) : undefined,
+        });
         break;
       }
 

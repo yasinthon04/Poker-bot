@@ -147,6 +147,11 @@
         <span>📱</span> <span class="hidden sm:inline">พร้อมเพย์/QR</span>
       </button>
 
+      <!-- Table Settings Modal Button -->
+      <button onclick="openSettingsModal()" class="bg-slate-800 hover:bg-slate-700 text-teal-300 text-xs px-2.5 py-1.5 rounded-lg font-medium border border-teal-500/30 transition flex items-center gap-1 shadow">
+        <span>⚙️</span> <span class="hidden sm:inline">ตั้งค่าโต๊ะ</span>
+      </button>
+
       <!-- Add Bot Button -->
       <button id="addBotBtn" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-2.5 py-1.5 rounded-lg font-semibold flex items-center gap-1 transition shadow">
         <span>🤖</span> + Bot
@@ -488,6 +493,139 @@
     </div>
   </div>
 
+  <!-- MODAL 8: TABLE SETTINGS (BUY-IN, TIMER, BLINDS) -->
+  <div id="settingsModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl p-5 max-w-md w-full space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="font-bold text-base text-teal-400 flex items-center gap-2">
+          <span>⚙️</span> ตั้งค่าโต๊ะโป๊กเกอร์ (Table Settings)
+        </h3>
+        <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-white text-lg">&times;</button>
+      </div>
+
+      <!-- Setting 1: Buy-In -->
+      <div class="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2.5">
+        <div class="flex items-center justify-between">
+          <label class="font-bold text-xs text-slate-200 flex items-center gap-1.5">
+            <span>💰</span> ยอดซื้อชิปเข้าโต๊ะ (Buy-in)
+          </label>
+          <span class="text-[11px] text-teal-400 font-mono font-bold" id="settingsBuyInLabel">100฿</span>
+        </div>
+        <p class="text-[11px] text-slate-400 leading-tight">
+          ยอดชิปมาตรฐานเมื่อผู้เล่นใหม่หรือบอทนั่งโต๊ะ (และใช้กำหนดค่ารีโหลดบอท)
+        </p>
+        <div class="flex items-center gap-2">
+          <input id="settingsBuyInInput" type="number" step="50" min="10" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100 font-mono font-bold text-xs focus:outline-none focus:border-teal-500">
+          <span class="text-xs text-slate-400 font-mono">฿</span>
+        </div>
+        <div class="grid grid-cols-5 gap-1.5 text-[11px]">
+          <button type="button" onclick="setBuyInPreset(100)" class="py-1 bg-slate-800 hover:bg-teal-700/60 border border-slate-700 rounded-lg font-mono text-slate-300 hover:text-white transition">100฿</button>
+          <button type="button" onclick="setBuyInPreset(200)" class="py-1 bg-slate-800 hover:bg-teal-700/60 border border-slate-700 rounded-lg font-mono text-slate-300 hover:text-white transition">200฿</button>
+          <button type="button" onclick="setBuyInPreset(500)" class="py-1 bg-slate-800 hover:bg-teal-700/60 border border-slate-700 rounded-lg font-mono text-slate-300 hover:text-white transition">500฿</button>
+          <button type="button" onclick="setBuyInPreset(1000)" class="py-1 bg-slate-800 hover:bg-teal-700/60 border border-slate-700 rounded-lg font-mono text-slate-300 hover:text-white transition">1,000฿</button>
+          <button type="button" onclick="setBuyInPreset(2000)" class="py-1 bg-slate-800 hover:bg-teal-700/60 border border-slate-700 rounded-lg font-mono text-slate-300 hover:text-white transition">2,000฿</button>
+        </div>
+      </div>
+
+      <!-- Setting 2: Timer -->
+      <div class="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2.5">
+        <div class="flex items-center justify-between">
+          <label class="font-bold text-xs text-slate-200 flex items-center gap-1.5">
+            <span>⏱️</span> เวลานับถอยหลังต่อเทิร์น (Turn Timer)
+          </label>
+          <span class="text-[11px] text-amber-400 font-mono font-bold" id="settingsTimerLabel">20s</span>
+        </div>
+        <p class="text-[11px] text-slate-400 leading-tight">
+          เวลานับถอยหลังให้ผู้เล่นตัดสินใจ หากหมดเวลาระบบจะเคาะ (Check) หรือหมอบ (Fold) อัตโนมัติ
+        </p>
+        <div class="flex items-center gap-2">
+          <input id="settingsTimerInput" type="number" step="5" min="5" max="120" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100 font-mono font-bold text-xs focus:outline-none focus:border-amber-500">
+          <span class="text-xs text-slate-400 font-mono">วินาที</span>
+        </div>
+        <div class="grid grid-cols-5 gap-1.5 text-[11px]">
+          <button type="button" onclick="setTimerPreset(10)" class="py-1 bg-slate-800 hover:bg-amber-700/60 border border-slate-700 rounded-lg font-mono text-slate-300 hover:text-white transition">10s (เร็ว)</button>
+          <button type="button" onclick="setTimerPreset(15)" class="py-1 bg-slate-800 hover:bg-amber-700/60 border border-slate-700 rounded-lg font-mono text-slate-300 hover:text-white transition">15s</button>
+          <button type="button" onclick="setTimerPreset(20)" class="py-1 bg-slate-800 hover:bg-amber-700/60 border border-slate-700 rounded-lg font-mono text-slate-300 hover:text-white transition">20s (ปกติ)</button>
+          <button type="button" onclick="setTimerPreset(30)" class="py-1 bg-slate-800 hover:bg-amber-700/60 border border-slate-700 rounded-lg font-mono text-slate-300 hover:text-white transition">30s</button>
+          <button type="button" onclick="setTimerPreset(45)" class="py-1 bg-slate-800 hover:bg-amber-700/60 border border-slate-700 rounded-lg font-mono text-slate-300 hover:text-white transition">45s (ชิล)</button>
+        </div>
+      </div>
+
+      <!-- Setting 3: Blinds -->
+      <div class="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2.5">
+        <div class="flex items-center justify-between">
+          <label class="font-bold text-xs text-slate-200 flex items-center gap-1.5">
+            <span>🪙</span> ค่าบลายด์ (Small Blind / Big Blind)
+          </label>
+          <span class="text-[11px] text-emerald-400 font-mono font-bold" id="settingsBlindsLabel">10/20฿</span>
+        </div>
+        <p class="text-[11px] text-slate-400 leading-tight">
+          ค่าเดิมพันบังคับที่ต้องลงในแต่ละแฮนด์ (มีผลทันทีในแฮนด์ถัดไป และตั้งค่า Min Raise อัตโนมัติ)
+        </p>
+
+        <!-- Presets -->
+        <div class="grid grid-cols-5 gap-1.5 text-[11px]">
+          <button type="button" onclick="setBlindsPreset(5, 10)" class="py-1 bg-slate-800 hover:bg-emerald-700/60 border border-slate-700 rounded-lg font-mono text-slate-300 hover:text-white transition">5/10</button>
+          <button type="button" onclick="setBlindsPreset(10, 20)" class="py-1 bg-slate-800 hover:bg-emerald-700/60 border border-slate-700 rounded-lg font-mono text-slate-300 hover:text-white transition">10/20</button>
+          <button type="button" onclick="setBlindsPreset(25, 50)" class="py-1 bg-slate-800 hover:bg-emerald-700/60 border border-slate-700 rounded-lg font-mono text-slate-300 hover:text-white transition">25/50</button>
+          <button type="button" onclick="setBlindsPreset(50, 100)" class="py-1 bg-slate-800 hover:bg-emerald-700/60 border border-slate-700 rounded-lg font-mono text-slate-300 hover:text-white transition">50/100</button>
+          <button type="button" onclick="setBlindsPreset(100, 200)" class="py-1 bg-slate-800 hover:bg-emerald-700/60 border border-slate-700 rounded-lg font-mono text-slate-300 hover:text-white transition">100/200</button>
+        </div>
+
+        <!-- Custom inputs -->
+        <div class="grid grid-cols-2 gap-2 pt-1">
+          <div>
+            <label class="block text-[11px] text-slate-400 mb-1">Small Blind (SB):</label>
+            <input id="settingsSbInput" type="number" min="1" step="1" oninput="onSbInputChange()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100 font-mono font-bold text-xs focus:outline-none focus:border-emerald-500">
+          </div>
+          <div>
+            <label class="block text-[11px] text-slate-400 mb-1">Big Blind (BB):</label>
+            <input id="settingsBbInput" type="number" min="2" step="2" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-100 font-mono font-bold text-xs focus:outline-none focus:border-emerald-500">
+          </div>
+        </div>
+      </div>
+
+      <div class="flex gap-2 pt-2 border-t border-slate-800">
+        <button onclick="closeSettingsModal()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 py-2.5 rounded-xl text-xs font-semibold transition">ยกเลิก</button>
+        <button onclick="saveSettings()" class="flex-1 bg-teal-600 hover:bg-teal-500 text-white py-2.5 rounded-xl text-xs font-bold transition shadow-lg flex items-center justify-center gap-1.5">
+          <span>💾</span> บันทึกการตั้งค่า
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 9: SIT DOWN BUY-IN -->
+  <div id="sitDownModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl p-5 max-w-xs w-full space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="font-bold text-base text-amber-400 flex items-center gap-2">
+          <span>🪑</span> เข้าโต๊ะ (Buy-in)
+        </h3>
+        <button onclick="closeSitDownModal()" class="text-slate-400 hover:text-white text-lg">&times;</button>
+      </div>
+
+      <p class="text-xs text-slate-400" id="sitDownSeatLabel">ที่นั่งที่ 1: เลือกจำนวนชิปที่ต้องการนำเข้าโต๊ะ</p>
+
+      <div class="space-y-2">
+        <div class="relative">
+          <input id="sitDownBuyInInput" type="number" step="50" min="10" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-center font-extrabold text-emerald-400 font-mono text-base focus:outline-none focus:border-amber-500">
+          <span class="absolute right-3 top-3 text-xs text-slate-500 font-mono">฿</span>
+        </div>
+
+        <div class="grid grid-cols-3 gap-1.5 text-xs">
+          <button type="button" onclick="setSitDownPreset(100)" class="py-1.5 bg-slate-800 hover:bg-amber-600/70 border border-slate-700 rounded-lg font-mono text-slate-300 hover:text-white font-bold transition">100฿</button>
+          <button type="button" onclick="setSitDownPreset(200)" class="py-1.5 bg-slate-800 hover:bg-amber-600/70 border border-slate-700 rounded-lg font-mono text-slate-300 hover:text-white font-bold transition">200฿</button>
+          <button type="button" onclick="setSitDownPreset(500)" class="py-1.5 bg-slate-800 hover:bg-amber-600/70 border border-slate-700 rounded-lg font-mono text-slate-300 hover:text-white font-bold transition">500฿</button>
+        </div>
+      </div>
+
+      <div class="flex gap-2 pt-2 border-t border-slate-800">
+        <button onclick="closeSitDownModal()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 py-2 rounded-xl text-xs font-semibold">ยกเลิก</button>
+        <button onclick="confirmSitDown()" class="flex-1 bg-amber-600 hover:bg-amber-500 text-white py-2 rounded-xl text-xs font-bold transition shadow">นั่งโต๊ะเลย</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ==================== JAVASCRIPT ==================== -->
   <script>
     // ==========================================
@@ -772,7 +910,10 @@
     function renderTable(state) {
       if (!state) return;
 
-      document.getElementById('tableSubtitle').innerText = `ห้อง: ${state.channelId} • แฮนด์ #${state.handNumber}`;
+      const blindsStr = `Blinds: ${state.smallBlind}/${state.bigBlind}฿`;
+      const buyInStr = `Buy-in: ${state.defaultBuyIn || 100}฿`;
+      const timerStr = `เวลา: ${state.turnDuration}s`;
+      document.getElementById('tableSubtitle').innerText = `ห้อง: ${state.channelId} • แฮนด์ #${state.handNumber} • ${blindsStr} • ${buyInStr} • ${timerStr}`;
       document.getElementById('potAmount').innerText = `${state.totalPot.toLocaleString()}฿`;
       document.getElementById('actionAnnouncement').innerText = state.lastActionMessage || 'รอแอ็คชั่น...';
 
@@ -1208,13 +1349,103 @@
       }
     }
 
+    // ==========================================
+    // 6. SIT DOWN BUY-IN & TABLE SETTINGS LOGIC
+    // ==========================================
+    let selectedSeatToSit = null;
+
     function sitAtSeat(seatIndex) {
-      if (!ws) return;
+      selectedSeatToSit = seatIndex;
+      const defaultBuyIn = tableState?.defaultBuyIn || 100;
+      document.getElementById('sitDownSeatLabel').innerText = `ที่นั่งที่ ${seatIndex + 1}: เลือกจำนวนชิปที่ต้องการนำเข้าโต๊ะ`;
+      document.getElementById('sitDownBuyInInput').value = defaultBuyIn;
+      document.getElementById('sitDownModal').classList.remove('hidden');
+    }
+
+    function setSitDownPreset(amount) {
+      document.getElementById('sitDownBuyInInput').value = amount;
+    }
+
+    function closeSitDownModal() {
+      document.getElementById('sitDownModal').classList.add('hidden');
+      selectedSeatToSit = null;
+    }
+
+    function confirmSitDown() {
+      if (selectedSeatToSit === null || !ws) return;
+      const buyIn = parseInt(document.getElementById('sitDownBuyInInput').value, 10) || tableState?.defaultBuyIn || 100;
       ws.send(JSON.stringify({
         type: 'sit_down',
-        seatIndex,
-        buyIn: 100
+        seatIndex: selectedSeatToSit,
+        buyIn
       }));
+      closeSitDownModal();
+    }
+
+    // Table Settings Modal Handlers
+    function openSettingsModal() {
+      if (!tableState) return;
+      const buyIn = tableState.defaultBuyIn || 100;
+      const timer = tableState.turnDuration || 20;
+      const sb = tableState.smallBlind || 10;
+      const bb = tableState.bigBlind || 20;
+
+      document.getElementById('settingsBuyInInput').value = buyIn;
+      document.getElementById('settingsBuyInLabel').innerText = `${buyIn}฿`;
+
+      document.getElementById('settingsTimerInput').value = timer;
+      document.getElementById('settingsTimerLabel').innerText = `${timer}s`;
+
+      document.getElementById('settingsSbInput').value = sb;
+      document.getElementById('settingsBbInput').value = bb;
+      document.getElementById('settingsBlindsLabel').innerText = `${sb}/${bb}฿`;
+
+      document.getElementById('settingsModal').classList.remove('hidden');
+    }
+
+    function closeSettingsModal() {
+      document.getElementById('settingsModal').classList.add('hidden');
+    }
+
+    function setBuyInPreset(amount) {
+      document.getElementById('settingsBuyInInput').value = amount;
+      document.getElementById('settingsBuyInLabel').innerText = `${amount}฿`;
+    }
+
+    function setTimerPreset(seconds) {
+      document.getElementById('settingsTimerInput').value = seconds;
+      document.getElementById('settingsTimerLabel').innerText = `${seconds}s`;
+    }
+
+    function setBlindsPreset(sb, bb) {
+      document.getElementById('settingsSbInput').value = sb;
+      document.getElementById('settingsBbInput').value = bb;
+      document.getElementById('settingsBlindsLabel').innerText = `${sb}/${bb}฿`;
+    }
+
+    function onSbInputChange() {
+      const sb = parseInt(document.getElementById('settingsSbInput').value, 10) || 5;
+      document.getElementById('settingsBbInput').value = sb * 2;
+      document.getElementById('settingsBlindsLabel').innerText = `${sb}/${sb * 2}฿`;
+    }
+
+    function saveSettings() {
+      const defaultBuyIn = parseInt(document.getElementById('settingsBuyInInput').value, 10) || 100;
+      const turnDuration = parseInt(document.getElementById('settingsTimerInput').value, 10) || 20;
+      const smallBlind = parseInt(document.getElementById('settingsSbInput').value, 10) || 10;
+      const bigBlind = parseInt(document.getElementById('settingsBbInput').value, 10) || (smallBlind * 2);
+
+      if (ws) {
+        ws.send(JSON.stringify({
+          type: 'update_settings',
+          defaultBuyIn,
+          turnDuration,
+          smallBlind,
+          bigBlind
+        }));
+      }
+
+      closeSettingsModal();
     }
 
     document.getElementById('foldBtn').onclick = () => sendAction('fold');

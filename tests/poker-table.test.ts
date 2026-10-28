@@ -223,4 +223,70 @@ describe('Texas Hold\'em Poker Table State Machine', () => {
     assert.strictEqual(table.seats[1]!.chips > 0, true);
     assert.strictEqual(table.handNumber, 1);
   });
+
+  test('updateSettings updates defaultBuyIn, turnDuration, smallBlind, and bigBlind', () => {
+    const table = new PokerTable('tab13', 'chan13', 'user1', 100);
+    assert.strictEqual(table.defaultBuyIn, 100);
+    assert.strictEqual(table.turnDuration, 20);
+    assert.strictEqual(table.smallBlind, 5);
+    assert.strictEqual(table.bigBlind, 10);
+
+    const changed = table.updateSettings({
+      defaultBuyIn: 500,
+      turnDuration: 15,
+      smallBlind: 25,
+      bigBlind: 50,
+    });
+
+    assert.strictEqual(changed, true);
+    assert.strictEqual(table.defaultBuyIn, 500);
+    assert.strictEqual(table.turnDuration, 15);
+    assert.strictEqual(table.smallBlind, 25);
+    assert.strictEqual(table.bigBlind, 50);
+    assert.strictEqual(table.minRaise, 50);
+
+    const publicState = table.getPublicState();
+    assert.strictEqual(publicState.defaultBuyIn, 500);
+    assert.strictEqual(publicState.turnDuration, 15);
+    assert.strictEqual(publicState.smallBlind, 25);
+    assert.strictEqual(publicState.bigBlind, 50);
+  });
+
+  test('updateSettings with only smallBlind automatically doubles bigBlind', () => {
+    const table = new PokerTable('tab14', 'chan14', 'user1', 100);
+    table.updateSettings({ smallBlind: 40 });
+
+    assert.strictEqual(table.smallBlind, 40);
+    assert.strictEqual(table.bigBlind, 80);
+    assert.strictEqual(table.minRaise, 80);
+  });
+
+  test('sitDown without buyIn uses the configured defaultBuyIn', () => {
+    const table = new PokerTable('tab15', 'chan15', 'user1', 100);
+    table.updateSettings({ defaultBuyIn: 300 });
+
+    table.sitDown(0, { id: 'u1', username: 'alice', displayName: 'Alice' });
+
+    assert.strictEqual(table.seats[0]?.chips, 300);
+    assert.strictEqual(table.seats[0]?.initialBuyIn, 300);
+  });
+
+  test('startHand enforces newly configured Blinds in hand dealing', () => {
+    const table = new PokerTable('tab16', 'chan16', 'user1', 100);
+    table.updateSettings({ smallBlind: 25, bigBlind: 50 });
+
+    table.sitDown(0, { id: 'u1', username: 'alice', displayName: 'Alice' }, 500);
+    table.sitDown(1, { id: 'u2', username: 'bob', displayName: 'Bob' }, 500);
+
+    table.dealerSeat = 0;
+    table.startHand(); // Heads-up: Alice is SB (25), Bob is BB (50)
+
+    assert.strictEqual(table.seats[0]?.currentRoundBet, 25);
+    assert.strictEqual(table.seats[0]?.chips, 475);
+    assert.strictEqual(table.seats[1]?.currentRoundBet, 50);
+    assert.strictEqual(table.seats[1]?.chips, 450);
+    assert.strictEqual(table.currentHighBet, 50);
+    assert.strictEqual(table.minRaise, 50);
+    assert.strictEqual(table.getPublicState().totalPot, 75);
+  });
 });

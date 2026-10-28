@@ -56,6 +56,7 @@ export interface TableStateView {
   hostId: string;
   phase: GamePhase;
   handNumber: number;
+  defaultBuyIn: number;
   smallBlind: number;
   bigBlind: number;
   dealerSeat: number;
@@ -99,6 +100,7 @@ export class PokerTable {
   public seats: (TablePlayer | null)[] = Array(9).fill(null);
   public phase: GamePhase = 'waiting';
   public handNumber: number = 0;
+  public defaultBuyIn: number = 100;
   public smallBlind: number = 10;
   public bigBlind: number = 20;
   public dealerSeat: number = 0;
@@ -113,7 +115,7 @@ export class PokerTable {
   public lastEvent?: TableEvent;
 
   // Turn Timer
-  public turnDuration: number = 20; // 20 seconds like Poker Night
+  public turnDuration: number = 20; // in seconds (configurable)
   public turnStartedAt: number = Date.now();
   private turnTimeout: NodeJS.Timeout | null = null;
 
@@ -124,9 +126,53 @@ export class PokerTable {
     this.tableId = tableId;
     this.channelId = channelId;
     this.hostId = hostId;
-    this.smallBlind = Math.max(1, Math.round(buyIn * 0.05));
+    this.defaultBuyIn = buyIn > 0 ? buyIn : 100;
+    this.smallBlind = Math.max(1, Math.round(this.defaultBuyIn * 0.05));
     this.bigBlind = this.smallBlind * 2;
     this.minRaise = this.bigBlind;
+  }
+
+  public updateSettings(settings: {
+    smallBlind?: number;
+    bigBlind?: number;
+    defaultBuyIn?: number;
+    turnDuration?: number;
+  }): boolean {
+    let changed = false;
+
+    if (settings.defaultBuyIn !== undefined && Number(settings.defaultBuyIn) > 0) {
+      this.defaultBuyIn = Math.round(Number(settings.defaultBuyIn));
+      changed = true;
+    }
+
+    if (settings.smallBlind !== undefined && Number(settings.smallBlind) > 0) {
+      this.smallBlind = Math.round(Number(settings.smallBlind));
+      changed = true;
+    }
+
+    if (settings.bigBlind !== undefined && Number(settings.bigBlind) > 0) {
+      this.bigBlind = Math.round(Number(settings.bigBlind));
+      changed = true;
+    } else if (settings.smallBlind !== undefined && Number(settings.smallBlind) > 0) {
+      this.bigBlind = this.smallBlind * 2;
+      changed = true;
+    }
+
+    if (settings.turnDuration !== undefined && Number(settings.turnDuration) >= 5) {
+      this.turnDuration = Math.round(Number(settings.turnDuration));
+      changed = true;
+    }
+
+    if (this.phase === 'waiting' || this.phase === 'hand_ended') {
+      this.minRaise = this.bigBlind;
+    }
+
+    if (changed) {
+      this.lastActionMessage = `⚙️ ปรับการตั้งค่าโต๊ะ: Blinds ${this.smallBlind}/${this.bigBlind}฿ • Buy-in ${this.defaultBuyIn}฿ • เวลา ${this.turnDuration}s`;
+      this.emitChange();
+    }
+
+    return changed;
   }
 
   public get hasBots(): boolean {
@@ -144,7 +190,7 @@ export class PokerTable {
   public sitDown(
     seatIndex: number,
     user: { id: string; username: string; displayName: string; avatarUrl?: string },
-    buyIn: number
+    buyIn?: number
   ): boolean {
     if (seatIndex < 0 || seatIndex >= 9) return false;
     if (this.seats[seatIndex] !== null) return false;
@@ -153,15 +199,17 @@ export class PokerTable {
     const existingIndex = this.seats.findIndex(p => p?.userId === user.id);
     if (existingIndex !== -1) return false;
 
+    const actualBuyIn = buyIn && buyIn > 0 ? buyIn : this.defaultBuyIn;
+
     this.seats[seatIndex] = {
       userId: user.id,
       seatIndex,
       username: user.username,
       displayName: user.displayName,
       avatarUrl: user.avatarUrl,
-      chips: buyIn,
-      initialBuyIn: buyIn,
-      totalBuyIn: buyIn,
+      chips: actualBuyIn,
+      initialBuyIn: actualBuyIn,
+      totalBuyIn: actualBuyIn,
       currentRoundBet: 0,
       totalHandBet: 0,
       holeCards: [],
@@ -181,11 +229,12 @@ export class PokerTable {
     seatIndex: number,
     name: string,
     difficulty: BotDifficulty = 'medium',
-    chips: number = 200
+    chips?: number
   ): boolean {
     if (seatIndex < 0 || seatIndex >= 9) return false;
     if (this.seats[seatIndex] !== null) return false;
 
+    const actualChips = chips && chips > 0 ? chips : (this.defaultBuyIn * 2 || 200);
     const botId = `bot_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     this.seats[seatIndex] = {
       userId: botId,
@@ -193,9 +242,9 @@ export class PokerTable {
       username: name,
       displayName: name,
       avatarUrl: `https://api.dicebear.com/7.x/bottts/svg?seed=${botId}`,
-      chips,
-      initialBuyIn: chips,
-      totalBuyIn: chips,
+      chips: actualChips,
+      initialBuyIn: actualChips,
+      totalBuyIn: actualChips,
       currentRoundBet: 0,
       totalHandBet: 0,
       holeCards: [],
@@ -811,6 +860,7 @@ export class PokerTable {
       hostId: this.hostId,
       phase: this.phase,
       handNumber: this.handNumber,
+      defaultBuyIn: this.defaultBuyIn,
       smallBlind: this.smallBlind,
       bigBlind: this.bigBlind,
       dealerSeat: this.dealerSeat,
