@@ -3,14 +3,18 @@
 -- ก๊อปปี้โค้ดทั้งหมดนี้ไปวางในหน้า Supabase SQL Editor แล้วกด "Run" ได้ทันทีครับ
 -- =========================================================================
 
--- 1. ตาราง Users (ข้อมูลผู้เล่น และเบอร์พร้อมเพย์)
+-- 1. ตาราง Users (ข้อมูลผู้เล่น, เบอร์พร้อมเพย์, รูป QR Code โอนเงิน)
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   username TEXT NOT NULL,
   display_name TEXT,
   promptpay TEXT,
+  qr_image_url TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- เพิ่มคอลัมน์ qr_image_url สำหรับคนที่รันตาราง users ไปก่อนหน้าแล้ว
+ALTER TABLE users ADD COLUMN IF NOT EXISTS qr_image_url TEXT;
 
 -- 2. ตาราง Sessions (รอบโต๊ะ Poker)
 CREATE TABLE IF NOT EXISTS sessions (

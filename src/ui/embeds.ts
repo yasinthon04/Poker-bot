@@ -57,7 +57,7 @@ export function createTableEmbed(session: SessionRow, players: SessionPlayerRow[
 export function createSummaryEmbed(
   session: SessionRow,
   settlement: SettlementResult,
-  userPromptPayMap?: Record<string, string | null>,
+  userPromptPayMap?: Record<string, string | { promptpay?: string | null; qrImageUrl?: string | null } | null>,
   isPreview: boolean = false
 ): EmbedBuilder {
   const embed = new EmbedBuilder()
@@ -90,8 +90,19 @@ export function createSummaryEmbed(
   // 2. Settlement transactions (Who pays whom)
   if (settlement.transactions.length > 0) {
     const txLines = settlement.transactions.map((tx, idx) => {
-      const pp = userPromptPayMap?.[tx.toUserId];
-      const ppText = pp ? ` 📱 *พร้อมเพย์: \`${pp}\`*` : '';
+      const entry = userPromptPayMap?.[tx.toUserId];
+      let ppText = '';
+      if (typeof entry === 'string') {
+        ppText = ` 📱 *พร้อมเพย์: \`${entry}\`*`;
+      } else if (entry && typeof entry === 'object') {
+        if (entry.promptpay && entry.qrImageUrl) {
+          ppText = ` 📱 *พร้อมเพย์: \`${entry.promptpay}\`* (🖼️ มีรูป QR)`;
+        } else if (entry.promptpay) {
+          ppText = ` 📱 *พร้อมเพย์: \`${entry.promptpay}\`*`;
+        } else if (entry.qrImageUrl) {
+          ppText = ` 🖼️ *(มีรูป QR รับเงิน)*`;
+        }
+      }
       return `**${idx + 1}.** <@${tx.fromUserId}> โอนให้ <@${tx.toUserId}> 👉 **${tx.amount.toLocaleString()} บาท**${ppText}`;
     });
 

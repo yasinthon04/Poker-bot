@@ -18,6 +18,7 @@ export interface SessionPlayerRow {
   username: string;
   display_name: string | null;
   promptpay: string | null;
+  qr_image_url: string | null;
 }
 
 export interface UserStats {
@@ -55,6 +56,7 @@ export async function upsertUser(id: string, username: string, displayName?: str
     username,
     display_name: displayName || existing?.display_name || null,
     promptpay: existing?.promptpay || null,
+    qr_image_url: existing?.qr_image_url || null,
     created_at: existing?.created_at || new Date().toISOString(),
   };
   persistDb();
@@ -86,6 +88,28 @@ export async function clearUserPromptPay(userId: string): Promise<void> {
   const db = getMemoryDb();
   if (db.users[userId]) {
     db.users[userId].promptpay = null;
+    persistDb();
+  }
+}
+
+export async function setUserQrImage(userId: string, qrImageUrl: string): Promise<void> {
+  if (isSupabaseConfigured()) {
+    return supabaseRepo.setUserQrImage(userId, qrImageUrl);
+  }
+  const db = getMemoryDb();
+  if (db.users[userId]) {
+    db.users[userId].qr_image_url = qrImageUrl;
+    persistDb();
+  }
+}
+
+export async function clearUserQrImage(userId: string): Promise<void> {
+  if (isSupabaseConfigured()) {
+    return supabaseRepo.clearUserQrImage(userId);
+  }
+  const db = getMemoryDb();
+  if (db.users[userId]) {
+    db.users[userId].qr_image_url = null;
     persistDb();
   }
 }
@@ -186,6 +210,7 @@ export async function getSessionPlayers(sessionId: number): Promise<SessionPlaye
       username: user ? user.username : 'Unknown',
       display_name: user ? user.display_name : null,
       promptpay: user ? user.promptpay : null,
+      qr_image_url: user ? user.qr_image_url : null,
     };
   });
 }

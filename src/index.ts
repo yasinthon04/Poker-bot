@@ -467,27 +467,41 @@ client.on('interactionCreate', async (interaction: Interaction) => {
           const { calculateSettlements } = await import('./services/settlement');
           const settlement = calculateSettlements(playerInputs);
 
-          const ppMap: Record<string, string | null> = {};
+          const ppMap: Record<string, { promptpay: string | null; qrImageUrl: string | null }> = {};
           for (const p of players) {
-            ppMap[p.user_id] = p.promptpay;
+            ppMap[p.user_id] = { promptpay: p.promptpay, qrImageUrl: p.qr_image_url };
           }
 
           const { createSummaryEmbed } = await import('./ui/embeds');
           const embed = createSummaryEmbed(session, settlement, ppMap, true);
-          const files = [];
+          const files: any[] = [];
 
-          const topCreditor = settlement.players.find(p => p.net > 0 && ppMap[p.userId]);
-          if (topCreditor && ppMap[topCreditor.userId]) {
-            const topAmount = topCreditor.net;
-            const { generatePromptPayAttachment } = await import('./services/qr');
-            const qrAttachment = await generatePromptPayAttachment(ppMap[topCreditor.userId]!, topAmount);
-            if (qrAttachment) {
-              embed.setImage('attachment://promptpay-qr.png');
+          const topCreditor = settlement.players.find(
+            p => p.net > 0 && (ppMap[p.userId]?.qrImageUrl || ppMap[p.userId]?.promptpay)
+          );
+          if (topCreditor) {
+            const pInfo = ppMap[topCreditor.userId];
+            const { resolvePaymentAttachment } = await import('./services/qr');
+            const qrResult = await resolvePaymentAttachment(
+              {
+                userId: topCreditor.userId,
+                name: topCreditor.name,
+                promptpay: pInfo?.promptpay,
+                qrImageUrl: pInfo?.qrImageUrl,
+              },
+              topCreditor.net
+            );
+            if (qrResult) {
+              embed.setImage(`attachment://${qrResult.imageFileName}`);
               embed.addFields({
-                name: `📱 QR Code พร้อมเพย์ของ ${topCreditor.name} (${topAmount.toLocaleString()}฿)`,
-                value: `สามารถสแกน QR Code ด้านล่างเพื่อโอนเงินได้ทันที`,
+                name: qrResult.sourceType === 'custom_qr'
+                  ? `📱 QR Code รับเงินของ ${topCreditor.name} (${topCreditor.net.toLocaleString()}฿)`
+                  : `📱 QR Code พร้อมเพย์ของ ${topCreditor.name} (${topCreditor.net.toLocaleString()}฿)`,
+                value: qrResult.sourceType === 'custom_qr'
+                  ? `สแกน QR Code ด้านล่างเพื่อโอนเงินเข้าบัญชีได้ทันที (QR ที่ผู้เล่นอัปโหลดไว้)`
+                  : `สามารถสแกน QR Code ด้านล่างเพื่อโอนเงินได้ทันที (สร้างยอดอัตโนมัติ ${topCreditor.net.toLocaleString()} บาท)`,
               });
-              files.push(qrAttachment);
+              files.push(qrResult.attachment);
             }
           }
 
@@ -688,27 +702,41 @@ client.on('interactionCreate', async (interaction: Interaction) => {
         const { calculateSettlements } = await import('./services/settlement');
         const settlement = calculateSettlements(playerInputs);
 
-        const ppMap: Record<string, string | null> = {};
+        const ppMap: Record<string, { promptpay: string | null; qrImageUrl: string | null }> = {};
         for (const p of players) {
-          ppMap[p.user_id] = p.promptpay;
+          ppMap[p.user_id] = { promptpay: p.promptpay, qrImageUrl: p.qr_image_url };
         }
 
         const { createSummaryEmbed } = await import('./ui/embeds');
         const embed = createSummaryEmbed(session, settlement, ppMap, true);
-        const files = [];
+        const files: any[] = [];
 
-        const topCreditor = settlement.players.find(p => p.net > 0 && ppMap[p.userId]);
-        if (topCreditor && ppMap[topCreditor.userId]) {
-          const topAmount = topCreditor.net;
-          const { generatePromptPayAttachment } = await import('./services/qr');
-          const qrAttachment = await generatePromptPayAttachment(ppMap[topCreditor.userId]!, topAmount);
-          if (qrAttachment) {
-            embed.setImage('attachment://promptpay-qr.png');
+        const topCreditor = settlement.players.find(
+          p => p.net > 0 && (ppMap[p.userId]?.qrImageUrl || ppMap[p.userId]?.promptpay)
+        );
+        if (topCreditor) {
+          const pInfo = ppMap[topCreditor.userId];
+          const { resolvePaymentAttachment } = await import('./services/qr');
+          const qrResult = await resolvePaymentAttachment(
+            {
+              userId: topCreditor.userId,
+              name: topCreditor.name,
+              promptpay: pInfo?.promptpay,
+              qrImageUrl: pInfo?.qrImageUrl,
+            },
+            topCreditor.net
+          );
+          if (qrResult) {
+            embed.setImage(`attachment://${qrResult.imageFileName}`);
             embed.addFields({
-              name: `📱 QR Code พร้อมเพย์ของ ${topCreditor.name} (${topAmount.toLocaleString()}฿)`,
-              value: `สามารถสแกน QR Code ด้านล่างเพื่อโอนเงินได้ทันที`,
+              name: qrResult.sourceType === 'custom_qr'
+                ? `📱 QR Code รับเงินของ ${topCreditor.name} (${topCreditor.net.toLocaleString()}฿)`
+                : `📱 QR Code พร้อมเพย์ของ ${topCreditor.name} (${topCreditor.net.toLocaleString()}฿)`,
+              value: qrResult.sourceType === 'custom_qr'
+                ? `สแกน QR Code ด้านล่างเพื่อโอนเงินเข้าบัญชีได้ทันที (QR ที่ผู้เล่นอัปโหลดไว้)`
+                : `สามารถสแกน QR Code ด้านล่างเพื่อโอนเงินได้ทันที (สร้างยอดอัตโนมัติ ${topCreditor.net.toLocaleString()} บาท)`,
             });
-            files.push(qrAttachment);
+            files.push(qrResult.attachment);
           }
         }
 

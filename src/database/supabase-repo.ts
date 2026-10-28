@@ -37,6 +37,16 @@ export async function clearUserPromptPay(userId: string): Promise<void> {
   await supabase.from('users').update({ promptpay: null }).eq('id', userId);
 }
 
+export async function setUserQrImage(userId: string, qrImageUrl: string): Promise<void> {
+  const supabase = getSupabase();
+  await supabase.from('users').update({ qr_image_url: qrImageUrl }).eq('id', userId);
+}
+
+export async function clearUserQrImage(userId: string): Promise<void> {
+  const supabase = getSupabase();
+  await supabase.from('users').update({ qr_image_url: null }).eq('id', userId);
+}
+
 export async function getActiveSession(channelId: string): Promise<SessionRow | undefined> {
   const supabase = getSupabase();
   const { data, error } = await supabase
@@ -167,6 +177,7 @@ export async function getSessionPlayers(sessionId: number): Promise<SessionPlaye
       username: user ? user.username : 'Unknown',
       display_name: user ? user.display_name : null,
       promptpay: user ? user.promptpay : null,
+      qr_image_url: user ? user.qr_image_url : null,
     };
   });
 }

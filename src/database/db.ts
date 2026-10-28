@@ -6,6 +6,7 @@ export interface UserRecord {
   username: string;
   display_name: string | null;
   promptpay: string | null;
+  qr_image_url: string | null;
   created_at: string;
 }
 
