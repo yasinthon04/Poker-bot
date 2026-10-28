@@ -165,7 +165,7 @@
     <canvas id="fxCanvas" class="absolute inset-0 pointer-events-none z-40"></canvas>
 
     <!-- TABLE FELT (OVAL) -->
-    <div id="pokerTable" class="poker-felt relative w-full max-w-4xl h-[440px] sm:h-[480px] rounded-[240px] flex items-center justify-center">
+    <div id="pokerTable" class="poker-felt relative w-full max-w-4xl h-[470px] sm:h-[530px] rounded-[260px] flex items-center justify-center">
 
       <!-- CENTER BOARD (POT & COMMUNITY CARDS) -->
       <div class="flex flex-col items-center justify-center gap-2.5 z-10">
@@ -176,12 +176,12 @@
         </div>
 
         <!-- Community Cards (5 slots) -->
-        <div id="communityCards" class="flex gap-2 p-1.5 rounded-xl bg-black/30 backdrop-blur-sm border border-white/5 shadow-inner">
-          <div class="w-12 h-16 sm:w-14 sm:h-20 rounded border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/30 text-xs font-bold">Flop</div>
-          <div class="w-12 h-16 sm:w-14 sm:h-20 rounded border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/30 text-xs font-bold">Flop</div>
-          <div class="w-12 h-16 sm:w-14 sm:h-20 rounded border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/30 text-xs font-bold">Flop</div>
-          <div class="w-12 h-16 sm:w-14 sm:h-20 rounded border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/30 text-xs font-bold">Turn</div>
-          <div class="w-12 h-16 sm:w-14 sm:h-20 rounded border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/30 text-xs font-bold">River</div>
+        <div id="communityCards" class="flex gap-2 sm:gap-2.5 p-2 rounded-2xl bg-black/35 backdrop-blur-sm border border-white/10 shadow-2xl">
+          <div class="w-14 h-20 sm:w-16 sm:h-24 md:w-18 md:h-26 rounded-xl border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/30 text-xs sm:text-sm font-bold">Flop</div>
+          <div class="w-14 h-20 sm:w-16 sm:h-24 md:w-18 md:h-26 rounded-xl border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/30 text-xs sm:text-sm font-bold">Flop</div>
+          <div class="w-14 h-20 sm:w-16 sm:h-24 md:w-18 md:h-26 rounded-xl border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/30 text-xs sm:text-sm font-bold">Flop</div>
+          <div class="w-14 h-20 sm:w-16 sm:h-24 md:w-18 md:h-26 rounded-xl border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/30 text-xs sm:text-sm font-bold">Turn</div>
+          <div class="w-14 h-20 sm:w-16 sm:h-24 md:w-18 md:h-26 rounded-xl border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/30 text-xs sm:text-sm font-bold">River</div>
         </div>
 
         <!-- Action Announcement Banner -->
@@ -807,7 +807,7 @@
           commContainer.appendChild(cardEl);
         } else {
           const empty = document.createElement('div');
-          empty.className = 'w-12 h-16 sm:w-14 sm:h-20 rounded border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/25 text-xs font-bold';
+          empty.className = 'w-14 h-20 sm:w-16 sm:h-24 md:w-18 md:h-26 rounded-xl border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/30 text-xs sm:text-sm font-bold shadow-inner';
           empty.innerText = i < 3 ? 'Flop' : i === 3 ? 'Turn' : 'River';
           commContainer.appendChild(empty);
         }
@@ -818,23 +818,28 @@
       const container = document.getElementById('seatsContainer');
       container.innerHTML = '';
 
-      // Oval Coordinate Layout for 9 Seats
+      // Positions around oval: 9 seats with position direction (dir: 'top', 'bottom', 'left', 'right')
+      // dir specifies where the hole cards and bet chips sit relative to the player avatar/badge:
+      // 'top': cards and bet sit ABOVE the avatar towards table center (for bottom seats)
+      // 'bottom': cards and bet sit BELOW the avatar towards table center (for top seats)
+      // 'right': cards and bet sit RIGHT of the avatar towards table center (for left seats)
+      // 'left': cards and bet sit LEFT of the avatar towards table center (for right seats)
       const seatPositions = [
-        { left: '50%', top: '88%' },  // 0: Bottom Center (Hero)
-        { left: '22%', top: '82%' },  // 1: Bottom Left
-        { left: '6%',  top: '50%' },  // 2: Middle Left
-        { left: '22%', top: '18%' },  // 3: Top Left
-        { left: '40%', top: '12%' },  // 4: Top Center-Left
-        { left: '60%', top: '12%' },  // 5: Top Center-Right
-        { left: '78%', top: '18%' },  // 6: Top Right
-        { left: '94%', top: '50%' },  // 7: Middle Right
-        { left: '78%', top: '82%' },  // 8: Bottom Right
+        { left: '50%', top: '80%', dir: 'top' },    // 0: Bottom Center (Hero)
+        { left: '22%', top: '76%', dir: 'top' },    // 1: Bottom Left
+        { left: '8%',  top: '49%', dir: 'right' },  // 2: Middle Left
+        { left: '22%', top: '22%', dir: 'bottom' }, // 3: Top Left
+        { left: '40%', top: '15%', dir: 'bottom' }, // 4: Top Center-Left
+        { left: '60%', top: '15%', dir: 'bottom' }, // 5: Top Center-Right
+        { left: '78%', top: '22%', dir: 'bottom' }, // 6: Top Right
+        { left: '92%', top: '49%', dir: 'left' },   // 7: Middle Right
+        { left: '78%', top: '76%', dir: 'top' },    // 8: Bottom Right
       ];
 
       state.seats.forEach((seat, idx) => {
         const pos = seatPositions[idx];
         const wrapper = document.createElement('div');
-        wrapper.className = 'absolute -translate-x-1/2 -translate-y-1/2 pointer-events-auto flex flex-col items-center';
+        wrapper.className = 'absolute -translate-x-1/2 -translate-y-1/2 pointer-events-auto flex items-center justify-center';
         wrapper.style.left = pos.left;
         wrapper.style.top = pos.top;
 
@@ -843,15 +848,33 @@
           const isDealer = state.dealerSeat === idx;
           const isWinner = state.handWinners?.some(w => w.userId === seat.userId);
 
+          // Compute offsets based on pos.dir so cards and bets NEVER collide with avatar or badges
+          let cardClasses = '';
+          let betClasses = '';
+
+          if (pos.dir === 'top') {
+            cardClasses = 'absolute -top-18 sm:-top-21 left-1/2 -translate-x-1/2 flex items-center -space-x-2.5 z-20';
+            betClasses = 'absolute -top-26 sm:-top-29 left-1/2 -translate-x-1/2 z-30';
+          } else if (pos.dir === 'bottom') {
+            cardClasses = 'absolute -bottom-18 sm:-bottom-21 left-1/2 -translate-x-1/2 flex items-center -space-x-2.5 z-20';
+            betClasses = 'absolute -bottom-26 sm:-bottom-29 left-1/2 -translate-x-1/2 z-30';
+          } else if (pos.dir === 'right') {
+            cardClasses = 'absolute top-1/2 -translate-y-1/2 left-full ml-3 flex items-center -space-x-2.5 z-20';
+            betClasses = 'absolute top-1/2 -translate-y-1/2 left-full ml-24 sm:ml-28 z-30';
+          } else if (pos.dir === 'left') {
+            cardClasses = 'absolute top-1/2 -translate-y-1/2 right-full mr-3 flex items-center -space-x-2.5 z-20';
+            betClasses = 'absolute top-1/2 -translate-y-1/2 right-full mr-24 sm:mr-28 z-30';
+          }
+
           wrapper.innerHTML = `
             <div class="relative flex flex-col items-center">
-              ${isDealer ? '<span class="absolute -top-2 -left-2 bg-amber-400 text-slate-900 font-extrabold text-[10px] w-5 h-5 rounded-full flex items-center justify-center shadow z-20 border border-slate-900">D</span>' : ''}
+              ${isDealer ? '<span class="absolute -top-2 -left-2 bg-amber-400 text-slate-900 font-extrabold text-[11px] w-5 h-5 rounded-full flex items-center justify-center shadow-lg z-30 border border-slate-900 select-none">D</span>' : ''}
               
               <!-- AVATAR & POKER NIGHT TURN RING -->
-              <div class="relative w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center">
+              <div class="relative w-13 h-13 sm:w-15 sm:h-15 flex items-center justify-center">
                 <!-- Circular Countdown SVG Ring -->
                 ${isTurn ? `
-                  <svg class="absolute -inset-1 w-16 h-16 sm:w-18 sm:h-18 pointer-events-none z-10" viewBox="0 0 64 64">
+                  <svg class="absolute -inset-1.5 w-16 h-16 sm:w-18 sm:h-18 pointer-events-none z-10" viewBox="0 0 64 64">
                     <circle cx="32" cy="32" r="28" stroke="rgba(255,255,255,0.15)" stroke-width="3.5" fill="none" />
                     <circle id="turnRing-${idx}" cx="32" cy="32" r="28" stroke="#10b981" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-dasharray="175.93" stroke-dashoffset="0" transform="rotate(-90 32 32)" />
                   </svg>
@@ -859,43 +882,49 @@
                 ` : ''}
 
                 <!-- Avatar Image -->
-                <div class="w-13 h-13 sm:w-15 sm:h-15 rounded-full border-2 ${isWinner ? 'border-amber-400 win-glow' : isTurn ? 'border-emerald-400' : seat.isFolded ? 'border-rose-500 opacity-40' : 'border-slate-700'} overflow-hidden bg-slate-800 shadow-xl">
+                <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 ${isWinner ? 'border-amber-400 win-glow' : isTurn ? 'border-emerald-400 active-glow' : seat.isFolded ? 'border-rose-500 opacity-40' : 'border-slate-700'} overflow-hidden bg-slate-800 shadow-xl">
                   <img src="${seat.avatarUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=' + seat.userId}" class="w-full h-full object-cover">
                 </div>
               </div>
 
-              <!-- Badges -->
-              <div class="bg-slate-900/95 border border-slate-700/90 px-2 py-0.5 rounded-lg mt-1 text-center shadow max-w-[95px] backdrop-blur-sm">
-                <p class="text-[10px] font-bold truncate text-slate-200">
+              <!-- Name & Chips Badge (Separated from cards and bets) -->
+              <div class="bg-slate-900/95 border border-slate-700/90 px-2 py-0.5 rounded-lg mt-1 text-center shadow-lg min-w-[75px] max-w-[105px] backdrop-blur-sm z-10">
+                <p class="text-[10px] sm:text-[11px] font-bold truncate text-slate-200">
                   ${seat.isBot ? '🤖 ' : ''}${seat.displayName}
                 </p>
-                <p class="text-[10px] font-extrabold text-emerald-400 font-mono">${seat.chips.toLocaleString()}฿</p>
+                <p class="text-[10px] sm:text-[11px] font-extrabold text-emerald-400 font-mono">${seat.chips.toLocaleString()}฿</p>
               </div>
 
-              ${seat.currentRoundBet > 0 ? `<div class="bg-amber-500 text-slate-950 font-extrabold text-[10px] px-2 rounded-full mt-0.5 shadow font-mono">${seat.currentRoundBet}฿</div>` : ''}
+              <!-- Bet Chip Badge (Positioned independently on the felt towards the pot) -->
+              ${seat.currentRoundBet > 0 ? `
+                <div class="${betClasses}">
+                  <div class="bg-amber-400 text-slate-950 font-black text-[10px] sm:text-[11px] px-2.5 py-0.5 rounded-full shadow-lg border border-amber-300 font-mono flex items-center gap-1 whitespace-nowrap animate-pulse">
+                    <span>🪙</span> ${seat.currentRoundBet.toLocaleString()}฿
+                  </div>
+                </div>
+              ` : ''}
 
-              <!-- Hole Cards -->
+              <!-- Enlarged Hole Cards (Positioned in front towards felt, never overlapping badge!) -->
               ${seat.hasCards ? `
-                <div class="flex gap-1 -mt-2 z-20 card-deal-enter">
-                  ${seat.holeCards ? seat.holeCards.map(c => createMiniCardHTML(c)).join('') : `
-                    <div class="w-6 h-9 rounded bg-blue-800 border border-blue-400 shadow-md flex items-center justify-center text-[10px] text-white">🂠</div>
-                    <div class="w-6 h-9 rounded bg-blue-800 border border-blue-400 shadow-md flex items-center justify-center text-[10px] text-white">🂠</div>
-                  `}
+                <div class="${cardClasses} card-deal-enter">
+                  ${seat.holeCards && seat.holeCards.length > 0
+                    ? seat.holeCards.map(c => createHoleCardHTML(c)).join('')
+                    : (createFaceDownCardHTML() + createFaceDownCardHTML())}
                 </div>
               ` : ''}
 
               <!-- Winner Banner -->
               ${isWinner ? `
-                <div class="absolute -top-3 bg-amber-400 text-slate-950 text-[9px] font-extrabold px-1.5 py-0.5 rounded-full shadow-lg z-30 animate-bounce">
+                <div class="absolute -top-4 bg-amber-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full shadow-xl z-30 animate-bounce flex items-center gap-1 border border-amber-300">
                   👑 WINNER!
                 </div>
               ` : ''}
             </div>
           `;
         } else {
-          // Empty seat
+          // Empty seat button
           wrapper.innerHTML = `
-            <button onclick="sitAtSeat(${idx})" class="w-12 h-12 rounded-full border-2 border-dashed border-white/30 hover:border-amber-400 bg-black/40 hover:bg-amber-400/20 text-white/50 hover:text-amber-300 flex items-center justify-center text-xs font-bold transition shadow-lg">
+            <button onclick="sitAtSeat(${idx})" class="w-12 h-12 rounded-full border-2 border-dashed border-white/25 hover:border-amber-400 bg-black/40 hover:bg-amber-400/20 text-white/50 hover:text-amber-300 flex items-center justify-center text-xs font-bold transition shadow-lg">
               + นั่ง
             </button>
           `;
@@ -956,30 +985,58 @@
     startTurnAnimationLoop();
 
     // ==========================================
-    // 5. CARDS CREATOR HELPERS
+    // 5. CARDS CREATOR HELPERS (ENLARGED & BEAUTIFUL)
     // ==========================================
     function createCardElement(card) {
       const div = document.createElement('div');
       const isRed = ['h', 'd'].includes(card.suit);
-      div.className = `w-12 h-16 sm:w-14 sm:h-20 rounded-lg bg-white card-shadow flex flex-col justify-between p-1 sm:p-1.5 font-bold ${isRed ? 'text-red-600' : 'text-slate-900'} border border-slate-200`;
+      div.className = `w-14 h-20 sm:w-16 sm:h-24 md:w-18 md:h-26 rounded-xl bg-white card-shadow flex flex-col justify-between p-1.5 sm:p-2 font-bold ${isRed ? 'text-red-600' : 'text-slate-900'} border border-slate-200 select-none`;
       const suitSymbol = { s: '♠', h: '♥', d: '♦', c: '♣' }[card.suit];
       const rankText = { 14: 'A', 13: 'K', 12: 'Q', 11: 'J' }[card.rank] || card.rank;
 
       div.innerHTML = `
-        <div class="text-xs sm:text-sm font-extrabold leading-none">${rankText}</div>
-        <div class="text-lg sm:text-2xl text-center leading-none">${suitSymbol}</div>
-        <div class="text-xs sm:text-sm font-extrabold leading-none text-right">${rankText}</div>
+        <div class="flex items-center justify-between leading-none">
+          <span class="text-xs sm:text-base font-black font-mono">${rankText}</span>
+          <span class="text-xs sm:text-sm">${suitSymbol}</span>
+        </div>
+        <div class="text-2xl sm:text-3xl text-center leading-none my-auto select-none">${suitSymbol}</div>
+        <div class="flex items-center justify-between leading-none rotate-180">
+          <span class="text-xs sm:text-base font-black font-mono">${rankText}</span>
+          <span class="text-xs sm:text-sm">${suitSymbol}</span>
+        </div>
       `;
       return div;
     }
 
-    function createMiniCardHTML(card) {
+    function createHoleCardHTML(card) {
       const suitSymbol = { s: '♠', h: '♥', d: '♦', c: '♣' }[card.suit];
       const rankText = { 14: 'A', 13: 'K', 12: 'Q', 11: 'J' }[card.rank] || card.rank;
-      const color = ['h', 'd'].includes(card.suit) ? 'text-red-600' : 'text-slate-950';
-      return `<div class="w-6 h-9 rounded bg-white shadow-md flex flex-col items-center justify-center ${color} font-extrabold text-[10px] leading-tight border border-slate-400">
-        <span>${rankText}</span><span>${suitSymbol}</span>
-      </div>`;
+      const isRed = ['h', 'd'].includes(card.suit);
+      const color = isRed ? 'text-red-600' : 'text-slate-950';
+
+      return `
+        <div class="w-11 h-16 sm:w-13 sm:h-19 rounded-lg bg-white shadow-xl border border-slate-300 flex flex-col justify-between p-1 select-none ${color} transition hover:-translate-y-1 hover:z-30 card-shadow">
+          <div class="flex items-center justify-between leading-none">
+            <span class="text-xs sm:text-sm font-black font-mono">${rankText}</span>
+            <span class="text-[10px] sm:text-xs">${suitSymbol}</span>
+          </div>
+          <div class="text-lg sm:text-2xl text-center leading-none my-auto select-none">${suitSymbol}</div>
+          <div class="flex items-center justify-between leading-none rotate-180">
+            <span class="text-xs sm:text-sm font-black font-mono">${rankText}</span>
+            <span class="text-[10px] sm:text-xs">${suitSymbol}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function createFaceDownCardHTML() {
+      return `
+        <div class="w-11 h-16 sm:w-13 sm:h-19 rounded-lg bg-gradient-to-br from-blue-700 via-indigo-900 to-blue-950 border border-blue-400/80 shadow-xl flex items-center justify-center p-1 select-none card-shadow">
+          <div class="w-full h-full rounded border border-blue-300/30 bg-blue-900/40 flex items-center justify-center text-blue-200/60 text-base">
+            🂠
+          </div>
+        </div>
+      `;
     }
 
     // ==========================================
