@@ -3,105 +3,194 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>🃏 Poker Bot - Discord Activity Table</title>
+  <title>🃏 Poker Night Discord Activity</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
   <style>
-    body {
-      font-family: 'Kanit', sans-serif;
+    * {
+      box-sizing: border-box;
       user-select: none;
       -webkit-user-select: none;
+    }
+    body {
+      font-family: 'Kanit', sans-serif;
       overflow: hidden;
+      background: radial-gradient(circle at 50% 30%, #090d16 0%, #030712 100%);
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
     }
     .poker-felt {
-      background: radial-gradient(circle, #0f5132 0%, #0a3622 70%, #051b11 100%);
-      box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.8), 0 0 30px rgba(0, 0, 0, 0.9);
-      border: 14px solid #3d2314;
+      background: radial-gradient(ellipse at center, #115e3b 0%, #0a3d25 65%, #052114 100%);
+      box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.85), 0 10px 40px rgba(0, 0, 0, 0.95);
+      border: 14px solid #2b180d;
+      outline: 2px solid #5a3820;
     }
     .poker-felt::after {
       content: "";
       position: absolute;
-      top: 15px;
-      left: 15px;
-      right: 15px;
-      bottom: 15px;
-      border: 2px dashed rgba(255, 255, 255, 0.15);
+      top: 14px;
+      left: 14px;
+      right: 14px;
+      bottom: 14px;
+      border: 2px dashed rgba(255, 255, 255, 0.12);
       border-radius: 9999px;
       pointer-events: none;
     }
     .card-shadow {
-      box-shadow: 2px 4px 10px rgba(0,0,0,0.5);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.6);
     }
     .active-glow {
-      box-shadow: 0 0 20px 4px rgba(34, 197, 94, 0.7);
+      box-shadow: 0 0 25px 4px rgba(34, 197, 94, 0.75);
+    }
+    .active-glow-urgent {
+      box-shadow: 0 0 30px 6px rgba(239, 68, 68, 0.9);
+      animation: pulseUrgent 0.6s infinite alternate;
+    }
+    @keyframes pulseUrgent {
+      from { transform: scale(1); filter: drop-shadow(0 0 5px rgba(239, 68, 68, 0.8)); }
+      to { transform: scale(1.05); filter: drop-shadow(0 0 15px rgba(239, 68, 68, 1)); }
+    }
+    .win-glow {
+      animation: winPulse 1.2s infinite alternate;
+    }
+    @keyframes winPulse {
+      0% { box-shadow: 0 0 20px 4px #fbbf24; }
+      100% { box-shadow: 0 0 40px 10px #f59e0b; }
+    }
+    /* Card Flip & Deal Animations */
+    @keyframes flipIn {
+      0% { transform: perspective(400px) rotateY(90deg) scale(0.8); opacity: 0; }
+      100% { transform: perspective(400px) rotateY(0deg) scale(1); opacity: 1; }
+    }
+    .card-flip-enter {
+      animation: flipIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+    @keyframes dealIn {
+      0% { transform: translateY(-40px) scale(0.3); opacity: 0; }
+      100% { transform: translateY(0) scale(1); opacity: 1; }
+    }
+    .card-deal-enter {
+      animation: dealIn 0.35s ease-out forwards;
+    }
+    /* Custom Scrollbar for modals */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.6);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(100, 116, 139, 0.5);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(148, 163, 184, 0.8);
     }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-100 h-screen w-screen flex flex-col justify-between p-2 select-none">
+<body class="text-slate-100 h-screen w-screen flex flex-col justify-between p-2">
 
   <!-- TOP HEADER / TOOLBAR -->
-  <header class="flex items-center justify-between px-3 py-1 bg-slate-900/80 backdrop-blur rounded-lg border border-slate-800 z-20">
-    <div class="flex items-center gap-2">
-      <span class="text-xl">🃏</span>
+  <header class="flex items-center justify-between px-3 py-1.5 bg-slate-900/90 backdrop-blur-md rounded-xl border border-slate-800 z-30 shadow-lg">
+    <!-- Brand & Table Info -->
+    <div class="flex items-center gap-2.5">
+      <div class="w-8 h-8 rounded-lg bg-emerald-700/60 border border-emerald-500/50 flex items-center justify-center text-lg shadow-inner">
+        🃏
+      </div>
       <div>
-        <h1 class="font-bold text-sm text-amber-400 leading-tight">POKER BOT ACTIVITY</h1>
-        <p class="text-xs text-slate-400" id="tableSubtitle">ห้อง: ทั่วไป • แฮนด์ #0</p>
+        <div class="flex items-center gap-2">
+          <h1 class="font-bold text-sm text-amber-400 tracking-wide leading-tight">DISCORD POKER NIGHT</h1>
+          <span id="turnStatusBadge" class="hidden text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">ถึงตาคุณ!</span>
+        </div>
+        <p class="text-[11px] text-slate-400" id="tableSubtitle">ห้อง: ทั่วไป • แฮนด์ #0</p>
       </div>
     </div>
 
     <!-- Mode Badge -->
-    <div id="modeBadge" class="hidden px-2.5 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1.5 border">
+    <div id="modeBadge" class="hidden px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 border shadow">
       <!-- Injected dynamically -->
     </div>
 
+    <!-- Top Right Action Buttons -->
     <div class="flex items-center gap-1.5">
-      <button id="addBotBtn" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-2.5 py-1.5 rounded-md font-medium flex items-center gap-1 transition shadow">
-        <span>🤖</span> เพิ่ม Bot
+      <!-- Audio Toggle -->
+      <button id="soundToggleBtn" onclick="toggleSound()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-2.5 py-1.5 rounded-lg font-medium border border-slate-700 transition flex items-center gap-1 shadow">
+        <span id="soundIcon">🔊</span>
       </button>
-      <button id="rebuyBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2.5 py-1.5 rounded-md font-medium transition shadow">
-        + Rebuy
+
+      <!-- Player Profile Modal Button -->
+      <button onclick="openProfileModal()" class="bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs px-2.5 py-1.5 rounded-lg font-medium border border-amber-500/30 transition flex items-center gap-1 shadow">
+        <span>👤</span> <span class="hidden sm:inline">โปรไฟล์</span>
       </button>
-      <button id="settleBtn" class="bg-amber-600 hover:bg-amber-500 text-white text-xs px-2.5 py-1.5 rounded-md font-medium transition shadow">
-        🏁 คิดเงิน
+
+      <!-- Leaderboard Modal Button -->
+      <button onclick="openLeaderboardModal()" class="bg-slate-800 hover:bg-slate-700 text-yellow-300 text-xs px-2.5 py-1.5 rounded-lg font-medium border border-yellow-500/30 transition flex items-center gap-1 shadow">
+        <span>🏆</span> <span class="hidden sm:inline">อันดับ</span>
       </button>
-      <button id="standUpBtn" class="bg-rose-700 hover:bg-rose-600 text-white text-xs px-2.5 py-1.5 rounded-md font-medium transition shadow">
-        🚪 ลุกออก
+
+      <!-- Stats Modal Button -->
+      <button onclick="openStatsModal()" class="bg-slate-800 hover:bg-slate-700 text-cyan-300 text-xs px-2.5 py-1.5 rounded-lg font-medium border border-cyan-500/30 transition flex items-center gap-1 shadow">
+        <span>📊</span> <span class="hidden sm:inline">สถิติ</span>
+      </button>
+
+      <!-- PromptPay / QR Settings Button -->
+      <button onclick="openPromptPayModal()" class="bg-slate-800 hover:bg-slate-700 text-emerald-300 text-xs px-2.5 py-1.5 rounded-lg font-medium border border-emerald-500/30 transition flex items-center gap-1 shadow">
+        <span>📱</span> <span class="hidden sm:inline">พร้อมเพย์/QR</span>
+      </button>
+
+      <!-- Add Bot Button -->
+      <button id="addBotBtn" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-2.5 py-1.5 rounded-lg font-semibold flex items-center gap-1 transition shadow">
+        <span>🤖</span> + Bot
+      </button>
+
+      <!-- Settle & Preview Button -->
+      <button onclick="openSettleModal()" class="bg-amber-600 hover:bg-amber-500 text-white text-xs px-2.5 py-1.5 rounded-lg font-semibold transition shadow flex items-center gap-1">
+        <span>🏁</span> คิดเงิน
+      </button>
+
+      <!-- Early Leave Button -->
+      <button onclick="confirmEarlyLeave()" class="bg-slate-800 hover:bg-slate-700 text-rose-300 text-xs px-2.5 py-1.5 rounded-lg font-medium border border-rose-500/30 transition flex items-center gap-1 shadow">
+        <span>🏃</span> <span class="hidden sm:inline">ออกก่อน</span>
       </button>
     </div>
   </header>
 
   <!-- POKER TABLE CONTAINER -->
-  <main class="flex-1 relative flex items-center justify-center p-4">
+  <main class="flex-1 relative flex items-center justify-center p-2 sm:p-4 overflow-hidden">
+    <!-- Confetti / Win Canvas Overlay -->
+    <canvas id="fxCanvas" class="absolute inset-0 pointer-events-none z-40"></canvas>
+
     <!-- TABLE FELT (OVAL) -->
-    <div id="pokerTable" class="poker-felt relative w-full max-w-4xl h-[460px] rounded-[220px] flex items-center justify-center">
+    <div id="pokerTable" class="poker-felt relative w-full max-w-4xl h-[440px] sm:h-[480px] rounded-[240px] flex items-center justify-center">
 
       <!-- CENTER BOARD (POT & COMMUNITY CARDS) -->
-      <div class="flex flex-col items-center justify-center gap-3 z-10">
+      <div class="flex flex-col items-center justify-center gap-2.5 z-10">
         <!-- Pot Display -->
-        <div class="bg-slate-900/90 border border-amber-500/40 px-4 py-1.5 rounded-full shadow-lg flex items-center gap-2">
-          <span class="text-amber-400 font-extrabold text-sm tracking-wide">🪙 TOTAL POT:</span>
-          <span id="potAmount" class="text-emerald-400 font-extrabold text-lg">0฿</span>
+        <div class="bg-slate-900/90 border border-amber-500/50 px-4 py-1.5 rounded-full shadow-2xl flex items-center gap-2">
+          <span class="text-amber-400 font-extrabold text-xs sm:text-sm tracking-wide">🪙 TOTAL POT:</span>
+          <span id="potAmount" class="text-emerald-400 font-extrabold text-base sm:text-xl font-mono">0฿</span>
         </div>
 
         <!-- Community Cards (5 slots) -->
-        <div id="communityCards" class="flex gap-2">
-          <!-- Card slots 0 to 4 -->
-          <div class="w-12 h-16 rounded border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/20 text-xs">Flop</div>
-          <div class="w-12 h-16 rounded border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/20 text-xs">Flop</div>
-          <div class="w-12 h-16 rounded border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/20 text-xs">Flop</div>
-          <div class="w-12 h-16 rounded border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/20 text-xs">Turn</div>
-          <div class="w-12 h-16 rounded border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/20 text-xs">River</div>
+        <div id="communityCards" class="flex gap-2 p-1.5 rounded-xl bg-black/30 backdrop-blur-sm border border-white/5 shadow-inner">
+          <div class="w-12 h-16 sm:w-14 sm:h-20 rounded border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/30 text-xs font-bold">Flop</div>
+          <div class="w-12 h-16 sm:w-14 sm:h-20 rounded border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/30 text-xs font-bold">Flop</div>
+          <div class="w-12 h-16 sm:w-14 sm:h-20 rounded border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/30 text-xs font-bold">Flop</div>
+          <div class="w-12 h-16 sm:w-14 sm:h-20 rounded border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/30 text-xs font-bold">Turn</div>
+          <div class="w-12 h-16 sm:w-14 sm:h-20 rounded border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/30 text-xs font-bold">River</div>
         </div>
 
-        <!-- Action Message / Announcer -->
-        <div id="actionAnnouncement" class="text-xs px-3 py-1 bg-black/60 rounded-full text-slate-200 border border-white/10 max-w-md text-center truncate">
+        <!-- Action Announcement Banner -->
+        <div id="actionAnnouncement" class="text-xs px-3.5 py-1 bg-slate-950/80 rounded-full text-slate-200 border border-white/10 max-w-sm sm:max-w-md text-center truncate shadow">
           รอผู้เล่นนั่งโต๊ะเพื่อเริ่มเกม...
         </div>
       </div>
 
-      <!-- 9 SEATS (Positioned mathematically around the oval) -->
+      <!-- 9 SEATS (Mathematically positioned) -->
       <div id="seatsContainer" class="absolute inset-0 pointer-events-none">
         <!-- Seats 0-8 injected by JS -->
       </div>
@@ -109,108 +198,479 @@
   </main>
 
   <!-- ACTION CONTROLS DOCK (BOTTOM) -->
-  <footer id="actionDock" class="bg-slate-900/95 border border-slate-800 rounded-xl p-3 z-20 max-w-4xl mx-auto w-full flex flex-col gap-2">
+  <footer id="actionDock" class="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-2xl p-2.5 sm:p-3 z-30 max-w-4xl mx-auto w-full flex flex-col gap-2 shadow-2xl">
+    <!-- Info strip -->
     <div class="flex items-center justify-between text-xs text-slate-400 px-1">
-      <div>
-        คุณ: <span id="myPlayerName" class="font-bold text-slate-200">-</span> •
-        ชิปของคุณ: <span id="myChipsAmount" class="font-extrabold text-emerald-400">0฿</span>
+      <div class="flex items-center gap-2">
+        <div class="w-6 h-6 rounded-full overflow-hidden border border-slate-600 bg-slate-800">
+          <img id="myAvatarImg" src="" class="w-full h-full object-cover">
+        </div>
+        <div>
+          <span id="myPlayerName" class="font-bold text-slate-100">-</span>
+          <span class="text-slate-500">• ชิป:</span>
+          <span id="myChipsAmount" class="font-extrabold text-emerald-400 font-mono ml-0.5">0฿</span>
+        </div>
       </div>
-      <div>
-        ยอดตาม (Call): <span id="toCallAmount" class="font-bold text-amber-400">0฿</span> •
-        เดิมพันต่ำสุด: <span id="minRaiseAmount" class="font-bold text-slate-200">20฿</span>
+
+      <div class="flex items-center gap-3">
+        <div>
+          ยอดตาม (Call): <span id="toCallAmount" class="font-bold text-amber-400 font-mono">0฿</span>
+        </div>
+        <div>
+          เดิมพันต่ำสุด: <span id="minRaiseAmount" class="font-bold text-slate-200 font-mono">20฿</span>
+        </div>
+        <button onclick="openRebuyDialog()" class="bg-emerald-600/80 hover:bg-emerald-500 text-white text-[11px] px-2 py-0.5 rounded font-bold transition">
+          + เติมชิป
+        </button>
       </div>
     </div>
 
     <!-- Quick action buttons -->
     <div class="flex items-center gap-2">
-      <button id="foldBtn" class="flex-1 bg-rose-700 hover:bg-rose-600 disabled:opacity-40 disabled:cursor-not-allowed text-white py-2.5 rounded-lg font-bold text-sm transition shadow">
-        ❌ หมอบ (Fold)
+      <!-- Fold -->
+      <button id="foldBtn" class="flex-1 bg-rose-700 hover:bg-rose-600 disabled:opacity-35 disabled:cursor-not-allowed text-white py-2.5 rounded-xl font-bold text-sm transition shadow-md flex items-center justify-center gap-1.5">
+        <span>❌</span> หมอบ (Fold)
       </button>
 
-      <button id="checkCallBtn" class="flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white py-2.5 rounded-lg font-bold text-sm transition shadow">
-        ⚪ เคาะ (Check)
+      <!-- Check / Call -->
+      <button id="checkCallBtn" class="flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-35 disabled:cursor-not-allowed text-white py-2.5 rounded-xl font-bold text-sm transition shadow-md flex items-center justify-center gap-1.5">
+        <span id="checkCallIcon">⚪</span> <span id="checkCallText">เคาะ (Check)</span>
       </button>
 
+      <!-- Raise Group -->
       <div class="flex-[2] flex gap-2">
-        <button id="raiseBtn" class="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white py-2.5 rounded-lg font-bold text-sm transition shadow">
-          🟢 เกทับ (Raise)
+        <button id="raiseBtn" class="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-35 disabled:cursor-not-allowed text-white py-2.5 rounded-xl font-bold text-sm transition shadow-md flex items-center justify-center gap-1.5">
+          <span>🟢</span> เกทับ (Raise)
         </button>
-        <input id="raiseInput" type="number" step="10" min="20" class="w-24 bg-slate-950 border border-slate-700 text-center font-extrabold text-emerald-400 rounded-lg text-sm px-1 focus:outline-none focus:border-emerald-500" value="40">
+        <div class="relative w-28">
+          <input id="raiseInput" type="number" step="10" min="20" class="w-full h-full bg-slate-950 border border-slate-700 text-center font-extrabold text-emerald-400 rounded-xl text-sm px-2 focus:outline-none focus:border-emerald-500 font-mono" value="40">
+          <span class="absolute right-2 top-2.5 text-xs text-slate-500 font-mono pointer-events-none">฿</span>
+        </div>
       </div>
     </div>
 
-    <!-- Multiplier quick buttons -->
-    <div class="flex items-center gap-2 pt-1 border-t border-slate-800">
-      <button onclick="setRaiseMultiplier('min')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-xs rounded text-slate-300">Min</button>
-      <button onclick="setRaiseMultiplier(0.5)" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-xs rounded text-slate-300">1/2 Pot</button>
-      <button onclick="setRaiseMultiplier(1)" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-xs rounded text-slate-300">Pot</button>
-      <button onclick="setRaiseMultiplier('allin')" class="px-2.5 py-1 bg-rose-900/60 hover:bg-rose-800 text-xs rounded text-rose-300 font-bold">All-In</button>
+    <!-- Multiplier quick buttons & slider -->
+    <div class="flex items-center gap-2 pt-1 border-t border-slate-800/80">
+      <button onclick="setRaiseMultiplier('min')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-xs rounded-lg text-slate-300 font-medium transition">Min</button>
+      <button onclick="setRaiseMultiplier(0.5)" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-xs rounded-lg text-slate-300 font-medium transition">1/2 Pot</button>
+      <button onclick="setRaiseMultiplier(0.75)" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-xs rounded-lg text-slate-300 font-medium transition">3/4 Pot</button>
+      <button onclick="setRaiseMultiplier(1)" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-xs rounded-lg text-slate-300 font-medium transition">Pot</button>
+      <button onclick="setRaiseMultiplier('allin')" class="px-3 py-1 bg-rose-950 hover:bg-rose-900 border border-rose-500/40 text-xs rounded-lg text-rose-300 font-bold transition">All-In</button>
       <input id="raiseSlider" type="range" class="flex-1 accent-emerald-500 cursor-pointer ml-2">
     </div>
   </footer>
 
-  <!-- MODAL: ADD BOT -->
+  <!-- ==================== MODALS ==================== -->
+
+  <!-- MODAL 1: PLAYER PROFILE & CUSTOMIZATION -->
+  <div id="profileModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="font-bold text-base text-amber-400 flex items-center gap-2">
+          <span>👤</span> แก้ไขโปรไฟล์ผู้เล่น
+        </h3>
+        <button onclick="closeProfileModal()" class="text-slate-400 hover:text-white text-lg">&times;</button>
+      </div>
+
+      <div class="flex flex-col items-center gap-3 py-2">
+        <!-- Live Avatar Preview -->
+        <div class="relative w-20 h-20 rounded-full border-4 border-amber-500/60 overflow-hidden bg-slate-800 shadow-xl">
+          <img id="profilePreviewAvatar" src="" class="w-full h-full object-cover">
+        </div>
+        <span class="text-xs text-slate-400">รูปประจำตัวปัจจุบันของคุณ</span>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block text-slate-300 mb-1 font-medium">ชื่อที่แสดง (Display Name):</label>
+          <input id="profileNameInput" type="text" maxlength="20" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-slate-100 font-semibold focus:outline-none focus:border-amber-500">
+        </div>
+
+        <div>
+          <label class="block text-slate-300 mb-1 font-medium">เลือกรูปตัวละครเร็ว (DiceBear Presets):</label>
+          <div class="grid grid-cols-5 gap-2" id="presetAvatarsContainer">
+            <!-- Injected by JS -->
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-slate-300 mb-1 font-medium">หรือใส่ URL รูปภาพของคุณเอง:</label>
+          <input id="profileAvatarUrlInput" type="text" placeholder="https://..." class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-slate-100 focus:outline-none focus:border-amber-500">
+        </div>
+      </div>
+
+      <div class="flex gap-2 pt-2 border-t border-slate-800">
+        <button onclick="closeProfileModal()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 py-2 rounded-lg text-xs font-semibold transition">ยกเลิก</button>
+        <button onclick="saveProfile()" class="flex-1 bg-amber-600 hover:bg-amber-500 text-white py-2 rounded-lg text-xs font-semibold transition shadow">บันทึกโปรไฟล์</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: ADD BOT -->
   <div id="addBotModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-700 rounded-xl p-5 max-w-sm w-full space-y-4 shadow-2xl">
-      <h3 class="font-bold text-base text-amber-400 flex items-center gap-2">
-        <span>🤖</span> เพิ่มผู้เล่น AI Bot เข้าโต๊ะ
-      </h3>
-      <p class="text-xs text-slate-400 leading-relaxed">
-        เมื่อมี Bot ในโต๊ะ ระบบจะสลับเป็น <strong>โหมดเล่นสนุก (ไม่คิดเงินจริง)</strong> อัตโนมัติ เพื่อให้ซ้อมเล่นได้สบายใจ
-      </p>
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="font-bold text-base text-indigo-400 flex items-center gap-2">
+          <span>🤖</span> เพิ่ม AI Bot เข้าโต๊ะ
+        </h3>
+        <button onclick="closeAddBotModal()" class="text-slate-400 hover:text-white text-lg">&times;</button>
+      </div>
+
+      <div class="p-2.5 rounded-xl bg-indigo-950/60 border border-indigo-500/30 text-xs text-indigo-200 leading-relaxed">
+        💡 <strong>หมายเหตุ:</strong> เมื่อมี Bot ในโต๊ะ ระบบจะสลับเป็น <strong>โหมดเล่นสนุก (ไม่คิดเงินจริง)</strong> เพื่อความโปร่งใสและซ้อมฝีมือ
+      </div>
 
       <div class="space-y-3 text-xs">
         <div>
           <label class="block text-slate-300 mb-1 font-medium">ชื่อ Bot:</label>
-          <input id="botNameInput" type="text" value="Bot Sharky" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-slate-100">
+          <input id="botNameInput" type="text" value="Bot Sharky" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-slate-100">
         </div>
 
         <div>
-          <label class="block text-slate-300 mb-1 font-medium">ระดับความเก่ง (Difficulty):</label>
-          <select id="botDiffSelect" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-slate-100">
-            <option value="easy">🟢 ง่าย (Easy / Calling Station)</option>
-            <option value="medium" selected>🟡 ปานกลาง (Medium / TAG)</option>
-            <option value="hard">🔴 เซียน (Hard / Aggressive & Bluff)</option>
+          <label class="block text-slate-300 mb-1 font-medium">ระดับความเก่ง (AI Logic):</label>
+          <select id="botDiffSelect" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-slate-100">
+            <option value="easy">🟢 ง่าย (Calling Station - ชอบตาม)</option>
+            <option value="medium" selected>🟡 ปานกลาง (Tight Aggressive)</option>
+            <option value="hard">🔴 เซียน (Aggressive / Bluff Master)</option>
           </select>
         </div>
 
         <div>
           <label class="block text-slate-300 mb-1 font-medium">ชิปเริ่มต้น (Chips):</label>
-          <input id="botChipsInput" type="number" value="200" step="50" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-slate-100">
+          <input id="botChipsInput" type="number" value="200" step="50" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-slate-100 font-mono">
         </div>
 
         <div>
           <label class="block text-slate-300 mb-1 font-medium">เลือกที่นั่ง:</label>
-          <select id="botSeatSelect" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-slate-100">
+          <select id="botSeatSelect" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-slate-100">
             <!-- Populated by JS -->
           </select>
         </div>
       </div>
 
-      <div class="flex gap-2 pt-2">
-        <button onclick="closeAddBotModal()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 py-2 rounded text-xs font-semibold">ยกเลิก</button>
-        <button onclick="confirmAddBot()" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded text-xs font-semibold">เพิ่ม Bot ทันที</button>
+      <div class="flex gap-2 pt-2 border-t border-slate-800">
+        <button onclick="closeAddBotModal()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 py-2 rounded-lg text-xs font-semibold transition">ยกเลิก</button>
+        <button onclick="confirmAddBot()" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-lg text-xs font-semibold transition shadow">เพิ่ม Bot ทันที</button>
       </div>
     </div>
   </div>
 
-  <!-- CLIENT SCRIPT -->
+  <!-- MODAL 3: LEADERBOARD -->
+  <div id="leaderboardModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl p-5 max-w-md w-full space-y-4 shadow-2xl flex flex-col max-h-[85vh]">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="font-bold text-base text-yellow-400 flex items-center gap-2">
+          <span>🏆</span> อันดับเซียนโป๊กเกอร์ (Leaderboard)
+        </h3>
+        <button onclick="closeLeaderboardModal()" class="text-slate-400 hover:text-white text-lg">&times;</button>
+      </div>
+
+      <div id="leaderboardList" class="flex-1 overflow-y-auto space-y-2 pr-1 text-xs">
+        <div class="text-center py-8 text-slate-400">กำลังโหลดข้อมูลอันดับ...</div>
+      </div>
+
+      <div class="pt-2 border-t border-slate-800 flex justify-end">
+        <button onclick="closeLeaderboardModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg text-xs font-semibold transition">ปิด</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 4: USER STATS -->
+  <div id="statsModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="font-bold text-base text-cyan-400 flex items-center gap-2">
+          <span>📊</span> สถิติการเล่นของคุณ
+        </h3>
+        <button onclick="closeStatsModal()" class="text-slate-400 hover:text-white text-lg">&times;</button>
+      </div>
+
+      <div id="statsContent" class="space-y-3 text-xs">
+        <div class="text-center py-6 text-slate-400">กำลังโหลดสถิติ...</div>
+      </div>
+
+      <div class="pt-2 border-t border-slate-800 flex justify-end">
+        <button onclick="closeStatsModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg text-xs font-semibold transition">ปิด</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 5: SETTLE & PREVIEW -->
+  <div id="settleModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl p-5 max-w-lg w-full space-y-4 shadow-2xl flex flex-col max-h-[90vh]">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="font-bold text-base text-amber-400 flex items-center gap-2">
+          <span>🏁</span> คิดเงิน & สรุปผลการเล่น (Settlement)
+        </h3>
+        <button onclick="closeSettleModal()" class="text-slate-400 hover:text-white text-lg">&times;</button>
+      </div>
+
+      <div id="settleContent" class="flex-1 overflow-y-auto space-y-3 text-xs pr-1">
+        <div class="text-center py-8 text-slate-400">กำลังคำนวณยอดเงินและรายการโอน...</div>
+      </div>
+
+      <div class="flex gap-2 pt-3 border-t border-slate-800">
+        <button onclick="refreshSettlePreview()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs font-semibold transition">🔄 รีเฟรช</button>
+        <div class="flex-1"></div>
+        <button onclick="closeSettleModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-lg text-xs font-semibold transition">ปิด</button>
+        <button id="confirmSettleBtn" onclick="confirmSettleAndClose()" class="bg-rose-700 hover:bg-rose-600 text-white px-4 py-2 rounded-lg text-xs font-bold transition shadow">🏁 จบเกม & ส่งเข้า Discord</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 6: PROMPTPAY & QR SETTINGS -->
+  <div id="promptPayModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="font-bold text-base text-emerald-400 flex items-center gap-2">
+          <span>📱</span> ตั้งค่าพร้อมเพย์ & QR รับเงิน
+        </h3>
+        <button onclick="closePromptPayModal()" class="text-slate-400 hover:text-white text-lg">&times;</button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block text-slate-300 mb-1 font-medium">เบอร์พร้อมเพย์ / เลขบัตรประชาชน:</label>
+          <input id="promptPayInput" type="text" placeholder="08XXXXXXXX หรือ 1XXXXXXXXXXXX" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-slate-100 font-mono focus:outline-none focus:border-emerald-500">
+        </div>
+
+        <div>
+          <label class="block text-slate-300 mb-1 font-medium">อัปโหลดรูป QR Code พร้อมเพย์ของคุณ:</label>
+          <input id="qrFileInput" type="file" accept="image/*" class="w-full text-slate-400 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:bg-emerald-700 file:text-white hover:file:bg-emerald-600 file:cursor-pointer">
+          <div id="qrUploadStatus" class="mt-1 text-[11px] text-slate-400"></div>
+        </div>
+
+        <div id="qrPreviewBox" class="hidden flex flex-col items-center gap-1.5 p-3 rounded-xl bg-slate-950 border border-slate-800">
+          <span class="text-slate-400 text-[11px]">ตัวอย่าง QR Code ที่บันทึกไว้:</span>
+          <img id="qrPreviewImg" src="" class="w-36 h-36 object-contain rounded-lg border border-slate-700 bg-white p-1">
+        </div>
+      </div>
+
+      <div class="flex gap-2 pt-2 border-t border-slate-800">
+        <button onclick="closePromptPayModal()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 py-2 rounded-lg text-xs font-semibold transition">ปิด</button>
+        <button onclick="savePromptPayDetails()" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg text-xs font-semibold transition shadow">บันทึกข้อมูล</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 7: REBUY DIALOG -->
+  <div id="rebuyModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl p-5 max-w-xs w-full space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="font-bold text-base text-emerald-400 flex items-center gap-2">
+          <span>💰</span> เติมชิป (Rebuy)
+        </h3>
+        <button onclick="closeRebuyDialog()" class="text-slate-400 hover:text-white text-lg">&times;</button>
+      </div>
+
+      <p class="text-xs text-slate-400">เลือกจำนวนชิปที่ต้องการเติมเข้ากองกลาง:</p>
+
+      <div class="grid grid-cols-2 gap-2 text-xs">
+        <button onclick="executeRebuy(100)" class="py-2.5 bg-slate-800 hover:bg-emerald-700 border border-slate-700 rounded-xl font-bold text-emerald-400 hover:text-white transition">+100฿</button>
+        <button onclick="executeRebuy(200)" class="py-2.5 bg-slate-800 hover:bg-emerald-700 border border-slate-700 rounded-xl font-bold text-emerald-400 hover:text-white transition">+200฿</button>
+        <button onclick="executeRebuy(500)" class="py-2.5 bg-slate-800 hover:bg-emerald-700 border border-slate-700 rounded-xl font-bold text-emerald-400 hover:text-white transition">+500฿</button>
+        <button onclick="executeRebuy(1000)" class="py-2.5 bg-slate-800 hover:bg-emerald-700 border border-slate-700 rounded-xl font-bold text-emerald-400 hover:text-white transition">+1,000฿</button>
+      </div>
+
+      <div class="pt-2 border-t border-slate-800">
+        <button onclick="closeRebuyDialog()" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 py-2 rounded-lg text-xs font-semibold">ยกเลิก</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== JAVASCRIPT ==================== -->
   <script>
-    // Config & State
+    // ==========================================
+    // 1. CONFIG & AUDIO SYNTHESIZER
+    // ==========================================
     const urlParams = new URLSearchParams(window.location.search);
     const channelId = urlParams.get('channel_id') || 'general_table';
+
+    // Saved profile from localStorage or URL params
+    const savedName = localStorage.getItem('poker_display_name') || urlParams.get('display_name') || urlParams.get('username') || `Player_${Math.floor(Math.random() * 90 + 10)}`;
+    const savedAvatar = localStorage.getItem('poker_avatar_url') || urlParams.get('avatar_url') || `https://api.dicebear.com/7.x/adventurer/svg?seed=${savedName}`;
+
     const myUser = {
       id: urlParams.get('user_id') || `user_${Math.floor(Math.random() * 8999 + 1000)}`,
-      username: urlParams.get('username') || `Player_${Math.floor(Math.random() * 90 + 10)}`,
-      displayName: urlParams.get('display_name') || `Player_${Math.floor(Math.random() * 90 + 10)}`,
-      avatarUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=${urlParams.get('user_id') || 'poker'}`
+      username: urlParams.get('username') || savedName,
+      displayName: savedName,
+      avatarUrl: savedAvatar
     };
 
     let ws = null;
     let tableState = null;
     let mySeatIndex = null;
+    let lastProcessedEventTime = 0;
+    let turnAnimationTimer = null;
+    let lastTickedSecond = -1;
 
-    // Connect WebSocket
+    // Web Audio Synthesizer (Zero-latency synthetic sounds)
+    let audioCtx = null;
+    let isSoundEnabled = localStorage.getItem('poker_sound_enabled') !== 'false';
+
+    function initAudio() {
+      if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+          audioCtx = new AudioContextClass();
+        }
+      }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    // Auto-unlock audio on first user click
+    window.addEventListener('click', () => initAudio(), { once: true });
+    window.addEventListener('touchstart', () => initAudio(), { once: true });
+
+    function toggleSound() {
+      isSoundEnabled = !isSoundEnabled;
+      localStorage.setItem('poker_sound_enabled', isSoundEnabled ? 'true' : 'false');
+      updateSoundButtonUI();
+    }
+
+    function updateSoundButtonUI() {
+      const icon = document.getElementById('soundIcon');
+      if (icon) {
+        icon.innerText = isSoundEnabled ? '🔊' : '🔇';
+      }
+    }
+    updateSoundButtonUI();
+
+    function playSound(type) {
+      if (!isSoundEnabled) return;
+      initAudio();
+      if (!audioCtx) return;
+
+      const now = audioCtx.currentTime;
+
+      switch (type) {
+        case 'deal': {
+          // Swoosh sound (filtered noise glide)
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(400, now);
+          osc.frequency.exponentialRampToValueAtTime(100, now + 0.15);
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now);
+          osc.stop(now + 0.15);
+          break;
+        }
+
+        case 'check': {
+          // Double knock wood sound
+          [0, 0.09].forEach(delay => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(180, now + delay);
+            osc.frequency.exponentialRampToValueAtTime(80, now + delay + 0.06);
+            gain.gain.setValueAtTime(0.4, now + delay);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + delay + 0.06);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now + delay);
+            osc.stop(now + delay + 0.07);
+          });
+          break;
+        }
+
+        case 'call': {
+          // Casino poker chips clink (dual metallic tones)
+          [2400, 3200].forEach(freq => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now);
+            gain.gain.setValueAtTime(0.2, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now);
+            osc.stop(now + 0.12);
+          });
+          break;
+        }
+
+        case 'raise': {
+          // Heavy chip stack clatter + rising tone
+          [400, 600, 850].forEach((freq, i) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            const startT = now + i * 0.05;
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, startT);
+            gain.gain.setValueAtTime(0.25, startT);
+            gain.gain.exponentialRampToValueAtTime(0.01, startT + 0.1);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(startT);
+            osc.stop(startT + 0.11);
+          });
+          break;
+        }
+
+        case 'fold': {
+          // Soft card flick / slide
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(260, now);
+          osc.frequency.exponentialRampToValueAtTime(90, now + 0.12);
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now);
+          osc.stop(now + 0.12);
+          break;
+        }
+
+        case 'timerTick': {
+          // Sharp woodblock ticking blip
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(950, now);
+          gain.gain.setValueAtTime(0.35, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now);
+          osc.stop(now + 0.06);
+          break;
+        }
+
+        case 'win': {
+          // Victory chime fanfare (C5, E5, G5, C6)
+          const notes = [523.25, 659.25, 783.99, 1046.50];
+          notes.forEach((freq, idx) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            const startT = now + idx * 0.1;
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, startT);
+            gain.gain.setValueAtTime(0.3, startT);
+            gain.gain.exponentialRampToValueAtTime(0.005, startT + 0.4);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(startT);
+            osc.stop(startT + 0.42);
+          });
+          triggerConfetti();
+          break;
+        }
+      }
+    }
+
+    // ==========================================
+    // 2. WEBSOCKET CLIENT & STATE DISPATCH
+    // ==========================================
     function connectWs() {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const wsUrl = `${protocol}//${window.location.host}/ws/poker`;
@@ -229,23 +689,71 @@
       ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
-          if (msg.type === 'table_state') {
-            tableState = msg.state;
-            renderTable(tableState);
-          } else if (msg.type === 'table_closed') {
-            alert('🏁 โต๊ะนี้ถูกปิดและทำการคิดเงินส่งเข้าดิสคอร์ดเรียบร้อยแล้ว!');
-          }
+          handleServerMessage(msg);
         } catch (e) {
-          console.error(e);
+          console.error('Error parsing WS message:', e);
         }
       };
 
       ws.onclose = () => {
-        setTimeout(connectWs, 3000);
+        setTimeout(connectWs, 2500);
       };
     }
 
-    // Render Table
+    function handleServerMessage(msg) {
+      switch (msg.type) {
+        case 'table_state': {
+          tableState = msg.state;
+          renderTable(tableState);
+          handleTableEvents(tableState);
+          break;
+        }
+        case 'leaderboard_data': {
+          renderLeaderboard(msg.leaderboard);
+          break;
+        }
+        case 'stats_data': {
+          renderStats(msg.stats, msg.user);
+          break;
+        }
+        case 'preview_settlement_data': {
+          renderSettlementData(msg.settlement, msg.userPayments);
+          break;
+        }
+        case 'promptpay_saved': {
+          alert(msg.success ? '✅ บันทึกเลขพร้อมเพย์สำเร็จ!' : '❌ ไม่สามารถบันทึกได้: ' + msg.error);
+          break;
+        }
+        case 'qr_saved': {
+          document.getElementById('qrUploadStatus').innerText = msg.success ? '✅ บันทึกรูป QR Code สำเร็จ!' : '❌ บันทึกรูปไม่สำเร็จ';
+          break;
+        }
+        case 'table_closed': {
+          alert('🏁 โต๊ะนี้ถูกปิดและทำการสรุปยอดส่งเข้าดิสคอร์ดเรียบร้อยแล้ว!');
+          closeSettleModal();
+          break;
+        }
+      }
+    }
+
+    function handleTableEvents(state) {
+      if (!state.lastEvent) return;
+      if (state.lastEvent.timestamp <= lastProcessedEventTime) return;
+      lastProcessedEventTime = state.lastEvent.timestamp;
+
+      // Play corresponding sound effect
+      if (['check', 'call', 'raise', 'fold', 'deal'].includes(state.lastEvent.type)) {
+        playSound(state.lastEvent.type);
+      } else if (state.lastEvent.type === 'board_deal') {
+        playSound('deal');
+      } else if (state.lastEvent.type === 'showdown') {
+        playSound('win');
+      }
+    }
+
+    // ==========================================
+    // 3. TABLE RENDERING & SEAT ENGINE
+    // ==========================================
     function renderTable(state) {
       if (!state) return;
 
@@ -257,47 +765,60 @@
       const modeBadge = document.getElementById('modeBadge');
       modeBadge.classList.remove('hidden');
       if (state.hasBots) {
-        modeBadge.className = 'px-2.5 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1.5 border bg-indigo-950/80 border-indigo-500 text-indigo-300 shadow';
+        modeBadge.className = 'px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 border bg-indigo-950/80 border-indigo-500 text-indigo-300 shadow';
         modeBadge.innerHTML = '<span>🤖</span> โหมดเล่นสนุก (มี Bot - ไม่คิดเงินจริง)';
       } else {
-        modeBadge.className = 'px-2.5 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1.5 border bg-emerald-950/80 border-emerald-500 text-emerald-300 shadow';
+        modeBadge.className = 'px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 border bg-emerald-950/80 border-emerald-500 text-emerald-300 shadow';
         modeBadge.innerHTML = '<span>💸</span> โหมดแข่งขัน (บันทึกสถิติ/คิดเงินจริง)';
       }
 
-      // Render Community Cards
-      const commContainer = document.getElementById('communityCards');
-      commContainer.innerHTML = '';
-      for (let i = 0; i < 5; i++) {
-        const card = state.communityCards[i];
-        if (card) {
-          commContainer.appendChild(createCardElement(card));
-        } else {
-          const empty = document.createElement('div');
-          empty.className = 'w-12 h-16 rounded border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/20 text-xs font-bold';
-          empty.innerText = i < 3 ? 'Flop' : i === 3 ? 'Turn' : 'River';
-          commContainer.appendChild(empty);
-        }
-      }
+      // Render Community Cards with 3D Flip
+      renderCommunityCards(state.communityCards);
 
       // Find my seat
       mySeatIndex = state.seats.findIndex(p => p && p.userId === myUser.id);
       const myPlayer = mySeatIndex !== -1 ? state.seats[mySeatIndex] : null;
 
       document.getElementById('myPlayerName').innerText = myUser.displayName;
+      document.getElementById('myAvatarImg').src = myUser.avatarUrl;
       document.getElementById('myChipsAmount').innerText = myPlayer ? `${myPlayer.chips.toLocaleString()}฿` : '0฿ (ยังไม่นั่ง)';
+
+      // Turn Status Indicator
+      const isMyTurn = myPlayer && state.currentTurnSeat === myPlayer.seatIndex;
+      const turnBadge = document.getElementById('turnStatusBadge');
+      if (isMyTurn) turnBadge.classList.remove('hidden');
+      else turnBadge.classList.add('hidden');
 
       // Render 9 Seats
       renderSeats(state);
 
-      // Update Action Dock Controls
+      // Update Action Controls
       updateActionDock(state, myPlayer);
+    }
+
+    function renderCommunityCards(cards) {
+      const commContainer = document.getElementById('communityCards');
+      commContainer.innerHTML = '';
+      for (let i = 0; i < 5; i++) {
+        const card = cards[i];
+        if (card) {
+          const cardEl = createCardElement(card);
+          cardEl.classList.add('card-flip-enter');
+          commContainer.appendChild(cardEl);
+        } else {
+          const empty = document.createElement('div');
+          empty.className = 'w-12 h-16 sm:w-14 sm:h-20 rounded border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/25 text-xs font-bold';
+          empty.innerText = i < 3 ? 'Flop' : i === 3 ? 'Turn' : 'River';
+          commContainer.appendChild(empty);
+        }
+      }
     }
 
     function renderSeats(state) {
       const container = document.getElementById('seatsContainer');
       container.innerHTML = '';
 
-      // Positions around oval: 9 seats percentages (X, Y)
+      // Oval Coordinate Layout for 9 Seats
       const seatPositions = [
         { left: '50%', top: '88%' },  // 0: Bottom Center (Hero)
         { left: '22%', top: '82%' },  // 1: Bottom Left
@@ -320,41 +841,61 @@
         if (seat) {
           const isTurn = state.currentTurnSeat === idx;
           const isDealer = state.dealerSeat === idx;
+          const isWinner = state.handWinners?.some(w => w.userId === seat.userId);
 
           wrapper.innerHTML = `
             <div class="relative flex flex-col items-center">
-              ${isDealer ? '<span class="absolute -top-2 -left-2 bg-amber-400 text-slate-900 font-extrabold text-[10px] w-5 h-5 rounded-full flex items-center justify-center shadow z-10 border border-slate-900">D</span>' : ''}
+              ${isDealer ? '<span class="absolute -top-2 -left-2 bg-amber-400 text-slate-900 font-extrabold text-[10px] w-5 h-5 rounded-full flex items-center justify-center shadow z-20 border border-slate-900">D</span>' : ''}
               
-              <!-- Avatar -->
-              <div class="w-12 h-12 rounded-full border-2 ${isTurn ? 'border-emerald-400 active-glow' : seat.isFolded ? 'border-rose-500 opacity-50' : 'border-slate-700'} overflow-hidden bg-slate-800 shadow-md">
-                <img src="${seat.avatarUrl || 'https://api.dicebear.com/7.x/bottts/svg?seed=' + seat.userId}" class="w-full h-full object-cover">
+              <!-- AVATAR & POKER NIGHT TURN RING -->
+              <div class="relative w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center">
+                <!-- Circular Countdown SVG Ring -->
+                ${isTurn ? `
+                  <svg class="absolute -inset-1 w-16 h-16 sm:w-18 sm:h-18 pointer-events-none z-10" viewBox="0 0 64 64">
+                    <circle cx="32" cy="32" r="28" stroke="rgba(255,255,255,0.15)" stroke-width="3.5" fill="none" />
+                    <circle id="turnRing-${idx}" cx="32" cy="32" r="28" stroke="#10b981" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-dasharray="175.93" stroke-dashoffset="0" transform="rotate(-90 32 32)" />
+                  </svg>
+                  <span id="turnTimeText-${idx}" class="absolute -bottom-1 z-20 text-[10px] font-extrabold px-1.5 rounded-full bg-slate-950 text-emerald-400 border border-emerald-500 shadow font-mono">20s</span>
+                ` : ''}
+
+                <!-- Avatar Image -->
+                <div class="w-13 h-13 sm:w-15 sm:h-15 rounded-full border-2 ${isWinner ? 'border-amber-400 win-glow' : isTurn ? 'border-emerald-400' : seat.isFolded ? 'border-rose-500 opacity-40' : 'border-slate-700'} overflow-hidden bg-slate-800 shadow-xl">
+                  <img src="${seat.avatarUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=' + seat.userId}" class="w-full h-full object-cover">
+                </div>
               </div>
 
               <!-- Badges -->
-              <div class="bg-slate-900/95 border border-slate-700 px-2 py-0.5 rounded-md mt-1 text-center shadow">
-                <p class="text-[10px] font-bold truncate max-w-[80px] text-slate-200">
+              <div class="bg-slate-900/95 border border-slate-700/90 px-2 py-0.5 rounded-lg mt-1 text-center shadow max-w-[95px] backdrop-blur-sm">
+                <p class="text-[10px] font-bold truncate text-slate-200">
                   ${seat.isBot ? '🤖 ' : ''}${seat.displayName}
                 </p>
-                <p class="text-[10px] font-extrabold text-emerald-400">${seat.chips.toLocaleString()}฿</p>
+                <p class="text-[10px] font-extrabold text-emerald-400 font-mono">${seat.chips.toLocaleString()}฿</p>
               </div>
 
-              ${seat.currentRoundBet > 0 ? `<div class="bg-amber-500 text-slate-950 font-extrabold text-[10px] px-1.5 rounded-full mt-0.5 shadow">${seat.currentRoundBet}฿</div>` : ''}
+              ${seat.currentRoundBet > 0 ? `<div class="bg-amber-500 text-slate-950 font-extrabold text-[10px] px-2 rounded-full mt-0.5 shadow font-mono">${seat.currentRoundBet}฿</div>` : ''}
 
-              <!-- Cards -->
+              <!-- Hole Cards -->
               ${seat.hasCards ? `
-                <div class="flex gap-1 -mt-2 z-10">
+                <div class="flex gap-1 -mt-2 z-20 card-deal-enter">
                   ${seat.holeCards ? seat.holeCards.map(c => createMiniCardHTML(c)).join('') : `
-                    <div class="w-6 h-9 rounded bg-blue-800 border border-white/60 shadow flex items-center justify-center text-[10px]">🂠</div>
-                    <div class="w-6 h-9 rounded bg-blue-800 border border-white/60 shadow flex items-center justify-center text-[10px]">🂠</div>
+                    <div class="w-6 h-9 rounded bg-blue-800 border border-blue-400 shadow-md flex items-center justify-center text-[10px] text-white">🂠</div>
+                    <div class="w-6 h-9 rounded bg-blue-800 border border-blue-400 shadow-md flex items-center justify-center text-[10px] text-white">🂠</div>
                   `}
+                </div>
+              ` : ''}
+
+              <!-- Winner Banner -->
+              ${isWinner ? `
+                <div class="absolute -top-3 bg-amber-400 text-slate-950 text-[9px] font-extrabold px-1.5 py-0.5 rounded-full shadow-lg z-30 animate-bounce">
+                  👑 WINNER!
                 </div>
               ` : ''}
             </div>
           `;
         } else {
-          // Empty seat button
+          // Empty seat
           wrapper.innerHTML = `
-            <button onclick="sitAtSeat(${idx})" class="w-11 h-11 rounded-full border-2 border-dashed border-white/30 hover:border-amber-400 bg-black/40 hover:bg-amber-400/20 text-white/50 hover:text-amber-300 flex items-center justify-center text-xs font-bold transition shadow">
+            <button onclick="sitAtSeat(${idx})" class="w-12 h-12 rounded-full border-2 border-dashed border-white/30 hover:border-amber-400 bg-black/40 hover:bg-amber-400/20 text-white/50 hover:text-amber-300 flex items-center justify-center text-xs font-bold transition shadow-lg">
               + นั่ง
             </button>
           `;
@@ -364,16 +905,70 @@
       });
     }
 
+    // ==========================================
+    // 4. CIRCULAR TURN TIMER LOOP
+    // ==========================================
+    function startTurnAnimationLoop() {
+      if (turnAnimationTimer) cancelAnimationFrame(turnAnimationTimer);
+
+      function updateTimer() {
+        if (tableState && tableState.currentTurnSeat !== null && tableState.phase !== 'showdown' && tableState.phase !== 'waiting') {
+          const turnIdx = tableState.currentTurnSeat;
+          const ringEl = document.getElementById(`turnRing-${turnIdx}`);
+          const textEl = document.getElementById(`turnTimeText-${turnIdx}`);
+
+          if (ringEl && textEl) {
+            const elapsed = (Date.now() - tableState.turnStartedAt) / 1000;
+            const remaining = Math.max(0, tableState.turnDuration - elapsed);
+            const pct = Math.max(0, remaining / tableState.turnDuration);
+
+            // Circumference: 2 * PI * 28 ≈ 175.93
+            const circumference = 175.93;
+            const offset = circumference * (1 - pct);
+            ringEl.style.strokeDashoffset = offset;
+
+            const remainingSec = Math.ceil(remaining);
+            textEl.innerText = `${remainingSec}s`;
+
+            // Color stages
+            if (remainingSec <= 5) {
+              ringEl.style.stroke = '#ef4444';
+              textEl.className = 'absolute -bottom-1 z-20 text-[10px] font-extrabold px-1.5 rounded-full bg-rose-950 text-rose-300 border border-rose-500 shadow font-mono animate-pulse';
+              // Warning audio tick once per second
+              if (lastTickedSecond !== remainingSec && remainingSec > 0) {
+                lastTickedSecond = remainingSec;
+                playSound('timerTick');
+              }
+            } else if (remainingSec <= 10) {
+              ringEl.style.stroke = '#f59e0b';
+              textEl.className = 'absolute -bottom-1 z-20 text-[10px] font-extrabold px-1.5 rounded-full bg-amber-950 text-amber-300 border border-amber-500 shadow font-mono';
+            } else {
+              ringEl.style.stroke = '#10b981';
+              textEl.className = 'absolute -bottom-1 z-20 text-[10px] font-extrabold px-1.5 rounded-full bg-slate-950 text-emerald-400 border border-emerald-500 shadow font-mono';
+            }
+          }
+        }
+        turnAnimationTimer = requestAnimationFrame(updateTimer);
+      }
+
+      turnAnimationTimer = requestAnimationFrame(updateTimer);
+    }
+    startTurnAnimationLoop();
+
+    // ==========================================
+    // 5. CARDS CREATOR HELPERS
+    // ==========================================
     function createCardElement(card) {
       const div = document.createElement('div');
-      div.className = `w-12 h-16 rounded-md bg-white card-shadow flex flex-col justify-between p-1 font-bold ${['h', 'd'].includes(card.suit) ? 'text-red-600' : 'text-slate-900'}`;
+      const isRed = ['h', 'd'].includes(card.suit);
+      div.className = `w-12 h-16 sm:w-14 sm:h-20 rounded-lg bg-white card-shadow flex flex-col justify-between p-1 sm:p-1.5 font-bold ${isRed ? 'text-red-600' : 'text-slate-900'} border border-slate-200`;
       const suitSymbol = { s: '♠', h: '♥', d: '♦', c: '♣' }[card.suit];
       const rankText = { 14: 'A', 13: 'K', 12: 'Q', 11: 'J' }[card.rank] || card.rank;
 
       div.innerHTML = `
-        <div class="text-xs leading-none">${rankText}</div>
-        <div class="text-xl text-center leading-none">${suitSymbol}</div>
-        <div class="text-xs leading-none text-right">${rankText}</div>
+        <div class="text-xs sm:text-sm font-extrabold leading-none">${rankText}</div>
+        <div class="text-lg sm:text-2xl text-center leading-none">${suitSymbol}</div>
+        <div class="text-xs sm:text-sm font-extrabold leading-none text-right">${rankText}</div>
       `;
       return div;
     }
@@ -382,11 +977,14 @@
       const suitSymbol = { s: '♠', h: '♥', d: '♦', c: '♣' }[card.suit];
       const rankText = { 14: 'A', 13: 'K', 12: 'Q', 11: 'J' }[card.rank] || card.rank;
       const color = ['h', 'd'].includes(card.suit) ? 'text-red-600' : 'text-slate-950';
-      return `<div class="w-6 h-9 rounded bg-white shadow flex flex-col items-center justify-center ${color} font-extrabold text-[10px] leading-tight border border-slate-400">
+      return `<div class="w-6 h-9 rounded bg-white shadow-md flex flex-col items-center justify-center ${color} font-extrabold text-[10px] leading-tight border border-slate-400">
         <span>${rankText}</span><span>${suitSymbol}</span>
       </div>`;
     }
 
+    // ==========================================
+    // 6. ACTION CONTROLS & LOGIC
+    // ==========================================
     function updateActionDock(state, myPlayer) {
       const isMyTurn = myPlayer && state.currentTurnSeat === myPlayer.seatIndex;
       const foldBtn = document.getElementById('foldBtn');
@@ -405,20 +1003,26 @@
       raiseInput.disabled = !isMyTurn;
       raiseSlider.disabled = !isMyTurn;
 
+      const checkCallIcon = document.getElementById('checkCallIcon');
+      const checkCallText = document.getElementById('checkCallText');
+
       if (toCall === 0) {
-        checkCallBtn.innerText = '⚪ เคาะ (Check)';
-        checkCallBtn.className = 'flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white py-2.5 rounded-lg font-bold text-sm transition shadow';
+        checkCallIcon.innerText = '⚪';
+        checkCallText.innerText = 'เคาะ (Check)';
+        checkCallBtn.className = 'flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-35 disabled:cursor-not-allowed text-white py-2.5 rounded-xl font-bold text-sm transition shadow-md flex items-center justify-center gap-1.5';
       } else {
-        checkCallBtn.innerText = `🔵 ตาม (Call ${toCall}฿)`;
-        checkCallBtn.className = 'flex-1 bg-amber-600 hover:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed text-white py-2.5 rounded-lg font-bold text-sm transition shadow';
+        checkCallIcon.innerText = '🔵';
+        checkCallText.innerText = `ตาม (Call ${toCall}฿)`;
+        checkCallBtn.className = 'flex-1 bg-amber-600 hover:bg-amber-500 disabled:opacity-35 disabled:cursor-not-allowed text-white py-2.5 rounded-xl font-bold text-sm transition shadow-md flex items-center justify-center gap-1.5';
       }
 
       if (myPlayer) {
         const minRaiseTotal = state.currentHighBet + state.minRaise;
+        const maxChips = myPlayer.chips + myPlayer.currentRoundBet;
         raiseInput.min = minRaiseTotal;
-        raiseInput.max = myPlayer.chips + myPlayer.currentRoundBet;
+        raiseInput.max = maxChips;
         raiseSlider.min = minRaiseTotal;
-        raiseSlider.max = myPlayer.chips + myPlayer.currentRoundBet;
+        raiseSlider.max = maxChips;
         if (parseInt(raiseInput.value) < minRaiseTotal) {
           raiseInput.value = minRaiseTotal;
           raiseSlider.value = minRaiseTotal;
@@ -426,7 +1030,6 @@
       }
     }
 
-    // Seat actions
     function sitAtSeat(seatIndex) {
       if (!ws) return;
       ws.send(JSON.stringify({
@@ -436,7 +1039,6 @@
       }));
     }
 
-    // Action clicks
     document.getElementById('foldBtn').onclick = () => sendAction('fold');
     document.getElementById('checkCallBtn').onclick = () => {
       const myPlayer = tableState?.seats[mySeatIndex];
@@ -485,20 +1087,339 @@
       document.getElementById('raiseSlider').value = e.target.value;
     };
 
-    // Rebuy & Standup & Settle
-    document.getElementById('rebuyBtn').onclick = () => {
-      if (ws) ws.send(JSON.stringify({ type: 'rebuy', amount: 100 }));
+    // ==========================================
+    // 7. PROFILE CUSTOMIZATION MODAL
+    // ==========================================
+    const presetSeeds = ['Alex', 'Sharky', 'Ruby', 'Luna', 'Viper', 'Jack', 'Ace', 'Shadow', 'Neo', 'Max'];
+
+    function openProfileModal() {
+      document.getElementById('profileNameInput').value = myUser.displayName;
+      document.getElementById('profileAvatarUrlInput').value = myUser.avatarUrl;
+      document.getElementById('profilePreviewAvatar').src = myUser.avatarUrl;
+
+      const presetContainer = document.getElementById('presetAvatarsContainer');
+      presetContainer.innerHTML = '';
+      presetSeeds.forEach(seed => {
+        const url = `https://api.dicebear.com/7.x/adventurer/svg?seed=${seed}`;
+        const btn = document.createElement('button');
+        btn.className = 'w-10 h-10 rounded-full border-2 border-slate-700 hover:border-amber-400 overflow-hidden bg-slate-800 transition shadow';
+        btn.innerHTML = `<img src="${url}" class="w-full h-full object-cover">`;
+        btn.onclick = () => {
+          document.getElementById('profileAvatarUrlInput').value = url;
+          document.getElementById('profilePreviewAvatar').src = url;
+        };
+        presetContainer.appendChild(btn);
+      });
+
+      document.getElementById('profileModal').classList.remove('hidden');
+    }
+
+    function closeProfileModal() {
+      document.getElementById('profileModal').classList.add('hidden');
+    }
+
+    document.getElementById('profileAvatarUrlInput').oninput = (e) => {
+      document.getElementById('profilePreviewAvatar').src = e.target.value || myUser.avatarUrl;
     };
-    document.getElementById('standUpBtn').onclick = () => {
-      if (ws) ws.send(JSON.stringify({ type: 'stand_up' }));
-    };
-    document.getElementById('settleBtn').onclick = () => {
-      if (confirm('คุณต้องการปิดโต๊ะและให้บอทคำนวณเงินส่งเข้าห้อง Discord หรือไม่?')) {
+
+    function saveProfile() {
+      const newName = document.getElementById('profileNameInput').value.trim() || myUser.displayName;
+      const newAvatar = document.getElementById('profileAvatarUrlInput').value.trim() || myUser.avatarUrl;
+
+      myUser.displayName = newName;
+      myUser.avatarUrl = newAvatar;
+
+      localStorage.setItem('poker_display_name', newName);
+      localStorage.setItem('poker_avatar_url', newAvatar);
+
+      document.getElementById('myPlayerName').innerText = newName;
+      document.getElementById('myAvatarImg').src = newAvatar;
+
+      if (ws) {
+        ws.send(JSON.stringify({
+          type: 'update_profile',
+          displayName: newName,
+          avatarUrl: newAvatar
+        }));
+      }
+
+      closeProfileModal();
+    }
+
+    // ==========================================
+    // 8. LEADERBOARD & STATS MODALS
+    // ==========================================
+    function openLeaderboardModal() {
+      document.getElementById('leaderboardModal').classList.remove('hidden');
+      if (ws) ws.send(JSON.stringify({ type: 'get_leaderboard' }));
+    }
+
+    function closeLeaderboardModal() {
+      document.getElementById('leaderboardModal').classList.add('hidden');
+    }
+
+    function renderLeaderboard(list) {
+      const container = document.getElementById('leaderboardList');
+      if (!list || list.length === 0) {
+        container.innerHTML = '<div class="text-center py-6 text-slate-400">ยังไม่มีข้อมูลอันดับในระบบ</div>';
+        return;
+      }
+
+      container.innerHTML = list.map((item, idx) => {
+        const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`;
+        const isPos = item.net_profit >= 0;
+        return `
+          <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/80 border border-slate-800">
+            <div class="flex items-center gap-2.5">
+              <span class="font-extrabold text-sm w-6 text-center text-amber-400">${medal}</span>
+              <div class="w-8 h-8 rounded-full overflow-hidden border border-slate-700 bg-slate-800">
+                <img src="${item.avatar_url || 'https://api.dicebear.com/7.x/adventurer/svg?seed=' + item.user_id}" class="w-full h-full object-cover">
+              </div>
+              <div>
+                <p class="font-bold text-slate-200">${item.display_name || item.username}</p>
+                <p class="text-[10px] text-slate-400">เล่น ${item.games_played} เกม • ชนะ ${item.win_rate}%</p>
+              </div>
+            </div>
+            <div class="text-right">
+              <span class="font-mono font-extrabold text-xs ${isPos ? 'text-emerald-400' : 'text-rose-400'}">
+                ${isPos ? '+' : ''}${item.net_profit.toLocaleString()}฿
+              </span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function openStatsModal() {
+      document.getElementById('statsModal').classList.remove('hidden');
+      if (ws) ws.send(JSON.stringify({ type: 'get_stats', userId: myUser.id }));
+    }
+
+    function closeStatsModal() {
+      document.getElementById('statsModal').classList.add('hidden');
+    }
+
+    function renderStats(stats, user) {
+      const container = document.getElementById('statsContent');
+      if (!stats) {
+        container.innerHTML = '<div class="text-center py-6 text-slate-400">ยังไม่มีประวัติการเล่นของคุณ</div>';
+        return;
+      }
+
+      const isPos = stats.net_profit >= 0;
+      container.innerHTML = `
+        <div class="flex items-center gap-3 p-3 rounded-xl bg-slate-950 border border-slate-800">
+          <div class="w-12 h-12 rounded-full overflow-hidden border border-cyan-500/50 bg-slate-800">
+            <img src="${myUser.avatarUrl}" class="w-full h-full object-cover">
+          </div>
+          <div>
+            <h4 class="font-bold text-sm text-slate-100">${myUser.displayName}</h4>
+            <p class="text-[11px] text-slate-400">กำไรสุทธิรวม: <span class="font-mono font-extrabold ${isPos ? 'text-emerald-400' : 'text-rose-400'}">${isPos ? '+' : ''}${stats.net_profit.toLocaleString()}฿</span></p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div class="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
+            <span class="text-slate-400 text-[11px]">จำนวนเกมที่เล่น:</span>
+            <p class="font-extrabold text-sm text-slate-200 font-mono">${stats.games_played} เกม</p>
+          </div>
+          <div class="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
+            <span class="text-slate-400 text-[11px]">อัตราการชนะ (Win Rate):</span>
+            <p class="font-extrabold text-sm text-emerald-400 font-mono">${stats.win_rate}%</p>
+          </div>
+          <div class="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
+            <span class="text-slate-400 text-[11px]">Buy-in สะสม:</span>
+            <p class="font-bold text-xs text-slate-300 font-mono">${stats.total_buy_in.toLocaleString()}฿</p>
+          </div>
+          <div class="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
+            <span class="text-slate-400 text-[11px]">Cash-out สะสม:</span>
+            <p class="font-bold text-xs text-slate-300 font-mono">${stats.total_cash_out.toLocaleString()}฿</p>
+          </div>
+        </div>
+      `;
+    }
+
+    // ==========================================
+    // 9. SETTLEMENT & DEBT PREVIEW MODAL
+    // ==========================================
+    function openSettleModal() {
+      document.getElementById('settleModal').classList.remove('hidden');
+      refreshSettlePreview();
+    }
+
+    function closeSettleModal() {
+      document.getElementById('settleModal').classList.add('hidden');
+    }
+
+    function refreshSettlePreview() {
+      if (ws) ws.send(JSON.stringify({ type: 'preview_settlement' }));
+    }
+
+    function renderSettlementData(settlement, userPayments) {
+      const container = document.getElementById('settleContent');
+      if (!settlement) return;
+
+      const hasBots = tableState?.hasBots || false;
+
+      let html = '';
+
+      if (hasBots) {
+        html += `
+          <div class="p-3 rounded-xl bg-indigo-950/80 border border-indigo-500/50 text-indigo-200">
+            <div class="font-bold flex items-center gap-1.5 mb-1 text-indigo-300">
+              <span>🤖</span> โหมดเล่นสนุก (มี Bot ในโต๊ะ)
+            </div>
+            <p class="text-[11px] leading-relaxed">
+              โต๊ะนี้มี Bot ร่วมเล่น จึง <strong>ไม่มีการทำรายการโอนเงินจริง</strong> เพื่อป้องกันการได้เปรียบเสียเปรียบและให้ทุกคนซ้อมเล่นได้สบายใจ
+            </p>
+          </div>
+        `;
+      }
+
+      // Player Net Summaries
+      html += `
+        <div>
+          <h4 class="font-bold text-slate-300 mb-2">สรุปชิปและผลกำไร/ขาดทุนแต่ละคน:</h4>
+          <div class="space-y-1.5">
+            ${settlement.players.map(p => {
+              const isPos = p.net >= 0;
+              return `
+                <div class="flex items-center justify-between p-2 rounded-lg bg-slate-950 border border-slate-800">
+                  <div>
+                    <span class="font-bold text-slate-200">${p.name}</span>
+                    <span class="text-slate-500 text-[11px] ml-1">(เข้า ${p.buyIn}฿ • ออก ${p.cashOut}฿)</span>
+                  </div>
+                  <span class="font-mono font-bold ${isPos ? 'text-emerald-400' : 'text-rose-400'}">
+                    ${isPos ? '+' : ''}${p.net.toLocaleString()}฿
+                  </span>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+
+      // Transactions
+      if (!hasBots && settlement.transactions.length > 0) {
+        html += `
+          <div>
+            <h4 class="font-bold text-amber-400 mb-2">รายการโอนเงินเคลียร์หนี้ (Minimum Cash Flow):</h4>
+            <div class="space-y-2">
+              ${settlement.transactions.map(t => {
+                const toPayment = userPayments?.[t.toId];
+                return `
+                  <div class="p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex flex-col gap-1.5">
+                    <div class="flex items-center justify-between font-bold">
+                      <span class="text-rose-300">${t.fromName}</span>
+                      <span class="text-slate-500">โอนให้ ➡️</span>
+                      <span class="text-emerald-300">${t.toName}</span>
+                      <span class="font-mono text-amber-400">${t.amount.toLocaleString()}฿</span>
+                    </div>
+                    ${toPayment?.promptpay ? `
+                      <div class="text-[11px] text-slate-400 flex items-center justify-between border-t border-slate-800 pt-1">
+                        <span>พร้อมเพย์: <strong class="text-slate-200 font-mono">${toPayment.promptpay}</strong></span>
+                        ${toPayment.hasQr ? `<a href="/data/qr_images/${t.toId}.png" target="_blank" class="text-cyan-400 hover:underline">🔍 ดูรูป QR Code</a>` : ''}
+                      </div>
+                    ` : ''}
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      } else if (!hasBots) {
+        html += `<div class="p-3 text-center text-slate-400 bg-slate-950 rounded-xl border border-slate-800">ทุกคนมียอดเสมอกัน ไม่ต้องมีการโอนเงิน</div>`;
+      }
+
+      container.innerHTML = html;
+    }
+
+    function confirmSettleAndClose() {
+      if (confirm('คุณแน่ใจหรือไม่ว่าต้องการจบเกม ปิดโต๊ะ และส่งสรุปผลการคิดเงินเข้าห้อง Discord?')) {
         if (ws) ws.send(JSON.stringify({ type: 'settle_and_close' }));
+      }
+    }
+
+    // ==========================================
+    // 10. EARLY LEAVE & REBUY DIALOGS
+    // ==========================================
+    function confirmEarlyLeave() {
+      if (mySeatIndex === null) {
+        alert('คุณยังไม่ได้นั่งที่โต๊ะ');
+        return;
+      }
+      const myPlayer = tableState?.seats[mySeatIndex];
+      const chips = myPlayer?.chips || 0;
+      if (confirm(`คุณต้องการขอออกก่อนและล็อคชิป ${chips}฿ ไว้ใช่หรือไม่? (คุณจะไม่เสียชิปจาก Blinds ในรอบถัดไป)`)) {
+        if (ws) ws.send(JSON.stringify({ type: 'early_leave', chips }));
+      }
+    }
+
+    function openRebuyDialog() {
+      document.getElementById('rebuyModal').classList.remove('hidden');
+    }
+
+    function closeRebuyDialog() {
+      document.getElementById('rebuyModal').classList.add('hidden');
+    }
+
+    function executeRebuy(amount) {
+      if (ws) ws.send(JSON.stringify({ type: 'rebuy', amount }));
+      closeRebuyDialog();
+    }
+
+    // ==========================================
+    // 11. PROMPTPAY & QR CODE SETTINGS
+    // ==========================================
+    function openPromptPayModal() {
+      document.getElementById('promptPayModal').classList.remove('hidden');
+    }
+
+    function closePromptPayModal() {
+      document.getElementById('promptPayModal').classList.add('hidden');
+    }
+
+    function savePromptPayDetails() {
+      const promptpay = document.getElementById('promptPayInput').value.trim();
+      if (promptpay && ws) {
+        ws.send(JSON.stringify({
+          type: 'save_promptpay',
+          promptpay
+        }));
+      }
+
+      const fileInput = document.getElementById('qrFileInput');
+      if (fileInput.files && fileInput.files[0]) {
+        const file = fileInput.files[0];
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (ws) {
+            ws.send(JSON.stringify({
+              type: 'save_qr_image',
+              base64Data: reader.result,
+              extension: '.' + (file.name.split('.').pop() || 'png')
+            }));
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    document.getElementById('qrFileInput').onchange = (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          document.getElementById('qrPreviewImg').src = reader.result;
+          document.getElementById('qrPreviewBox').classList.remove('hidden');
+        };
+        reader.readAsDataURL(file);
       }
     };
 
-    // Modal Add Bot
+    // ==========================================
+    // 12. ADD BOT MODAL LOGIC
+    // ==========================================
     document.getElementById('addBotBtn').onclick = () => {
       if (!tableState) return;
       const select = document.getElementById('botSeatSelect');
@@ -540,7 +1461,65 @@
       closeAddBotModal();
     }
 
-    // Start
+    // ==========================================
+    // 13. WINNER CONFETTI CANVAS PARTICLES
+    // ==========================================
+    function triggerConfetti() {
+      const canvas = document.getElementById('fxCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+
+      const particles = [];
+      const colors = ['#f59e0b', '#10b981', '#3b82f6', '#ec4899', '#8b5cf6'];
+
+      for (let i = 0; i < 80; i++) {
+        particles.push({
+          x: canvas.width / 2,
+          y: canvas.height / 2,
+          vx: (Math.random() - 0.5) * 14,
+          vy: (Math.random() - 0.7) * 14,
+          size: Math.random() * 8 + 4,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          alpha: 1,
+          rot: Math.random() * 360,
+          vrot: (Math.random() - 0.5) * 10
+        });
+      }
+
+      let frames = 0;
+      function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let alive = false;
+        particles.forEach(p => {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy += 0.25; // gravity
+          p.alpha -= 0.012;
+          p.rot += p.vrot;
+          if (p.alpha > 0) {
+            alive = true;
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.rotate((p.rot * Math.PI) / 180);
+            ctx.fillStyle = p.color;
+            ctx.globalAlpha = p.alpha;
+            ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+            ctx.restore();
+          }
+        });
+        frames++;
+        if (alive && frames < 120) {
+          requestAnimationFrame(animate);
+        } else {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+      }
+      animate();
+    }
+
+    // Connect on startup
     connectWs();
   </script>
 </body>

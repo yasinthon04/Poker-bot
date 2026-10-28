@@ -1,5 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import http from 'http';
+import fs from 'fs';
+import path from 'path';
 import { PokerTable, TablePlayer } from './poker-table';
 import { calculateSettlements } from '../services/settlement';
 import { createSummaryEmbed } from '../ui/embeds';
@@ -197,6 +199,127 @@ export class PokerGameManager {
         if (!table) return;
 
         table.standUp(conn.userId);
+        break;
+      }
+
+      case 'update_profile': {
+        const { displayName, avatarUrl } = msg;
+        if (displayName) conn.displayName = displayName;
+        if (avatarUrl) conn.avatarUrl = avatarUrl;
+        if (conn.channelId && conn.userId) {
+          const table = this.tables.get(conn.channelId);
+          if (table) {
+            table.updatePlayerProfile(conn.userId, conn.displayName || 'Player', conn.avatarUrl);
+          }
+        }
+        break;
+      }
+
+      case 'early_leave': {
+        if (!conn.channelId || !conn.userId) return;
+        const table = this.tables.get(conn.channelId);
+        if (!table) return;
+
+        const { chips } = msg;
+        table.earlyLeave(conn.userId, chips ?? 0);
+        break;
+      }
+
+      case 'get_leaderboard': {
+        (async () => {
+          try {
+            const leaderboard = await repo.getRankedStats(conn.channelId || '');
+            conn.ws.send(JSON.stringify({ type: 'leaderboard_data', leaderboard }));
+          } catch (e) {
+            console.error('Error fetching leaderboard:', e);
+          }
+        })();
+        break;
+      }
+
+      case 'get_stats': {
+        (async () => {
+          try {
+            const targetId = msg.userId || conn.userId;
+            if (!targetId) return;
+            const stats = await repo.getUserStats(targetId);
+            const user = await repo.getUser(targetId);
+            conn.ws.send(JSON.stringify({ type: 'stats_data', stats, user }));
+          } catch (e) {
+            console.error('Error fetching stats:', e);
+          }
+        })();
+        break;
+      }
+
+      case 'preview_settlement': {
+        if (!conn.channelId) return;
+        const table = this.tables.get(conn.channelId);
+        if (!table) return;
+
+        (async () => {
+          try {
+            const seatedPlayers = table.seats.filter((p): p is TablePlayer => p !== null);
+            const playerInputs = seatedPlayers.map(p => ({
+              userId: p.userId,
+              name: p.displayName,
+              buyIn: p.totalBuyIn,
+              cashOut: p.chips,
+              isBot: p.isBot,
+            }));
+            const settlement = calculateSettlements(playerInputs);
+
+            // Fetch payment info
+            const userPayments: Record<string, { promptpay: string | null; hasQr: boolean }> = {};
+            for (const p of seatedPlayers) {
+              const u = await repo.getUser(p.userId);
+              userPayments[p.userId] = {
+                promptpay: u?.promptpay || null,
+                hasQr: !!u?.qr_image_url,
+              };
+            }
+
+            conn.ws.send(JSON.stringify({ type: 'preview_settlement_data', settlement, userPayments }));
+          } catch (e) {
+            console.error('Error previewing settlement:', e);
+          }
+        })();
+        break;
+      }
+
+      case 'save_promptpay': {
+        if (!conn.userId) return;
+        const { promptpay } = msg;
+        (async () => {
+          try {
+            await repo.setUserPromptPay(conn.userId!, promptpay);
+            conn.ws.send(JSON.stringify({ type: 'promptpay_saved', success: true }));
+          } catch (e) {
+            conn.ws.send(JSON.stringify({ type: 'promptpay_saved', success: false, error: String(e) }));
+          }
+        })();
+        break;
+      }
+
+      case 'save_qr_image': {
+        if (!conn.userId) return;
+        const { base64Data, extension } = msg;
+        (async () => {
+          try {
+            const dir = path.join(process.cwd(), 'data', 'qr_images');
+            if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+            const ext = extension || '.png';
+            const fileName = `${conn.userId}${ext}`;
+            const filePath = path.join(dir, fileName);
+            const relativePath = `data/qr_images/${fileName}`;
+            const buffer = Buffer.from(base64Data.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+            fs.writeFileSync(filePath, buffer);
+            await repo.setUserQrImage(conn.userId!, relativePath);
+            conn.ws.send(JSON.stringify({ type: 'qr_saved', success: true }));
+          } catch (e) {
+            conn.ws.send(JSON.stringify({ type: 'qr_saved', success: false, error: String(e) }));
+          }
+        })();
         break;
       }
 

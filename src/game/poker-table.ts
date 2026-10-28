@@ -1,5 +1,5 @@
 import { Card, createDeck, shuffleDeck, cardToString } from './deck';
-import { evaluateBestHand, EvaluatedHand, formatHandDescription } from './evaluator';
+import { evaluateBestHand, EvaluatedHand } from './evaluator';
 import { calculatePots, Pot, PlayerContribution } from './pot-manager';
 import { decideBotAction, BotDifficulty } from './bot-ai';
 
@@ -20,7 +20,9 @@ export interface TablePlayer {
   isBot: boolean;
   botDifficulty?: BotDifficulty;
   lastAction?: string;
+  hasActedThisRound: boolean;
   connected: boolean;
+  isEarlyLeaver?: boolean;
 }
 
 export type GamePhase =
@@ -38,6 +40,14 @@ export interface HandWinnerResult {
   potAmount: number;
   handDescription: string;
   cards: Card[];
+}
+
+export interface TableEvent {
+  type: 'deal' | 'check' | 'call' | 'raise' | 'fold' | 'board_deal' | 'showdown' | 'rebuy' | 'early_leave';
+  userId?: string;
+  amount?: number;
+  phase?: GamePhase;
+  timestamp: number;
 }
 
 export interface TableStateView {
@@ -59,6 +69,9 @@ export interface TableStateView {
   hasBots: boolean;
   handWinners?: HandWinnerResult[];
   lastActionMessage?: string;
+  turnStartedAt: number;
+  turnDuration: number; // in seconds
+  lastEvent?: TableEvent;
 }
 
 export interface TablePlayerPublic {
@@ -76,7 +89,7 @@ export interface TablePlayerPublic {
   lastAction?: string;
   connected: boolean;
   hasCards: boolean;
-  holeCards?: Card[]; // Only visible if viewer is this player or during showdown
+  holeCards?: Card[];
 }
 
 export class PokerTable {
@@ -97,9 +110,13 @@ export class PokerTable {
   public pots: Pot[] = [];
   public lastActionMessage: string = '';
   public handWinners?: HandWinnerResult[];
+  public lastEvent?: TableEvent;
 
-  // Action timer
+  // Turn Timer
+  public turnDuration: number = 20; // 20 seconds like Poker Night
+  public turnStartedAt: number = Date.now();
   private turnTimeout: NodeJS.Timeout | null = null;
+
   public onStateChanged?: () => void;
   public onHandFinished?: (summary: { winners: HandWinnerResult[]; hasBots: boolean }) => void;
 
@@ -117,16 +134,13 @@ export class PokerTable {
   }
 
   public get activePlayers(): TablePlayer[] {
+    return this.seats.filter((p): p is TablePlayer => p !== null && !p.isEarlyLeaver);
+  }
+
+  public get seatedPlayers(): TablePlayer[] {
     return this.seats.filter((p): p is TablePlayer => p !== null);
   }
 
-  public get playersInHand(): TablePlayer[] {
-    return this.seats.filter((p): p is TablePlayer => p !== null && !p.isFolded && p.chips + p.totalHandBet > 0);
-  }
-
-  /**
-   * Sits a human player down at a seat.
-   */
   public sitDown(
     seatIndex: number,
     user: { id: string; username: string; displayName: string; avatarUrl?: string },
@@ -135,7 +149,7 @@ export class PokerTable {
     if (seatIndex < 0 || seatIndex >= 9) return false;
     if (this.seats[seatIndex] !== null) return false;
 
-    // Check if player is already seated elsewhere
+    // Check if player is already seated
     const existingIndex = this.seats.findIndex(p => p?.userId === user.id);
     if (existingIndex !== -1) return false;
 
@@ -154,6 +168,7 @@ export class PokerTable {
       isFolded: false,
       isAllIn: false,
       isBot: false,
+      hasActedThisRound: false,
       connected: true,
     };
 
@@ -162,9 +177,6 @@ export class PokerTable {
     return true;
   }
 
-  /**
-   * Adds an AI Bot player to a seat.
-   */
   public addBot(
     seatIndex: number,
     name: string,
@@ -191,6 +203,7 @@ export class PokerTable {
       isAllIn: false,
       isBot: true,
       botDifficulty: difficulty,
+      hasActedThisRound: false,
       connected: true,
     };
 
@@ -200,9 +213,6 @@ export class PokerTable {
     return true;
   }
 
-  /**
-   * Removes a bot player from a seat.
-   */
   public removeBot(seatIndex: number): boolean {
     if (seatIndex < 0 || seatIndex >= 9) return false;
     const player = this.seats[seatIndex];
@@ -214,9 +224,15 @@ export class PokerTable {
     return true;
   }
 
-  /**
-   * Stands a player up.
-   */
+  public updatePlayerProfile(userId: string, displayName: string, avatarUrl?: string): boolean {
+    const player = this.seats.find(p => p?.userId === userId);
+    if (!player) return false;
+    player.displayName = displayName;
+    if (avatarUrl) player.avatarUrl = avatarUrl;
+    this.emitChange();
+    return true;
+  }
+
   public standUp(userId: string): TablePlayer | null {
     const seatIndex = this.seats.findIndex(p => p?.userId === userId);
     if (seatIndex === -1) return null;
@@ -231,31 +247,46 @@ export class PokerTable {
     return player;
   }
 
-  /**
-   * Rebuys chips for a seated player.
-   */
+  public earlyLeave(userId: string, chips: number): boolean {
+    const player = this.seats.find(p => p?.userId === userId);
+    if (!player) return false;
+
+    player.chips = chips;
+    player.isFolded = true;
+    player.isEarlyLeaver = true;
+    this.lastActionMessage = `🏃 ${player.displayName} ขอออกก่อน (ล็อคชิป ${chips}฿)`;
+    this.lastEvent = { type: 'early_leave', userId, amount: chips, timestamp: Date.now() };
+
+    if (this.currentTurnSeat === player.seatIndex) {
+      this.advanceTurn();
+    }
+
+    this.emitChange();
+    return true;
+  }
+
   public rebuy(userId: string, amount: number): boolean {
     const player = this.seats.find(p => p?.userId === userId);
     if (!player) return false;
     player.chips += amount;
     player.totalBuyIn += amount;
+    this.lastActionMessage = `💰 ${player.displayName} เติมชิป (Rebuy) +${amount}฿`;
+    this.lastEvent = { type: 'rebuy', userId, amount, timestamp: Date.now() };
     this.emitChange();
     return true;
   }
 
   private checkAutoStart() {
     if (this.phase === 'waiting' && this.activePlayers.filter(p => p.chips > 0).length >= 2) {
-      setTimeout(() => this.startHand(), 2000);
+      setTimeout(() => this.startHand(), 2000).unref?.();
     }
   }
 
-  /**
-   * Starts a new poker hand.
-   */
   public startHand(): boolean {
-    const eligible = this.seats.filter(p => p !== null && p.chips > 0);
+    const eligible = this.activePlayers.filter(p => p.chips > 0);
     if (eligible.length < 2) {
       this.phase = 'waiting';
+      this.currentTurnSeat = null;
       this.emitChange();
       return false;
     }
@@ -268,8 +299,10 @@ export class PokerTable {
     this.handWinners = undefined;
     this.deck = shuffleDeck(createDeck());
 
-    // Advance dealer button to next active player
-    this.dealerSeat = this.findNextOccupiedSeat(this.dealerSeat);
+    // Advance dealer button only after the first hand
+    if (this.handNumber > 1) {
+      this.dealerSeat = this.findNextOccupiedSeat(this.dealerSeat);
+    }
 
     // Reset players for new hand
     for (const p of this.seats) {
@@ -277,9 +310,10 @@ export class PokerTable {
         p.currentRoundBet = 0;
         p.totalHandBet = 0;
         p.holeCards = [];
-        p.isFolded = p.chips <= 0;
+        p.isFolded = p.chips <= 0 || !!p.isEarlyLeaver;
         p.isAllIn = false;
         p.lastAction = undefined;
+        p.hasActedThisRound = false;
       }
     }
 
@@ -292,9 +326,29 @@ export class PokerTable {
       }
     }
 
-    // Post Blinds
-    const sbSeat = this.findNextActiveSeat(this.dealerSeat);
-    const bbSeat = this.findNextActiveSeat(sbSeat);
+    // Determine Blinds and Action Order based on player count (Heads-up vs 3+ players)
+    const activeSeats = this.seats
+      .map((p, idx) => (p && !p.isFolded ? idx : -1))
+      .filter(idx => idx !== -1);
+
+    let sbSeat: number;
+    let bbSeat: number;
+
+    if (activeSeats.length === 2) {
+      // HEADS-UP RULES:
+      // Dealer is Small Blind!
+      // Other player is Big Blind!
+      sbSeat = this.dealerSeat;
+      bbSeat = activeSeats.find(s => s !== this.dealerSeat)!;
+      // Preflop: SB (Dealer) acts first!
+      this.currentTurnSeat = sbSeat;
+    } else {
+      // 3+ PLAYERS RULES:
+      sbSeat = this.findNextActiveSeat(this.dealerSeat);
+      bbSeat = this.findNextActiveSeat(sbSeat);
+      // Preflop: UTG (left of BB) acts first!
+      this.currentTurnSeat = this.findNextActiveSeat(bbSeat);
+    }
 
     const sbPlayer = this.seats[sbSeat]!;
     const bbPlayer = this.seats[bbSeat]!;
@@ -304,6 +358,7 @@ export class PokerTable {
     sbPlayer.currentRoundBet = sbAmount;
     sbPlayer.totalHandBet = sbAmount;
     sbPlayer.lastAction = `SB ${sbAmount}฿`;
+    sbPlayer.hasActedThisRound = false; // Must still act if raised
     if (sbPlayer.chips === 0) sbPlayer.isAllIn = true;
 
     const bbAmount = Math.min(bbPlayer.chips, this.bigBlind);
@@ -311,24 +366,23 @@ export class PokerTable {
     bbPlayer.currentRoundBet = bbAmount;
     bbPlayer.totalHandBet = bbAmount;
     bbPlayer.lastAction = `BB ${bbAmount}฿`;
+    // CRITICAL POKER RULE: Big blind HAS NOT acted yet (retains option to check/raise if no one raises)
+    bbPlayer.hasActedThisRound = false;
     if (bbPlayer.chips === 0) bbPlayer.isAllIn = true;
 
-    this.currentHighBet = bbAmount;
+    this.currentHighBet = Math.max(sbAmount, bbAmount);
     this.minRaise = this.bigBlind;
     this.updatePots();
 
-    // First to act preflop: Under The Gun (UTG) = after BB
-    this.currentTurnSeat = this.findNextActiveSeat(bbSeat);
+    this.turnStartedAt = Date.now();
     this.lastActionMessage = `🃏 เริ่มแฮนด์ #${this.handNumber} (SB: ${sbAmount}฿, BB: ${bbAmount}฿)`;
+    this.lastEvent = { type: 'deal', timestamp: Date.now() };
 
     this.emitChange();
     this.checkBotTurn();
     return true;
   }
 
-  /**
-   * Handles player action (fold, check, call, bet, raise, all_in).
-   */
   public handleAction(
     userId: string,
     action: 'fold' | 'check' | 'call' | 'bet' | 'raise' | 'all_in',
@@ -346,12 +400,14 @@ export class PokerTable {
       case 'fold': {
         player.isFolded = true;
         player.lastAction = 'Fold';
+        player.hasActedThisRound = true;
         this.lastActionMessage = `❌ ${player.displayName} หมอบ (Fold)`;
         break;
       }
       case 'check': {
-        if (toCall > 0) return false; // Cannot check if there's a bet to call
+        if (toCall > 0) return false; // Cannot check if facing a bet
         player.lastAction = 'Check';
+        player.hasActedThisRound = true;
         this.lastActionMessage = `⚪ ${player.displayName} เคาะ (Check)`;
         break;
       }
@@ -362,6 +418,7 @@ export class PokerTable {
         player.totalHandBet += callAmount;
         if (player.chips === 0) player.isAllIn = true;
         player.lastAction = `Call ${callAmount}฿`;
+        player.hasActedThisRound = true;
         this.lastActionMessage = `🔵 ${player.displayName} ตาม (Call) ${callAmount.toLocaleString()}฿`;
         break;
       }
@@ -379,10 +436,18 @@ export class PokerTable {
         if (raiseDifference > 0) {
           this.minRaise = Math.max(this.bigBlind, raiseDifference);
           this.currentHighBet = player.currentRoundBet;
+
+          // When a raise occurs, all other active players MUST react again!
+          for (const other of this.seats) {
+            if (other && other.userId !== player.userId && !other.isFolded && !other.isAllIn) {
+              other.hasActedThisRound = false;
+            }
+          }
         }
 
         if (player.chips === 0) player.isAllIn = true;
         player.lastAction = `${action.toUpperCase()} ${player.currentRoundBet}฿`;
+        player.hasActedThisRound = true;
         this.lastActionMessage = `🟢 ${player.displayName} ${action === 'bet' ? 'เดิมพัน (Bet)' : 'เกทับ (Raise)'} เป็น ${player.currentRoundBet.toLocaleString()}฿`;
         break;
       }
@@ -392,10 +457,21 @@ export class PokerTable {
         player.currentRoundBet += allInChips;
         player.totalHandBet += allInChips;
         player.isAllIn = true;
+        player.hasActedThisRound = true;
 
         if (player.currentRoundBet > this.currentHighBet) {
-          this.minRaise = Math.max(this.bigBlind, player.currentRoundBet - this.currentHighBet);
+          const raiseDiff = player.currentRoundBet - this.currentHighBet;
+          if (raiseDiff >= this.minRaise) {
+            this.minRaise = raiseDiff;
+          }
           this.currentHighBet = player.currentRoundBet;
+
+          // Full raise reopens action
+          for (const other of this.seats) {
+            if (other && other.userId !== player.userId && !other.isFolded && !other.isAllIn) {
+              other.hasActedThisRound = false;
+            }
+          }
         }
 
         player.lastAction = `All-In (${allInChips}฿)`;
@@ -405,6 +481,8 @@ export class PokerTable {
     }
 
     this.updatePots();
+    const eventType = (action === 'bet' || action === 'all_in') ? 'raise' : action;
+    this.lastEvent = { type: eventType, userId, amount: player.currentRoundBet, timestamp: Date.now() };
 
     // Check if only 1 player remains in hand
     const remainingInHand = this.seats.filter(p => p !== null && !p.isFolded);
@@ -423,29 +501,34 @@ export class PokerTable {
     return true;
   }
 
-  private isBettingRoundComplete(): boolean {
+  public isBettingRoundComplete(): boolean {
     const active = this.seats.filter((p): p is TablePlayer => p !== null && !p.isFolded);
     const nonAllIn = active.filter(p => !p.isAllIn);
 
     if (nonAllIn.length <= 1) {
+      // 0 or 1 player left with chips to bet:
+      // If remaining players matched the bet or are all in, round is complete!
       return active.every(p => p.currentRoundBet === this.currentHighBet || p.isAllIn);
     }
 
-    return active.every(p => (p.currentRoundBet === this.currentHighBet || p.isAllIn) && p.lastAction !== undefined);
+    // Standard betting round: every active non-all-in player must have acted AND matched high bet
+    return active.every(p => p.isAllIn || (p.hasActedThisRound && p.currentRoundBet === this.currentHighBet));
   }
 
   private advanceTurn() {
     if (this.currentTurnSeat === null) return;
     this.currentTurnSeat = this.findNextActiveSeat(this.currentTurnSeat);
+    this.turnStartedAt = Date.now();
     this.emitChange();
     this.checkBotTurn();
   }
 
   private advancePhase() {
-    // Reset round bets
+    // Reset round bets and action flags for next round
     for (const p of this.seats) {
       if (p) {
         p.currentRoundBet = 0;
+        p.hasActedThisRound = false;
         if (!p.isFolded && !p.isAllIn) p.lastAction = undefined;
       }
     }
@@ -481,17 +564,20 @@ export class PokerTable {
       }
     }
 
-    // Check if all remaining players are all-in (auto fast forward)
+    this.lastEvent = { type: 'board_deal', phase: this.phase, timestamp: Date.now() };
+
+    // Fast forward if all remaining non-folded players are all-in
     const active = this.seats.filter((p): p is TablePlayer => p !== null && !p.isFolded);
     const nonAllIn = active.filter(p => !p.isAllIn);
     if (nonAllIn.length <= 1) {
       this.emitChange();
-      setTimeout(() => this.advancePhase(), 1500);
+      setTimeout(() => this.advancePhase(), 1500).unref?.();
       return;
     }
 
-    // Next action starts from first active player to the left of dealer
+    // Action starts left of dealer button
     this.currentTurnSeat = this.findNextActiveSeat(this.dealerSeat);
+    this.turnStartedAt = Date.now();
     this.emitChange();
     this.checkBotTurn();
   }
@@ -511,7 +597,7 @@ export class PokerTable {
 
     const winnersMap = new Map<string, { player: TablePlayer; amount: number; desc: string }>();
 
-    // Resolve each pot (Main pot, then side pots)
+    // Distribute each pot (Main pot, then side pots)
     for (const pot of this.pots) {
       if (pot.amount <= 0) continue;
       const contenders = activePlayers.filter(p => pot.eligiblePlayerIds.includes(p.userId));
@@ -530,12 +616,21 @@ export class PokerTable {
         }
       }
 
-      const splitShare = Math.round((pot.amount / potWinners.length) * 100) / 100;
-      for (const w of potWinners) {
-        w.chips += splitShare;
+      const splitShare = Math.floor((pot.amount / potWinners.length) * 100) / 100;
+      let remainder = Math.round((pot.amount - splitShare * potWinners.length) * 100) / 100;
+
+      for (let i = 0; i < potWinners.length; i++) {
+        const w = potWinners[i];
+        let winAmount = splitShare;
+        if (remainder > 0) {
+          winAmount += 0.01;
+          remainder = Math.round((remainder - 0.01) * 100) / 100;
+        }
+
+        w.chips += winAmount;
         const ev = evaluatedHands.get(w.userId)!;
         const current = winnersMap.get(w.userId) || { player: w, amount: 0, desc: ev.nameTh };
-        current.amount += splitShare;
+        current.amount += winAmount;
         winnersMap.set(w.userId, current);
       }
     }
@@ -550,6 +645,7 @@ export class PokerTable {
 
     const winnerNames = this.handWinners.map(w => `${w.name} (+${w.potAmount.toLocaleString()}฿)`).join(', ');
     this.lastActionMessage = `🏆 Showdown: ผู้ชนะได้แก่ ${winnerNames}`;
+    this.lastEvent = { type: 'showdown', timestamp: Date.now() };
 
     this.emitChange();
 
@@ -557,11 +653,11 @@ export class PokerTable {
       this.onHandFinished({ winners: this.handWinners, hasBots: this.hasBots });
     }
 
-    // Auto start next hand after 6 seconds
+    // Auto-advance to next hand after 6 seconds
     setTimeout(() => {
       this.phase = 'hand_ended';
       this.checkAutoStart();
-    }, 6000);
+    }, 6000).unref?.();
   }
 
   private awardPotToSingleWinner(winner: TablePlayer) {
@@ -580,6 +676,7 @@ export class PokerTable {
     ];
 
     this.lastActionMessage = `🏆 ${winner.displayName} ชนะ Pot ${totalPot.toLocaleString()}฿ (ทุกคนหมอบ)`;
+    this.lastEvent = { type: 'showdown', timestamp: Date.now() };
     this.phase = 'hand_ended';
     this.emitChange();
 
@@ -587,7 +684,7 @@ export class PokerTable {
       this.onHandFinished({ winners: this.handWinners, hasBots: this.hasBots });
     }
 
-    setTimeout(() => this.checkAutoStart(), 4000);
+    setTimeout(() => this.checkAutoStart(), 4000).unref?.();
   }
 
   private updatePots() {
@@ -607,7 +704,7 @@ export class PokerTable {
     if (!player || player.isFolded || player.isAllIn) return;
 
     if (player.isBot) {
-      // Human-like delay (1.5 - 2.5s)
+      // Humanized delay: 1.5 - 2.5s
       const delay = 1500 + Math.random() * 1000;
       setTimeout(() => {
         if (this.currentTurnSeat === player.seatIndex && this.phase !== 'showdown') {
@@ -624,9 +721,10 @@ export class PokerTable {
 
           this.handleAction(player.userId, decision.action, decision.amount);
         }
-      }, delay);
+      }, delay).unref?.();
     } else {
-      // 30-second action timer for human player (auto-check or auto-fold)
+      // 20-second turn countdown timer for human
+      this.turnStartedAt = Date.now();
       this.turnTimeout = setTimeout(() => {
         if (this.currentTurnSeat === player.seatIndex) {
           const toCall = this.currentHighBet - player.currentRoundBet;
@@ -636,7 +734,8 @@ export class PokerTable {
             this.handleAction(player.userId, 'fold');
           }
         }
-      }, 30000);
+      }, this.turnDuration * 1000);
+      this.turnTimeout.unref?.();
     }
   }
 
@@ -650,7 +749,8 @@ export class PokerTable {
   private findNextOccupiedSeat(startIndex: number): number {
     for (let i = 1; i <= 9; i++) {
       const idx = (startIndex + i) % 9;
-      if (this.seats[idx] !== null && this.seats[idx]!.chips > 0) {
+      const p = this.seats[idx];
+      if (p !== null && !p.isEarlyLeaver && p.chips > 0) {
         return idx;
       }
     }
@@ -661,16 +761,13 @@ export class PokerTable {
     for (let i = 1; i <= 9; i++) {
       const idx = (startIndex + i) % 9;
       const p = this.seats[idx];
-      if (p !== null && !p.isFolded && !p.isAllIn && p.chips > 0) {
+      if (p !== null && !p.isFolded && !p.isAllIn && !p.isEarlyLeaver && p.chips > 0) {
         return idx;
       }
     }
     return startIndex;
   }
 
-  /**
-   * Generates a filtered view of the table for a specific viewer (obfuscating opponents' hole cards).
-   */
   public getPublicState(viewerUserId?: string): TableStateView {
     const isShowdown = this.phase === 'showdown';
 
@@ -692,6 +789,9 @@ export class PokerTable {
       hasBots: this.hasBots,
       handWinners: this.handWinners,
       lastActionMessage: this.lastActionMessage,
+      turnStartedAt: this.turnStartedAt,
+      turnDuration: this.turnDuration,
+      lastEvent: this.lastEvent,
       seats: this.seats.map(p => {
         if (!p) return null;
         const canSeeHoleCards = isShowdown || (viewerUserId && p.userId === viewerUserId);

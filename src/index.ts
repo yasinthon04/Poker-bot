@@ -40,6 +40,16 @@ const server = http.createServer((req, res) => {
     }
   }
 
+  if (url.startsWith('/data/qr_images/')) {
+    const cleanUrl = url.split('?')[0];
+    const imagePath = path.join(process.cwd(), cleanUrl);
+    if (fs.existsSync(imagePath)) {
+      res.writeHead(200, { 'Content-Type': 'image/png' });
+      fs.createReadStream(imagePath).pipe(res);
+      return;
+    }
+  }
+
   res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
   res.end('🃏 Poker Bot is online and healthy!\n');
 });

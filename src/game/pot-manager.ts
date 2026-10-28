@@ -12,6 +12,7 @@ export interface PlayerContribution {
 
 /**
  * Calculates Main Pot and Side Pots from player contributions.
+ * Accurately handles multiple all-ins, different stack tiers, and folded players.
  */
 export function calculatePots(contributions: PlayerContribution[]): Pot[] {
   // Filter players who contributed anything > 0
@@ -49,15 +50,27 @@ export function calculatePots(contributions: PlayerContribution[]): Pot[] {
     }
 
     if (potChips > 0) {
-      pots.push({
-        id: potIndex++,
-        amount: Math.round(potChips * 100) / 100,
-        eligiblePlayerIds: eligible,
-      });
+      if (eligible.length > 0) {
+        pots.push({
+          id: potIndex++,
+          amount: Math.round(potChips * 100) / 100,
+          eligiblePlayerIds: eligible,
+        });
+      } else if (pots.length > 0) {
+        // If everyone who reached this tier folded, merge chips into previous eligible pot
+        pots[pots.length - 1].amount += Math.round(potChips * 100) / 100;
+      } else {
+        // Fallback for initial pot
+        pots.push({
+          id: potIndex++,
+          amount: Math.round(potChips * 100) / 100,
+          eligiblePlayerIds: [],
+        });
+      }
     }
 
     previousTierAmount = tierAmount;
   }
 
-  return pots;
+  return pots.length > 0 ? pots : [{ id: 0, amount: 0, eligiblePlayerIds: [] }];
 }
