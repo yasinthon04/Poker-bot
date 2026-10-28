@@ -302,7 +302,7 @@ export class PokerTable {
           if (this.phase === 'waiting' && this.activePlayers.filter(p => p.chips > 0).length >= 2) {
             this.startHand();
           }
-        }, 1500).unref?.();
+        }, 1200);
       } else {
         // Hand just finished (showdown or all others folded), start next hand
         this.startHand();
@@ -686,11 +686,11 @@ export class PokerTable {
       this.onHandFinished({ winners: this.handWinners, hasBots: this.hasBots });
     }
 
-    // Auto-advance to next hand after 5 seconds
+    // Auto-advance to next hand after 3.0 seconds
     setTimeout(() => {
       this.phase = 'hand_ended';
       this.checkAutoStart();
-    }, 5000).unref?.();
+    }, 3000);
   }
 
   private awardPotToSingleWinner(winner: TablePlayer) {
@@ -717,7 +717,8 @@ export class PokerTable {
       this.onHandFinished({ winners: this.handWinners, hasBots: this.hasBots });
     }
 
-    setTimeout(() => this.checkAutoStart(), 4000).unref?.();
+    // Auto-advance to next hand after 2.5 seconds
+    setTimeout(() => this.checkAutoStart(), 2500);
   }
 
   private updatePots() {

@@ -192,13 +192,14 @@ export class PokerGameManager {
         break;
       }
 
+      case 'start_game':
       case 'next_hand': {
         if (!conn.channelId) return;
         const table = this.tables.get(conn.channelId);
         if (!table) return;
 
-        if (table.phase === 'hand_ended' || table.phase === 'showdown' || table.phase === 'waiting') {
-          table.checkAutoStart();
+        if (table.phase === 'waiting' || table.phase === 'hand_ended' || table.phase === 'showdown') {
+          table.startHand();
         }
         break;
       }

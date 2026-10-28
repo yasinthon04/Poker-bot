@@ -187,4 +187,40 @@ describe('Texas Hold\'em Poker Table State Machine', () => {
     assert.strictEqual(table.seats[0]?.holeCards.length, 2);
     assert.strictEqual(table.seats[1]?.holeCards.length, 2);
   });
+
+  test('startHand manually starts the game from waiting phase (Start button)', () => {
+    const table = new PokerTable('tab11', 'chan11', 'user1', 100);
+    table.sitDown(0, { id: 'u1', username: 'alice', displayName: 'Alice' }, 200);
+    table.sitDown(1, { id: 'u2', username: 'bob', displayName: 'Bob' }, 200);
+
+    // Initial phase is waiting
+    assert.strictEqual(table.phase, 'waiting');
+    assert.strictEqual(table.handNumber, 0);
+
+    // Click Start Game button
+    const started = table.startHand();
+    assert.strictEqual(started, true);
+    assert.strictEqual(table.phase, 'preflop');
+    assert.strictEqual(table.handNumber, 1);
+    assert.strictEqual(table.seats[0]?.holeCards.length, 2);
+    assert.strictEqual(table.seats[1]?.holeCards.length, 2);
+    assert.strictEqual(table.communityCards.length, 0);
+  });
+
+  test('Broke bot rebuys automatically so checkAutoStart never halts solo testing', () => {
+    const table = new PokerTable('tab12', 'chan12', 'user1', 100);
+    table.sitDown(0, { id: 'u1', username: 'alice', displayName: 'Alice' }, 200);
+    table.addBot(1, 'Bot Sharky', 'medium', 200);
+
+    // Bot loses all chips
+    table.seats[1]!.chips = 0;
+    table.phase = 'hand_ended';
+
+    table.checkAutoStart();
+
+    // Bot should have been reloaded and Hand started!
+    assert.strictEqual(table.phase, 'preflop');
+    assert.strictEqual(table.seats[1]!.chips > 0, true);
+    assert.strictEqual(table.handNumber, 1);
+  });
 });

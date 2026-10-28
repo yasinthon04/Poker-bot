@@ -117,6 +117,11 @@
 
     <!-- Top Right Action Buttons -->
     <div class="flex items-center gap-1.5">
+      <!-- Start Game / Next Hand Button (Pill in Header) -->
+      <button id="headerStartBtn" onclick="requestStartGame()" class="hidden bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 shadow-lg border border-emerald-400 transition transform active:scale-95">
+        <span id="headerStartIcon">▶️</span> <span id="headerStartText">เริ่มเกม (Start)</span>
+      </button>
+
       <!-- Audio Toggle -->
       <button id="soundToggleBtn" onclick="toggleSound()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-2.5 py-1.5 rounded-lg font-medium border border-slate-700 transition flex items-center gap-1 shadow">
         <span id="soundIcon">🔊</span>
@@ -167,31 +172,31 @@
     <!-- TABLE FELT (OVAL) -->
     <div id="pokerTable" class="poker-felt relative w-full max-w-4xl h-[470px] sm:h-[530px] rounded-[260px] flex items-center justify-center">
 
-      <!-- CENTER BOARD (POT & COMMUNITY CARDS) -->
-      <div class="flex flex-col items-center justify-center gap-2.5 z-10">
+      <!-- CENTER BOARD (POT, ANNOUNCEMENT, COMMUNITY CARDS, QUICK START) -->
+      <div class="flex flex-col items-center justify-center gap-1.5 z-10 max-w-xl">
         <!-- Pot Display -->
-        <div class="bg-slate-900/90 border border-amber-500/50 px-4 py-1.5 rounded-full shadow-2xl flex items-center gap-2">
+        <div class="bg-slate-900/90 border border-amber-500/50 px-4 py-1 rounded-full shadow-2xl flex items-center gap-2">
           <span class="text-amber-400 font-extrabold text-xs sm:text-sm tracking-wide">🪙 TOTAL POT:</span>
           <span id="potAmount" class="text-emerald-400 font-extrabold text-base sm:text-xl font-mono">0฿</span>
         </div>
 
-        <!-- Community Cards (5 slots) -->
-        <div id="communityCards" class="flex gap-2 sm:gap-2.5 p-2 rounded-2xl bg-black/35 backdrop-blur-sm border border-white/10 shadow-2xl">
-          <div class="w-14 h-20 sm:w-16 sm:h-24 md:w-18 md:h-26 rounded-xl border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/30 text-xs sm:text-sm font-bold">Flop</div>
-          <div class="w-14 h-20 sm:w-16 sm:h-24 md:w-18 md:h-26 rounded-xl border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/30 text-xs sm:text-sm font-bold">Flop</div>
-          <div class="w-14 h-20 sm:w-16 sm:h-24 md:w-18 md:h-26 rounded-xl border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/30 text-xs sm:text-sm font-bold">Flop</div>
-          <div class="w-14 h-20 sm:w-16 sm:h-24 md:w-18 md:h-26 rounded-xl border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/30 text-xs sm:text-sm font-bold">Turn</div>
-          <div class="w-14 h-20 sm:w-16 sm:h-24 md:w-18 md:h-26 rounded-xl border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/30 text-xs sm:text-sm font-bold">River</div>
+        <!-- Action Announcement Banner (Cleanly ABOVE Community Cards to avoid seat collision) -->
+        <div id="actionAnnouncement" class="text-xs px-3.5 py-1 bg-slate-950/85 rounded-full text-slate-200 border border-white/10 max-w-sm sm:max-w-md text-center truncate shadow">
+          รอผู้เล่นนั่งโต๊ะเพื่อเริ่มเกม...
         </div>
 
-        <!-- Action Announcement Banner & Next Hand Quick Action -->
-        <div class="flex flex-col items-center gap-1.5 z-20">
-          <div id="actionAnnouncement" class="text-xs px-3.5 py-1 bg-slate-950/80 rounded-full text-slate-200 border border-white/10 max-w-sm sm:max-w-md text-center truncate shadow">
-            รอผู้เล่นนั่งโต๊ะเพื่อเริ่มเกม...
-          </div>
-          <button id="nextHandBtn" onclick="requestNextHand()" class="hidden text-xs px-3.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full font-bold shadow-xl border border-emerald-400 transition animate-bounce">
-            ▶️ แจกไพ่แฮนด์ถัดไปทันที
-          </button>
+        <!-- Community Cards (5 slots) -->
+        <div id="communityCards" class="flex gap-1.5 sm:gap-2 p-1.5 sm:p-2 rounded-2xl bg-black/35 backdrop-blur-sm border border-white/10 shadow-2xl">
+          <div class="w-13 h-19 sm:w-16 sm:h-23 rounded-xl border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/30 text-xs sm:text-sm font-bold">Flop</div>
+          <div class="w-13 h-19 sm:w-16 sm:h-23 rounded-xl border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/30 text-xs sm:text-sm font-bold">Flop</div>
+          <div class="w-13 h-19 sm:w-16 sm:h-23 rounded-xl border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/30 text-xs sm:text-sm font-bold">Flop</div>
+          <div class="w-13 h-19 sm:w-16 sm:h-23 rounded-xl border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/30 text-xs sm:text-sm font-bold">Turn</div>
+          <div class="w-13 h-19 sm:w-16 sm:h-23 rounded-xl border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/30 text-xs sm:text-sm font-bold">River</div>
+        </div>
+
+        <!-- Center Prompt & Controls (Start Button / Auto-deal Countdown) -->
+        <div id="centerPromptContainer" class="flex items-center justify-center min-h-[30px] z-20">
+          <!-- Injected dynamically based on state -->
         </div>
       </div>
 
@@ -759,6 +764,11 @@
     // ==========================================
     // 3. TABLE RENDERING & SEAT ENGINE
     // ==========================================
+    // Auto-deal timer state
+    let autoDealInterval = null;
+    let autoDealCountdown = 3;
+    let lastHandEndedHandNum = -1;
+
     function renderTable(state) {
       if (!state) return;
 
@@ -794,21 +804,112 @@
       if (isMyTurn) turnBadge.classList.remove('hidden');
       else turnBadge.classList.add('hidden');
 
-      // Next Hand Quick Action Button
-      const nextHandBtn = document.getElementById('nextHandBtn');
-      if (nextHandBtn) {
-        if (state.phase === 'hand_ended' || state.phase === 'showdown') {
-          nextHandBtn.classList.remove('hidden');
-        } else {
-          nextHandBtn.classList.add('hidden');
-        }
-      }
+      // Header Start Button & Center Prompt (Start / Auto-deal Countdown)
+      handleAutoDealAndStartButtons(state);
 
-      // Render 9 Seats
+      // Render 9 Seats with zero overlap side-by-side layout
       renderSeats(state);
 
       // Update Action Controls
       updateActionDock(state, myPlayer);
+    }
+
+    function handleAutoDealAndStartButtons(state) {
+      const promptContainer = document.getElementById('centerPromptContainer');
+      const headerStartBtn = document.getElementById('headerStartBtn');
+      const headerStartText = document.getElementById('headerStartText');
+      const eligiblePlayers = state.seats.filter(p => p !== null && p.chips > 0);
+
+      if (state.phase === 'waiting') {
+        if (autoDealInterval) {
+          clearInterval(autoDealInterval);
+          autoDealInterval = null;
+        }
+
+        if (eligiblePlayers.length >= 2) {
+          if (headerStartBtn) {
+            headerStartBtn.classList.remove('hidden');
+            if (headerStartText) headerStartText.innerText = 'เริ่มเกม (Start)';
+          }
+          if (promptContainer) {
+            promptContainer.innerHTML = `
+              <div class="flex flex-col items-center gap-1 mt-1">
+                <button onclick="requestStartGame()" class="px-5 py-2 bg-gradient-to-r from-emerald-600 to-green-500 hover:from-emerald-500 hover:to-green-400 text-white font-extrabold text-xs sm:text-sm rounded-full shadow-2xl border-2 border-emerald-300 animate-pulse transition transform hover:scale-105 active:scale-95 flex items-center gap-2 cursor-pointer">
+                  <span class="text-base">▶️</span> เริ่มเกมแจกไพ่ (Start Game)
+                </button>
+                <span class="text-[11px] text-emerald-300 font-medium">ผู้เล่นพร้อมแล้ว ${eligiblePlayers.length} คน (ระบบจะเริ่มให้อัตโนมัติด้วย)</span>
+              </div>
+            `;
+          }
+        } else {
+          if (headerStartBtn) headerStartBtn.classList.add('hidden');
+          if (promptContainer) {
+            promptContainer.innerHTML = `
+              <div class="flex items-center gap-2 mt-1">
+                <span class="text-xs text-amber-300 font-medium bg-black/60 px-3.5 py-1 rounded-full border border-amber-500/30">
+                  👥 รอผู้เล่นอีก ${Math.max(1, 2 - eligiblePlayers.length)} คน
+                </span>
+                <button onclick="document.getElementById('addBotBtn').click()" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded-full font-bold shadow flex items-center gap-1 transition hover:scale-105 active:scale-95">
+                  <span>🤖</span> + เพิ่ม Bot
+                </button>
+              </div>
+            `;
+          }
+        }
+      } else if (state.phase === 'hand_ended' || state.phase === 'showdown') {
+        if (eligiblePlayers.length >= 2) {
+          if (headerStartBtn) {
+            headerStartBtn.classList.remove('hidden');
+            if (headerStartText) headerStartText.innerText = 'แจกไพ่ทันที';
+          }
+
+          if (lastHandEndedHandNum !== state.handNumber) {
+            lastHandEndedHandNum = state.handNumber;
+            autoDealCountdown = 3;
+            if (autoDealInterval) clearInterval(autoDealInterval);
+
+            autoDealInterval = setInterval(() => {
+              autoDealCountdown--;
+              const timerEl = document.getElementById('autoDealSec');
+              if (timerEl) timerEl.innerText = autoDealCountdown;
+
+              if (autoDealCountdown <= 0) {
+                clearInterval(autoDealInterval);
+                autoDealInterval = null;
+                // Auto fallback trigger if server hasn't advanced yet
+                if (tableState && (tableState.phase === 'hand_ended' || tableState.phase === 'showdown')) {
+                  requestStartGame();
+                }
+              }
+            }, 1000);
+          }
+
+          if (promptContainer) {
+            promptContainer.innerHTML = `
+              <div class="flex items-center gap-2 mt-1">
+                <span class="text-xs text-amber-300 font-bold bg-black/70 px-3.5 py-1 rounded-full border border-amber-500/40 shadow flex items-center gap-1.5">
+                  <span>⏱️</span> แจกไพ่รอบต่อไปใน <span id="autoDealSec" class="font-mono font-black text-amber-400 text-sm">${autoDealCountdown}</span>s...
+                </span>
+                <button onclick="requestStartGame()" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs rounded-full font-bold shadow-lg border border-emerald-400 transition hover:scale-105 active:scale-95 flex items-center gap-1">
+                  <span>▶️</span> แจกไพ่เลย
+                </button>
+              </div>
+            `;
+          }
+        } else {
+          if (headerStartBtn) headerStartBtn.classList.add('hidden');
+          if (promptContainer) promptContainer.innerHTML = '';
+        }
+      } else {
+        // Active hand (preflop, flop, turn, river)
+        if (headerStartBtn) headerStartBtn.classList.add('hidden');
+        if (promptContainer) promptContainer.innerHTML = '';
+        if (autoDealInterval) {
+          clearInterval(autoDealInterval);
+          autoDealInterval = null;
+        }
+        lastHandEndedHandNum = -1;
+      }
     }
 
     function renderCommunityCards(cards) {
@@ -822,7 +923,7 @@
           commContainer.appendChild(cardEl);
         } else {
           const empty = document.createElement('div');
-          empty.className = 'w-14 h-20 sm:w-16 sm:h-24 md:w-18 md:h-26 rounded-xl border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/30 text-xs sm:text-sm font-bold shadow-inner';
+          empty.className = 'w-13 h-19 sm:w-16 sm:h-23 rounded-xl border-2 border-dashed border-white/20 bg-emerald-950/40 flex items-center justify-center text-white/30 text-xs sm:text-sm font-bold shadow-inner';
           empty.innerText = i < 3 ? 'Flop' : i === 3 ? 'Turn' : 'River';
           commContainer.appendChild(empty);
         }
@@ -833,22 +934,19 @@
       const container = document.getElementById('seatsContainer');
       container.innerHTML = '';
 
-      // Positions around oval: 9 seats with position direction (dir: 'top', 'bottom', 'left', 'right')
-      // dir specifies where the hole cards and bet chips sit relative to the player avatar/badge:
-      // 'top': cards and bet sit ABOVE the avatar towards table center (for bottom seats)
-      // 'bottom': cards and bet sit BELOW the avatar towards table center (for top seats)
-      // 'right': cards and bet sit RIGHT of the avatar towards table center (for left seats)
-      // 'left': cards and bet sit LEFT of the avatar towards table center (for right seats)
+      // 9 Seats layout with side-by-side card & avatar placement:
+      // align: 'left' = [Avatar Capsule] [Hole Cards] (cards face table center)
+      // align: 'right' = [Hole Cards] [Avatar Capsule] (cards face table center)
       const seatPositions = [
-        { left: '50%', top: '80%', dir: 'top' },    // 0: Bottom Center (Hero)
-        { left: '22%', top: '76%', dir: 'top' },    // 1: Bottom Left
-        { left: '8%',  top: '49%', dir: 'right' },  // 2: Middle Left
-        { left: '22%', top: '22%', dir: 'bottom' }, // 3: Top Left
-        { left: '40%', top: '15%', dir: 'bottom' }, // 4: Top Center-Left
-        { left: '60%', top: '15%', dir: 'bottom' }, // 5: Top Center-Right
-        { left: '78%', top: '22%', dir: 'bottom' }, // 6: Top Right
-        { left: '92%', top: '49%', dir: 'left' },   // 7: Middle Right
-        { left: '78%', top: '76%', dir: 'top' },    // 8: Bottom Right
+        { left: '50%', top: '83%', align: 'left',  betPos: 'top' },    // 0: Bottom Center (Hero)
+        { left: '19%', top: '77%', align: 'left',  betPos: 'top' },    // 1: Bottom Left
+        { left: '8%',  top: '50%', align: 'left',  betPos: 'right' },  // 2: Middle Left
+        { left: '19%', top: '22%', align: 'left',  betPos: 'bottom' }, // 3: Top Left
+        { left: '38%', top: '13%', align: 'left',  betPos: 'bottom' }, // 4: Top Center-Left
+        { left: '62%', top: '13%', align: 'right', betPos: 'bottom' }, // 5: Top Center-Right
+        { left: '81%', top: '22%', align: 'right', betPos: 'bottom' }, // 6: Top Right
+        { left: '92%', top: '50%', align: 'right', betPos: 'left' },   // 7: Middle Right
+        { left: '81%', top: '77%', align: 'right', betPos: 'top' },    // 8: Bottom Right
       ];
 
       state.seats.forEach((seat, idx) => {
@@ -862,76 +960,83 @@
           const isTurn = state.currentTurnSeat === idx;
           const isDealer = state.dealerSeat === idx;
           const isWinner = state.handWinners?.some(w => w.userId === seat.userId);
+          const isHero = seat.userId === myUser.id || idx === 0;
 
-          // Compute offsets based on pos.dir so cards and bets NEVER collide with avatar or badges
-          let cardClasses = '';
-          let betClasses = '';
-
-          if (pos.dir === 'top') {
-            cardClasses = 'absolute -top-18 sm:-top-21 left-1/2 -translate-x-1/2 flex items-center -space-x-2.5 z-20';
-            betClasses = 'absolute -top-26 sm:-top-29 left-1/2 -translate-x-1/2 z-30';
-          } else if (pos.dir === 'bottom') {
-            cardClasses = 'absolute -bottom-18 sm:-bottom-21 left-1/2 -translate-x-1/2 flex items-center -space-x-2.5 z-20';
-            betClasses = 'absolute -bottom-26 sm:-bottom-29 left-1/2 -translate-x-1/2 z-30';
-          } else if (pos.dir === 'right') {
-            cardClasses = 'absolute top-1/2 -translate-y-1/2 left-full ml-3 flex items-center -space-x-2.5 z-20';
-            betClasses = 'absolute top-1/2 -translate-y-1/2 left-full ml-24 sm:ml-28 z-30';
-          } else if (pos.dir === 'left') {
-            cardClasses = 'absolute top-1/2 -translate-y-1/2 right-full mr-3 flex items-center -space-x-2.5 z-20';
-            betClasses = 'absolute top-1/2 -translate-y-1/2 right-full mr-24 sm:mr-28 z-30';
+          // Bet Chip position inline styles on the felt
+          let betStyle = '';
+          if (pos.betPos === 'top') {
+            betStyle = 'position: absolute; top: -28px; left: 50%; transform: translateX(-50%); z-index: 30;';
+          } else if (pos.betPos === 'bottom') {
+            betStyle = 'position: absolute; bottom: -28px; left: 50%; transform: translateX(-50%); z-index: 30;';
+          } else if (pos.betPos === 'right') {
+            betStyle = 'position: absolute; top: 50%; right: -62px; transform: translateY(-50%); z-index: 30;';
+          } else if (pos.betPos === 'left') {
+            betStyle = 'position: absolute; top: 50%; left: -62px; transform: translateY(-50%); z-index: 30;';
           }
 
-          wrapper.innerHTML = `
+          // Avatar capsule
+          const avatarBlock = `
             <div class="relative flex flex-col items-center">
-              ${isDealer ? '<span class="absolute -top-2 -left-2 bg-amber-400 text-slate-900 font-extrabold text-[11px] w-5 h-5 rounded-full flex items-center justify-center shadow-lg z-30 border border-slate-900 select-none">D</span>' : ''}
+              ${isDealer ? '<span class="absolute -top-1.5 -left-1.5 bg-amber-400 text-slate-900 font-black text-[10px] w-5 h-5 rounded-full flex items-center justify-center shadow-lg z-30 border border-slate-900 select-none">D</span>' : ''}
               
-              <!-- AVATAR & POKER NIGHT TURN RING -->
-              <div class="relative w-13 h-13 sm:w-15 sm:h-15 flex items-center justify-center">
-                <!-- Circular Countdown SVG Ring -->
+              <div class="relative w-11 h-11 sm:w-13 sm:h-13 flex items-center justify-center">
                 ${isTurn ? `
-                  <svg class="absolute -inset-1.5 w-16 h-16 sm:w-18 sm:h-18 pointer-events-none z-10" viewBox="0 0 64 64">
+                  <svg class="absolute -inset-1.5 w-14 h-14 sm:w-16 sm:h-16 pointer-events-none z-10" viewBox="0 0 64 64">
                     <circle cx="32" cy="32" r="28" stroke="rgba(255,255,255,0.15)" stroke-width="3.5" fill="none" />
                     <circle id="turnRing-${idx}" cx="32" cy="32" r="28" stroke="#10b981" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-dasharray="175.93" stroke-dashoffset="0" transform="rotate(-90 32 32)" />
                   </svg>
                   <span id="turnTimeText-${idx}" class="absolute -bottom-1 z-20 text-[10px] font-extrabold px-1.5 rounded-full bg-slate-950 text-emerald-400 border border-emerald-500 shadow font-mono">20s</span>
                 ` : ''}
 
-                <!-- Avatar Image -->
-                <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 ${isWinner ? 'border-amber-400 win-glow' : isTurn ? 'border-emerald-400 active-glow' : seat.isFolded ? 'border-rose-500 opacity-40' : 'border-slate-700'} overflow-hidden bg-slate-800 shadow-xl">
+                <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 ${isWinner ? 'border-amber-400 win-glow' : isTurn ? 'border-emerald-400 active-glow' : seat.isFolded ? 'border-rose-500 opacity-40 grayscale' : 'border-slate-700'} overflow-hidden bg-slate-800 shadow-xl">
                   <img src="${seat.avatarUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=' + seat.userId}" class="w-full h-full object-cover">
                 </div>
               </div>
 
-              <!-- Name & Chips Badge (Separated from cards and bets) -->
-              <div class="bg-slate-900/95 border border-slate-700/90 px-2 py-0.5 rounded-lg mt-1 text-center shadow-lg min-w-[75px] max-w-[105px] backdrop-blur-sm z-10">
-                <p class="text-[10px] sm:text-[11px] font-bold truncate text-slate-200">
+              <div class="bg-slate-900/95 border border-slate-700/80 px-1.5 py-0.5 rounded-md mt-1 text-center shadow-md min-w-[65px] max-w-[85px] backdrop-blur-sm z-10">
+                <p class="text-[10px] font-bold truncate text-slate-200">
                   ${seat.isBot ? '🤖 ' : ''}${seat.displayName}
                 </p>
-                <p class="text-[10px] sm:text-[11px] font-extrabold text-emerald-400 font-mono">${seat.chips.toLocaleString()}฿</p>
+                <p class="text-[10px] font-extrabold text-emerald-400 font-mono leading-tight">${seat.chips.toLocaleString()}฿</p>
               </div>
 
-              <!-- Bet Chip Badge (Positioned independently on the felt towards the pot) -->
+              ${isWinner ? `
+                <div class="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-amber-400 text-slate-950 text-[10px] font-black px-2 py-0.2 rounded-full shadow-xl z-30 animate-bounce flex items-center gap-0.5 border border-amber-300 whitespace-nowrap">
+                  👑 ชนะ!
+                </div>
+              ` : ''}
+
+              ${seat.isFolded ? `
+                <div class="absolute -bottom-1 bg-rose-950 text-rose-300 text-[9px] font-bold px-1.5 rounded border border-rose-500/50 shadow z-20">หมอบ</div>
+              ` : seat.isAllIn ? `
+                <div class="absolute -bottom-1 bg-rose-600 text-white text-[9px] font-black px-1.5 rounded shadow z-20 animate-pulse">ALL-IN</div>
+              ` : ''}
+            </div>
+          `;
+
+          // Hole Cards block (placed horizontally beside the avatar)
+          const cardsBlock = seat.hasCards ? `
+            <div class="flex items-center -space-x-2.5 z-20 ${seat.isFolded ? 'opacity-35 grayscale' : ''} card-deal-enter">
+              ${seat.holeCards && seat.holeCards.length > 0
+                ? seat.holeCards.map(c => createHoleCardHTML(c, isHero)).join('')
+                : (createFaceDownCardHTML() + createFaceDownCardHTML())}
+            </div>
+          ` : '';
+
+          // Side-by-side assembly
+          const innerContent = pos.align === 'left'
+            ? `${avatarBlock}${cardsBlock}`
+            : `${cardsBlock}${avatarBlock}`;
+
+          wrapper.innerHTML = `
+            <div class="relative flex items-center gap-1.5">
+              ${innerContent}
+
               ${seat.currentRoundBet > 0 ? `
-                <div class="${betClasses}">
-                  <div class="bg-amber-400 text-slate-950 font-black text-[10px] sm:text-[11px] px-2.5 py-0.5 rounded-full shadow-lg border border-amber-300 font-mono flex items-center gap-1 whitespace-nowrap animate-pulse">
+                <div style="${betStyle}">
+                  <div class="bg-amber-400 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded-full shadow-lg border border-amber-300 font-mono flex items-center gap-1 whitespace-nowrap animate-pulse">
                     <span>🪙</span> ${seat.currentRoundBet.toLocaleString()}฿
                   </div>
-                </div>
-              ` : ''}
-
-              <!-- Enlarged Hole Cards (Positioned in front towards felt, never overlapping badge!) -->
-              ${seat.hasCards ? `
-                <div class="${cardClasses} card-deal-enter">
-                  ${seat.holeCards && seat.holeCards.length > 0
-                    ? seat.holeCards.map(c => createHoleCardHTML(c)).join('')
-                    : (createFaceDownCardHTML() + createFaceDownCardHTML())}
-                </div>
-              ` : ''}
-
-              <!-- Winner Banner -->
-              ${isWinner ? `
-                <div class="absolute -top-4 bg-amber-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full shadow-xl z-30 animate-bounce flex items-center gap-1 border border-amber-300">
-                  👑 WINNER!
                 </div>
               ` : ''}
             </div>
@@ -939,7 +1044,7 @@
         } else {
           // Empty seat button
           wrapper.innerHTML = `
-            <button onclick="sitAtSeat(${idx})" class="w-12 h-12 rounded-full border-2 border-dashed border-white/25 hover:border-amber-400 bg-black/40 hover:bg-amber-400/20 text-white/50 hover:text-amber-300 flex items-center justify-center text-xs font-bold transition shadow-lg">
+            <button onclick="sitAtSeat(${idx})" class="w-11 h-11 sm:w-12 sm:h-12 rounded-full border-2 border-dashed border-white/25 hover:border-amber-400 bg-black/40 hover:bg-amber-400/20 text-white/50 hover:text-amber-300 flex items-center justify-center text-xs font-bold transition shadow-lg">
               + นั่ง
             </button>
           `;
@@ -1023,19 +1128,20 @@
       return div;
     }
 
-    function createHoleCardHTML(card) {
+    function createHoleCardHTML(card, isHero = false) {
       const suitSymbol = { s: '♠', h: '♥', d: '♦', c: '♣' }[card.suit];
       const rankText = { 14: 'A', 13: 'K', 12: 'Q', 11: 'J' }[card.rank] || card.rank;
       const isRed = ['h', 'd'].includes(card.suit);
       const color = isRed ? 'text-red-600' : 'text-slate-950';
+      const sizeClasses = isHero ? 'w-11 h-15 sm:w-13 sm:h-18' : 'w-10 h-14 sm:w-11 sm:h-16';
 
       return `
-        <div class="w-11 h-16 sm:w-13 sm:h-19 rounded-lg bg-white shadow-xl border border-slate-300 flex flex-col justify-between p-1 select-none ${color} transition hover:-translate-y-1 hover:z-30 card-shadow">
+        <div class="${sizeClasses} rounded-lg bg-white shadow-xl border border-slate-300 flex flex-col justify-between p-1 select-none ${color} transition hover:-translate-y-1 hover:z-30 card-shadow">
           <div class="flex items-center justify-between leading-none">
             <span class="text-xs sm:text-sm font-black font-mono">${rankText}</span>
             <span class="text-[10px] sm:text-xs">${suitSymbol}</span>
           </div>
-          <div class="text-lg sm:text-2xl text-center leading-none my-auto select-none">${suitSymbol}</div>
+          <div class="text-base sm:text-xl text-center leading-none my-auto select-none">${suitSymbol}</div>
           <div class="flex items-center justify-between leading-none rotate-180">
             <span class="text-xs sm:text-sm font-black font-mono">${rankText}</span>
             <span class="text-[10px] sm:text-xs">${suitSymbol}</span>
@@ -1046,8 +1152,8 @@
 
     function createFaceDownCardHTML() {
       return `
-        <div class="w-11 h-16 sm:w-13 sm:h-19 rounded-lg bg-gradient-to-br from-blue-700 via-indigo-900 to-blue-950 border border-blue-400/80 shadow-xl flex items-center justify-center p-1 select-none card-shadow">
-          <div class="w-full h-full rounded border border-blue-300/30 bg-blue-900/40 flex items-center justify-center text-blue-200/60 text-base">
+        <div class="w-9 h-13 sm:w-10 sm:h-15 rounded-lg bg-gradient-to-br from-blue-700 via-indigo-900 to-blue-950 border border-blue-400/80 shadow-xl flex items-center justify-center p-1 select-none card-shadow">
+          <div class="w-full h-full rounded border border-blue-300/30 bg-blue-900/40 flex items-center justify-center text-blue-200/60 text-sm">
             🂠
           </div>
         </div>
@@ -1131,8 +1237,12 @@
       }));
     }
 
+    function requestStartGame() {
+      if (ws) ws.send(JSON.stringify({ type: 'start_game' }));
+    }
+
     function requestNextHand() {
-      if (ws) ws.send(JSON.stringify({ type: 'next_hand' }));
+      if (ws) ws.send(JSON.stringify({ type: 'start_game' }));
     }
 
     function setRaiseMultiplier(mult) {
