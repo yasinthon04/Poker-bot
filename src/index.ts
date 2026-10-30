@@ -811,13 +811,19 @@ client.on('interactionCreate', async (interaction: Interaction) => {
         return;
       }
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error handling interaction:', error);
-    if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
-      await interaction.reply({
-        content: '⚠️ เกิดข้อผิดพลาดในการประมวลผลคำสั่ง กรุณาลองใหม่อีกครั้ง',
-        ephemeral: true,
-      });
+    try {
+      if (interaction.isRepliable()) {
+        const errorContent = `⚠️ เกิดข้อผิดพลาด: ${error?.message || 'กรุณาลองใหม่อีกครั้ง'}`;
+        if (interaction.deferred) {
+          await interaction.editReply({ content: errorContent });
+        } else if (!interaction.replied) {
+          await interaction.reply({ content: errorContent, ephemeral: true });
+        }
+      }
+    } catch (replyErr) {
+      console.error('Failed to send error reply:', replyErr);
     }
   }
 });

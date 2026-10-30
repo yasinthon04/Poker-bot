@@ -224,14 +224,14 @@ export const pokerCommand = {
       return;
     }
 
-    // Ensure user exists in DB
-    await repo.upsertUser(
+    // Ensure user exists in DB (non-blocking to ensure instant response within 3s)
+    repo.upsertUser(
       user.id,
       user.username,
       interaction.member && 'displayName' in interaction.member
         ? (interaction.member as any).displayName
         : user.displayName
-    );
+    ).catch(err => console.error('Background upsertUser error:', err));
 
     // HELP (No active session needed)
     if (subcommand === 'help') {
@@ -948,108 +948,118 @@ export async function executeManualSettlement(
   defaultBuyIn: number = 200,
   existingSessionId?: number
 ) {
-  const { parseManualInputLines, resolvePlayerDiscordMembers } = await import('../services/manual-parser');
-  const parsed = parseManualInputLines(rawPlayersText, defaultBuyIn);
+  try {
+    const { parseManualInputLines, resolvePlayerDiscordMembers } = await import('../services/manual-parser');
+    const parsed = parseManualInputLines(rawPlayersText, defaultBuyIn);
 
-  if (parsed.errors.length > 0 && parsed.players.length === 0) {
-    const errorMsg = `❌ **ไม่สามารถบันทึกข้อมูลได้:**\n${parsed.errors.join('\n')}\n\n💡 **ตัวอย่างรูปแบบที่ถูกต้อง:**\n\`@Ton 350\`\n\`@Nadear 50 buyin:400\`\n\`@JJ 200\``;
+    if (parsed.errors.length > 0 && parsed.players.length === 0) {
+      const errorMsg = `❌ **ไม่สามารถบันทึกข้อมูลได้:**\n${parsed.errors.join('\n')}\n\n💡 **ตัวอย่างรูปแบบที่ถูกต้อง:**\n\`@Ton 350\`\n\`@Nadear 50 buyin:400\`\n\`@JJ 200\``;
+      if (context.replied || context.deferred) {
+        await context.editReply({ content: errorMsg });
+      } else {
+        await context.reply({ content: errorMsg, ephemeral: true });
+      }
+      return;
+    }
+
+    const guildId = context.guildId || context.guild?.id || '';
+    const channelId = context.channelId || context.channel?.id || '';
+    const hostId = context.user?.id || context.member?.id || 'host';
+
+    let voiceChannelId: string | undefined;
+    try {
+      const callerMember = context.member;
+      voiceChannelId =
+        callerMember?.voice?.channelId ||
+        (context.user && context.guild?.voiceStates?.cache?.get(context.user.id)?.channelId);
+    } catch {}
+
+    const resolvedPlayers = await resolvePlayerDiscordMembers(parsed.players, context.guild, voiceChannelId);
+
+    for (const p of resolvedPlayers) {
+      if (!p.userId.startsWith('guest_')) {
+        await repo.upsertUser(p.userId, p.name);
+      }
+    }
+
+    const { settlement, session } = await repo.saveOrUpdateManualSession(
+      guildId,
+      channelId,
+      hostId,
+      defaultBuyIn,
+      resolvedPlayers,
+      existingSessionId
+    );
+
+    const sessionPlayers = await repo.getSessionPlayers(session.id);
+    const ppMap: Record<string, { promptpay: string | null; qrImageUrl: string | null }> = {};
+    for (const p of sessionPlayers) {
+      ppMap[p.user_id] = { promptpay: p.promptpay, qrImageUrl: p.qr_image_url };
+    }
+    const { createSummaryEmbed } = await import('../ui/embeds');
+    const embed = createSummaryEmbed(session, settlement, ppMap);
+
+    let prefixNote = existingSessionId
+      ? `✏️ **แก้ไขและคำนวณเงินใหม่สำหรับ Session #${session.id} สำเร็จ!** (อัปเดตตาราง Leaderboard เรียบร้อย)\n`
+      : `📝 **บันทึกและคิดเงิน Poker Session #${session.id} สำเร็จ!** (บันทึกลงตาราง Leaderboard เรียบร้อย)\n`;
+
+    if (parsed.errors.length > 0) {
+      prefixNote += `⚠️ *ข้อสังเกตบางรายการ:*\n${parsed.errors.join('\n')}\n\n`;
+    }
+
+    const topCreditor = settlement.players.find(
+      p =>
+        p.net > 0 &&
+        !p.isBot &&
+        !p.userId.startsWith('bot_') &&
+        !p.userId.startsWith('guest_') &&
+        (ppMap[p.userId]?.qrImageUrl || ppMap[p.userId]?.promptpay)
+    );
+
+    const files: any[] = [];
+    if (topCreditor) {
+      const pInfo = ppMap[topCreditor.userId];
+      const qrResult = await resolvePaymentAttachment(
+        {
+          userId: topCreditor.userId,
+          name: topCreditor.name,
+          promptpay: pInfo?.promptpay,
+          qrImageUrl: pInfo?.qrImageUrl,
+        },
+        topCreditor.net
+      );
+      if (qrResult) {
+        embed.setImage(`attachment://${qrResult.imageFileName}`);
+        embed.addFields({
+          name:
+            qrResult.sourceType === 'custom_qr'
+              ? `📱 QR Code รับเงินของ ${topCreditor.name} (${topCreditor.net.toLocaleString()}฿)`
+              : `📱 QR Code พร้อมเพย์ของ ${topCreditor.name} (${topCreditor.net.toLocaleString()}฿)`,
+          value:
+            qrResult.sourceType === 'custom_qr'
+              ? `สแกน QR Code ด้านล่างเพื่อโอนเงินเข้าบัญชีได้ทันที (QR ที่ผู้เล่นอัปโหลดไว้)`
+              : `สามารถสแกน QR Code ด้านล่างเพื่อโอนเงินได้ทันที (สร้างยอดอัตโนมัติ ${topCreditor.net.toLocaleString()} บาท)`,
+        });
+        files.push(qrResult.attachment);
+      }
+    }
+
+    const { createNextRoundActionRow } = await import('../ui/components');
+    const actionRow = createNextRoundActionRow(session.id, false, settlement.isBalanced);
+
+    if (context.replied || context.deferred) {
+      await context.editReply({ content: prefixNote, embeds: [embed], files, components: [actionRow] });
+    } else {
+      await context.reply({ content: prefixNote, embeds: [embed], files, components: [actionRow] });
+    }
+  } catch (err: any) {
+    console.error('Failed to execute manual settlement:', err);
+    const errorMsg = `❌ **เกิดข้อผิดพลาดในการคิดเงิน:** ${err?.message || 'กรุณาลองใหม่อีกครั้ง'}`;
     if (context.replied || context.deferred) {
       await context.editReply({ content: errorMsg });
     } else {
       await context.reply({ content: errorMsg, ephemeral: true });
     }
-    return;
-  }
-
-  const guildId = context.guildId || context.guild?.id || '';
-  const channelId = context.channelId || context.channel?.id || '';
-  const hostId = context.user?.id || context.member?.id || 'host';
-
-  let voiceChannelId: string | undefined;
-  try {
-    const callerMember = context.member;
-    voiceChannelId =
-      callerMember?.voice?.channelId ||
-      (context.user && context.guild?.voiceStates?.cache?.get(context.user.id)?.channelId);
-  } catch {}
-
-  const resolvedPlayers = await resolvePlayerDiscordMembers(parsed.players, context.guild, voiceChannelId);
-
-  for (const p of resolvedPlayers) {
-    if (!p.userId.startsWith('guest_')) {
-      await repo.upsertUser(p.userId, p.name);
-    }
-  }
-
-  const { settlement, session } = await repo.saveOrUpdateManualSession(
-    guildId,
-    channelId,
-    hostId,
-    defaultBuyIn,
-    resolvedPlayers,
-    existingSessionId
-  );
-
-  const sessionPlayers = await repo.getSessionPlayers(session.id);
-  const ppMap: Record<string, { promptpay: string | null; qrImageUrl: string | null }> = {};
-  for (const p of sessionPlayers) {
-    ppMap[p.user_id] = { promptpay: p.promptpay, qrImageUrl: p.qr_image_url };
-  }
-  const { createSummaryEmbed } = await import('../ui/embeds');
-  const embed = createSummaryEmbed(session, settlement, ppMap);
-
-  let prefixNote = existingSessionId
-    ? `✏️ **แก้ไขและคำนวณเงินใหม่สำหรับ Session #${session.id} สำเร็จ!** (อัปเดตตาราง Leaderboard เรียบร้อย)\n`
-    : `📝 **บันทึกและคิดเงิน Poker Session #${session.id} สำเร็จ!** (บันทึกลงตาราง Leaderboard เรียบร้อย)\n`;
-
-  if (parsed.errors.length > 0) {
-    prefixNote += `⚠️ *ข้อสังเกตบางรายการ:*\n${parsed.errors.join('\n')}\n\n`;
-  }
-
-  const topCreditor = settlement.players.find(
-    p =>
-      p.net > 0 &&
-      !p.isBot &&
-      !p.userId.startsWith('bot_') &&
-      !p.userId.startsWith('guest_') &&
-      (ppMap[p.userId]?.qrImageUrl || ppMap[p.userId]?.promptpay)
-  );
-
-  const files: any[] = [];
-  if (topCreditor) {
-    const pInfo = ppMap[topCreditor.userId];
-    const qrResult = await resolvePaymentAttachment(
-      {
-        userId: topCreditor.userId,
-        name: topCreditor.name,
-        promptpay: pInfo?.promptpay,
-        qrImageUrl: pInfo?.qrImageUrl,
-      },
-      topCreditor.net
-    );
-    if (qrResult) {
-      embed.setImage(`attachment://${qrResult.imageFileName}`);
-      embed.addFields({
-        name:
-          qrResult.sourceType === 'custom_qr'
-            ? `📱 QR Code รับเงินของ ${topCreditor.name} (${topCreditor.net.toLocaleString()}฿)`
-            : `📱 QR Code พร้อมเพย์ของ ${topCreditor.name} (${topCreditor.net.toLocaleString()}฿)`,
-        value:
-          qrResult.sourceType === 'custom_qr'
-            ? `สแกน QR Code ด้านล่างเพื่อโอนเงินเข้าบัญชีได้ทันที (QR ที่ผู้เล่นอัปโหลดไว้)`
-            : `สามารถสแกน QR Code ด้านล่างเพื่อโอนเงินได้ทันที (สร้างยอดอัตโนมัติ ${topCreditor.net.toLocaleString()} บาท)`,
-      });
-      files.push(qrResult.attachment);
-    }
-  }
-
-  const { createNextRoundActionRow } = await import('../ui/components');
-  const actionRow = createNextRoundActionRow(session.id, false, settlement.isBalanced);
-
-  if (context.replied || context.deferred) {
-    await context.editReply({ content: prefixNote, embeds: [embed], files, components: [actionRow] });
-  } else {
-    await context.reply({ content: prefixNote, embeds: [embed], files, components: [actionRow] });
   }
 }
 
