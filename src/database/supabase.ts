@@ -1,7 +1,13 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
+import WebSocket from 'ws';
 
 dotenv.config();
+
+// Polyfill native WebSocket for Node.js runtimes < 22 (e.g. Render Node 20)
+if (typeof (globalThis as any).WebSocket === 'undefined') {
+  (globalThis as any).WebSocket = WebSocket;
+}
 
 let supabaseInstance: SupabaseClient | null = null;
 
@@ -33,6 +39,9 @@ export function getSupabase(): SupabaseClient {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
+    },
+    realtime: {
+      transport: WebSocket as any,
     },
   });
 
