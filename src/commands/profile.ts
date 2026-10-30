@@ -46,8 +46,24 @@ export const profileCommand = {
     )
     .addSubcommand(sub =>
       sub
+        .setName('set-name')
+        .setDescription('บันทึกชื่อ-นามสกุลจริง หรือชื่อบัญชีธนาคาร (เพื่อให้ AI ตรวจสลิปได้แม่นยำขึ้น)')
+        .addStringOption(opt =>
+          opt
+            .setName('name')
+            .setDescription('ชื่อบัญชี เช่น สมชาย ใจดี หรือ SOMCHAI J.')
+            .setRequired(true)
+        )
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('clear-name')
+        .setDescription('ลบชื่อบัญชีธนาคารออกจากระบบ')
+    )
+    .addSubcommand(sub =>
+      sub
         .setName('view')
-        .setDescription('ดูข้อมูลการรับเงินปัจจุบันของคุณ (เบอร์พร้อมเพย์ & รูป QR Code)')
+        .setDescription('ดูข้อมูลการรับเงินปัจจุบันของคุณ (เบอร์พร้อมเพย์, รูป QR Code, ชื่อบัญชี)')
     ),
 
   async execute(interaction: ChatInputCommandInteraction) {
@@ -177,9 +193,29 @@ export const profileCommand = {
       return;
     }
 
+    if (subcommand === 'set-name') {
+      const bankName = interaction.options.getString('name', true).trim();
+      await repo.setUserBankName(user.id, bankName);
+      await interaction.reply({
+        content: `✅ บันทึกชื่อบัญชีธนาคาร **${bankName}** เรียบร้อยแล้ว!\n💡 เมื่อเพื่อนโอนเงินให้คุณหรือคุณส่งสลิป AI จะนำชื่อนี้ไปช่วยตรวจสอบให้อัตโนมัติ`,
+        ephemeral: true,
+      });
+      return;
+    }
+
+    if (subcommand === 'clear-name') {
+      await repo.clearUserBankName(user.id);
+      await interaction.reply({
+        content: '🗑️ ลบข้อมูลชื่อบัญชีธนาคารของคุณเรียบร้อยแล้ว!',
+        ephemeral: true,
+      });
+      return;
+    }
+
     if (subcommand === 'view') {
       const userRecord = await repo.getUser(user.id);
       const ppText = userRecord?.promptpay ? `\`${userRecord.promptpay}\`` : '*ยังไม่ได้ตั้งค่า*';
+      const bankNameText = userRecord?.bank_name ? `**${userRecord.bank_name}**` : '*ยังไม่ได้ตั้งค่า*';
       const hasQr = !!userRecord?.qr_image_url;
 
       const embed = new EmbedBuilder()
@@ -187,6 +223,7 @@ export const profileCommand = {
         .setColor(0x3498db)
         .addFields(
           { name: '📱 เบอร์พร้อมเพย์', value: ppText, inline: true },
+          { name: '🏦 ชื่อบัญชีธนาคาร', value: bankNameText, inline: true },
           { name: '🖼️ รูป QR Code', value: hasQr ? '✅ มีรูป QR ในระบบ' : '❌ ยังไม่ได้อัปโหลด', inline: true },
           {
             name: 'ℹ️ ลำดับการแสดง QR เมื่อคุณเป็นผู้ชนะ',

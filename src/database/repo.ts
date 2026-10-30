@@ -1,10 +1,17 @@
-import { getMemoryDb, persistDb, UserRecord, SessionRecord } from './db';
+import { getMemoryDb, persistDb, UserRecord, SessionRecord, SettlementRecord } from './db';
 import { calculateSettlements, SettlementResult } from '../services/settlement';
 import { isSupabaseConfigured } from './supabase';
 import * as supabaseRepo from './supabase-repo';
 
 export type UserRow = UserRecord;
 export type SessionRow = SessionRecord;
+
+export type SettlementRow = SettlementRecord & {
+  from_name?: string;
+  to_name?: string;
+  to_promptpay?: string | null;
+  to_bank_name?: string | null;
+};
 
 export interface SessionPlayerRow {
   id: number;
@@ -110,6 +117,28 @@ export async function clearUserQrImage(userId: string): Promise<void> {
   const db = getMemoryDb();
   if (db.users[userId]) {
     db.users[userId].qr_image_url = null;
+    persistDb();
+  }
+}
+
+export async function setUserBankName(userId: string, bankName: string): Promise<void> {
+  if (isSupabaseConfigured()) {
+    return supabaseRepo.setUserBankName(userId, bankName);
+  }
+  const db = getMemoryDb();
+  if (db.users[userId]) {
+    db.users[userId].bank_name = bankName;
+    persistDb();
+  }
+}
+
+export async function clearUserBankName(userId: string): Promise<void> {
+  if (isSupabaseConfigured()) {
+    return supabaseRepo.clearUserBankName(userId);
+  }
+  const db = getMemoryDb();
+  if (db.users[userId]) {
+    db.users[userId].bank_name = null;
     persistDb();
   }
 }
@@ -408,8 +437,15 @@ export async function finalizeSession(
       from_user_id: tx.fromUserId,
       to_user_id: tx.toUserId,
       amount: tx.amount,
+      status: 'pending',
+      slip_url: null,
+      trans_ref: null,
+      paid_at: null,
+      reminder_count: 0,
       created_at: new Date().toISOString(),
     };
+    tx.id = sId;
+    tx.status = 'pending';
   }
 
   session.status = 'completed';
@@ -518,12 +554,132 @@ export async function saveOrUpdateManualSession(
       from_user_id: tx.fromUserId,
       to_user_id: tx.toUserId,
       amount: tx.amount,
+      status: 'pending',
+      slip_url: null,
+      trans_ref: null,
+      paid_at: null,
+      reminder_count: 0,
       created_at: new Date().toISOString(),
     };
+    tx.id = sId;
+    tx.status = 'pending';
   }
 
   persistDb();
   return { settlement, session };
+}
+
+// Settlement Operations & KhunThong Debt Tracking
+export async function getSessionSettlements(sessionId: number): Promise<SettlementRow[]> {
+  if (isSupabaseConfigured()) {
+    return supabaseRepo.getSessionSettlements(sessionId);
+  }
+  const db = getMemoryDb();
+  const items = Object.values(db.settlements).filter(s => s.session_id === sessionId);
+  return items.map(s => {
+    const fromUser = db.users[s.from_user_id];
+    const toUser = db.users[s.to_user_id];
+    return {
+      ...s,
+      status: s.status || 'pending',
+      from_name: fromUser?.display_name || fromUser?.username || s.from_user_id,
+      to_name: toUser?.display_name || toUser?.username || s.to_user_id,
+      to_promptpay: toUser?.promptpay || null,
+      to_bank_name: toUser?.bank_name || null,
+    };
+  });
+}
+
+export async function getPendingSettlementsForUser(
+  userId: string,
+  channelId?: string
+): Promise<SettlementRow[]> {
+  if (isSupabaseConfigured()) {
+    return supabaseRepo.getPendingSettlementsForUser(userId, channelId);
+  }
+  const db = getMemoryDb();
+  const sessions = channelId
+    ? Object.values(db.sessions).filter(s => s.channel_id === channelId).map(s => s.id)
+    : undefined;
+
+  const items = Object.values(db.settlements).filter(s => {
+    if (s.from_user_id !== userId) return false;
+    if (s.status === 'paid') return false;
+    if (sessions && !sessions.includes(s.session_id)) return false;
+    return true;
+  });
+
+  return items.map(s => {
+    const fromUser = db.users[s.from_user_id];
+    const toUser = db.users[s.to_user_id];
+    return {
+      ...s,
+      status: 'pending',
+      from_name: fromUser?.display_name || fromUser?.username || s.from_user_id,
+      to_name: toUser?.display_name || toUser?.username || s.to_user_id,
+      to_promptpay: toUser?.promptpay || null,
+      to_bank_name: toUser?.bank_name || null,
+    };
+  });
+}
+
+export async function markSettlementPaid(
+  settlementId: number,
+  slipUrl?: string,
+  transRef?: string
+): Promise<boolean> {
+  if (isSupabaseConfigured()) {
+    return supabaseRepo.markSettlementPaid(settlementId, slipUrl, transRef);
+  }
+  const db = getMemoryDb();
+  const s = db.settlements[String(settlementId)];
+  if (!s) return false;
+  s.status = 'paid';
+  s.slip_url = slipUrl || null;
+  s.trans_ref = transRef || null;
+  s.paid_at = new Date().toISOString();
+  persistDb();
+  return true;
+}
+
+export async function revertSettlementPaid(settlementId: number): Promise<boolean> {
+  if (isSupabaseConfigured()) {
+    return supabaseRepo.revertSettlementPaid(settlementId);
+  }
+  const db = getMemoryDb();
+  const s = db.settlements[String(settlementId)];
+  if (!s) return false;
+  s.status = 'pending';
+  s.paid_at = null;
+  persistDb();
+  return true;
+}
+
+export async function isTransRefUsed(transRef: string): Promise<boolean> {
+  if (!transRef || transRef.trim().length === 0) return false;
+  if (isSupabaseConfigured()) {
+    return supabaseRepo.isTransRefUsed(transRef);
+  }
+  const db = getMemoryDb();
+  return Object.values(db.settlements).some(
+    s => s.trans_ref && s.trans_ref.trim() === transRef.trim()
+  );
+}
+
+export async function incrementSettlementReminder(sessionId: number): Promise<number> {
+  if (isSupabaseConfigured()) {
+    return supabaseRepo.incrementSettlementReminder(sessionId);
+  }
+  const db = getMemoryDb();
+  let maxCount = 1;
+  for (const s of Object.values(db.settlements)) {
+    if (s.session_id === sessionId && s.status !== 'paid') {
+      s.reminder_count = (s.reminder_count || 0) + 1;
+      maxCount = Math.max(maxCount, s.reminder_count);
+    }
+  }
+  persistDb();
+  return maxCount;
 }
 
 // Statistics Queries

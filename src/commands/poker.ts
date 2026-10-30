@@ -220,6 +220,54 @@ export const pokerCommand = {
     )
     .addSubcommand(sub =>
       sub
+        .setName('slip')
+        .setDescription('📸 ตรวจสลิปโอนเงินด้วย AI ตัดหนี้อัตโนมัติ (ขุนทองสไตล์)')
+        .addAttachmentOption(opt =>
+          opt
+            .setName('image')
+            .setDescription('รูปภาพสลิปโอนเงิน (PNG, JPG, WEBP)')
+            .setRequired(true)
+        )
+        .addIntegerOption(opt =>
+          opt
+            .setName('session_id')
+            .setDescription('เลข Session ID ที่ต้องการจ่าย (ไม่ใส่จะค้นหายอดหนี้ล่าสุดในห้องนี้)')
+            .setRequired(false)
+            .setMinValue(1)
+        )
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('remind')
+        .setDescription('🔔 สะกิดทวงเงินเพื่อนที่ยังค้างจ่ายในโต๊ะ (ขุนทองสไตล์)')
+        .addIntegerOption(opt =>
+          opt
+            .setName('session_id')
+            .setDescription('เลข Session ID ที่ต้องการทวง (ไม่ใส่จะใช้รอบล่าสุดในห้องนี้)')
+            .setRequired(false)
+            .setMinValue(1)
+        )
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('confirm-paid')
+        .setDescription('✅ [เจ้าหนี้/Host] กดยืนยันว่าได้รับเงินแล้วด้วยตนเอง (Manual)')
+        .addUserOption(opt =>
+          opt
+            .setName('player')
+            .setDescription('ผู้เล่นที่โอนเงินให้คุณแล้ว')
+            .setRequired(true)
+        )
+        .addIntegerOption(opt =>
+          opt
+            .setName('session_id')
+            .setDescription('เลข Session ID (ไม่ใส่จะใช้รอบล่าสุดในห้องนี้)')
+            .setRequired(false)
+            .setMinValue(1)
+        )
+    )
+    .addSubcommand(sub =>
+      sub
         .setName('help')
         .setDescription('ดูคู่มือและคำสั่งทั้งหมดของบอท Poker Bot')
     ),
@@ -279,6 +327,193 @@ export const pokerCommand = {
         content:
           '🗑️ **ล้างข้อมูลโต๊ะโป๊กเกอร์ การเล่น และการคำนวณหนี้ทั้งหมดออกจากระบบเรียบร้อยแล้วครับ!**\n💡 โต๊ะและฐานข้อมูลสะอาดพร้อมเริ่มเล่นรอบใหม่ได้ทันทีด้วย `/poker start`',
       });
+      return;
+    }
+
+    // SLIP (AI Bank Slip Verification - KhunThong style)
+    if (subcommand === 'slip') {
+      const attachment = interaction.options.getAttachment('image', true);
+      const specifiedSessionId = interaction.options.getInteger('session_id');
+
+      if (!attachment.contentType?.startsWith('image/')) {
+        await interaction.reply({
+          content: '❌ ไฟล์ที่แนบต้องเป็นรูปภาพสลิปโอนเงินเท่านั้นครับ (PNG, JPG, WEBP)',
+          ephemeral: true,
+        });
+        return;
+      }
+
+      await interaction.deferReply();
+
+      // Look up pending debt for this user
+      let pendingDebts = await repo.getPendingSettlementsForUser(user.id, channelId);
+      if (specifiedSessionId) {
+        pendingDebts = pendingDebts.filter(d => d.session_id === specifiedSessionId);
+      }
+
+      if (pendingDebts.length === 0) {
+        await interaction.editReply({
+          content: '⚠️ ไม่พบรายการหนี้ค้างชำระของคุณในห้องนี้ครับ! (อาจจะชำระครบแล้ว หรือไม่มีหนี้ในรอบนี้)',
+        });
+        return;
+      }
+
+      const targetDebt = pendingDebts[0];
+      const { verifyBankSlip } = await import('../services/slip-verifier');
+
+      const verification = await verifyBankSlip(
+        attachment.url,
+        targetDebt.amount,
+        targetDebt.to_promptpay,
+        targetDebt.to_bank_name || targetDebt.to_name
+      );
+
+      if (!verification.success) {
+        await interaction.editReply({
+          content: `❌ **ไม่สามารถยืนยันสลิปได้:**\n${verification.reason}`,
+        });
+        return;
+      }
+
+      // Mark paid in database
+      await repo.markSettlementPaid(targetDebt.id, attachment.url, verification.data?.transRef);
+
+      const { createSlipReceiptEmbed } = await import('../ui/embeds');
+      const { createDebtorContestRow } = await import('../ui/components');
+      const receipt = createSlipReceiptEmbed(
+        user.id,
+        targetDebt.to_user_id,
+        targetDebt.amount,
+        verification.data,
+        attachment.url
+      );
+
+      await interaction.editReply({
+        embeds: [receipt],
+        components: [createDebtorContestRow(targetDebt.id)],
+      });
+
+      // Refresh main bill in channel
+      const targetSession = await repo.getSessionById(targetDebt.session_id);
+      if (targetSession) {
+        await refreshSessionBillMessage(interaction, targetSession);
+      }
+      return;
+    }
+
+    // REMIND (Poke / Ping debtors - KhunThong style)
+    if (subcommand === 'remind') {
+      const specifiedSessionId = interaction.options.getInteger('session_id');
+      const targetSession = specifiedSessionId
+        ? await repo.getSessionById(specifiedSessionId)
+        : await repo.getLastSession(channelId);
+
+      if (!targetSession) {
+        await interaction.reply({
+          content: '❌ ไม่พบข้อมูลรอบ Poker ที่ต้องการทวงเงินครับ',
+          ephemeral: true,
+        });
+        return;
+      }
+
+      const settlements = await repo.getSessionSettlements(targetSession.id);
+      const pending = settlements.filter(s => s.status !== 'paid');
+
+      if (pending.length === 0) {
+        await interaction.reply({
+          content: `🎉 โต๊ะ Session #${targetSession.id} เคลียร์หนี้ครบทุกคนแล้ว ไม่มีใครค้างจ่ายครับ! 💚`,
+          ephemeral: true,
+        });
+        return;
+      }
+
+      const isHost = user.id === targetSession.host_id;
+      const isCreditor = pending.some(s => s.to_user_id === user.id);
+      const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild);
+
+      if (!isHost && !isCreditor && !isAdmin) {
+        await interaction.reply({
+          content: '❌ เฉพาะเจ้าหนี้ หรือ Host ประจำโต๊ะเท่านั้นที่สามารถกดสะกิดทวงเงินได้ครับ',
+          ephemeral: true,
+        });
+        return;
+      }
+
+      await interaction.deferReply();
+      const reminderCount = await repo.incrementSettlementReminder(targetSession.id);
+
+      const lines = pending.map((s, i) => {
+        return `**${i + 1}.** <@${s.from_user_id}> 👉 โอนให้ <@${s.to_user_id}> จำนวน **${s.amount.toLocaleString()} บาท**`;
+      });
+
+      const funnyReminders = [
+        'เพื่อนๆ รอเงินซื้อข้าวอยู่น้าา รีบโอนด่วนจ้าา 💸',
+        'อย่าลืมโอนน้าา โต๊ะรอบใหม่รอคุณอยู่ 🃏',
+        `ทวงรอบที่ ${reminderCount} แล้วนะเพื่อน รีบเคลียร์ให้ไวเลย! 🏃💨`,
+        'เจ้าหนี้เริ่มกินแกลบแล้วนะ ช่วยโอนหน่อยคร้าบบบ 🐟',
+      ];
+      const joke = funnyReminders[(reminderCount - 1) % funnyReminders.length];
+
+      const content =
+        `🔔 **สะกิดทวงเงินรอบ #${targetSession.id} (ขุนทอง Poker Alert 💸)**\n\n` +
+        lines.join('\n') +
+        `\n\n💡 *"${joke}"*\n*(สามารถโยนสลิปลงห้องนี้ได้เลย หรือใช้คำสั่ง \`/poker slip\` หรือกดปุ่ม [💸 แนบสลิป])*`;
+
+      await interaction.editReply({ content });
+      return;
+    }
+
+    // CONFIRM-PAID (Manual verification by creditor or host)
+    if (subcommand === 'confirm-paid') {
+      const targetPlayer = interaction.options.getUser('player', true);
+      const specifiedSessionId = interaction.options.getInteger('session_id');
+
+      const targetSession = specifiedSessionId
+        ? await repo.getSessionById(specifiedSessionId)
+        : await repo.getLastSession(channelId);
+
+      if (!targetSession) {
+        await interaction.reply({ content: '❌ ไม่พบข้อมูลรอบ Poker ครับ', ephemeral: true });
+        return;
+      }
+
+      const settlements = await repo.getSessionSettlements(targetSession.id);
+      const debt = settlements.find(
+        s => s.from_user_id === targetPlayer.id && s.to_user_id === user.id && s.status !== 'paid'
+      );
+
+      if (!debt) {
+        const isHostOrAdmin =
+          user.id === targetSession.host_id ||
+          interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild);
+
+        if (isHostOrAdmin) {
+          const anyDebt = settlements.find(
+            s => s.from_user_id === targetPlayer.id && s.status !== 'paid'
+          );
+          if (anyDebt) {
+            await repo.markSettlementPaid(anyDebt.id);
+            await interaction.reply({
+              content: `✅ Host ยืนยันการรับเงินของ <@${targetPlayer.id}> (ยอด **${anyDebt.amount.toLocaleString()}฿**) เรียบร้อยแล้ว!`,
+            });
+            await refreshSessionBillMessage(interaction, targetSession);
+            return;
+          }
+        }
+
+        await interaction.reply({
+          content: `❌ ไม่พบรายการหนี้ที่ <@${targetPlayer.id}> ต้องโอนให้คุณในรอบ #${targetSession.id} (หรืออาจจะชำระไปแล้ว)`,
+          ephemeral: true,
+        });
+        return;
+      }
+
+      await repo.markSettlementPaid(debt.id);
+      await interaction.reply({
+        content: `✅ คุณ <@${user.id}> ได้ยืนยันว่าได้รับเงิน **${debt.amount.toLocaleString()} บาท** จาก <@${targetPlayer.id}> เรียบร้อยแล้ว! [Manual Confirmation]`,
+      });
+
+      await refreshSessionBillMessage(interaction, targetSession);
       return;
     }
 
@@ -967,15 +1202,20 @@ export async function finalizeAndDisplaySummary(
     }
   }
 
-  const { createNextRoundActionRow } = await import('../ui/components');
-  const actionRow = createNextRoundActionRow(session.id, false, settlement.isBalanced);
+  const { createSettlementBillActionRows } = await import('../ui/components');
+  const actionRows = createSettlementBillActionRows(session.id, false, settlement.isBalanced);
 
+  let replyMsg: any = null;
   if (interaction.deferred && !interaction.replied) {
-    await interaction.editReply({ embeds: [embed], files, components: [actionRow] });
+    replyMsg = await interaction.editReply({ embeds: [embed], files, components: actionRows });
   } else if (interaction.replied) {
-    await interaction.followUp({ embeds: [embed], files, components: [actionRow] });
+    replyMsg = await interaction.followUp({ embeds: [embed], files, components: actionRows });
   } else {
-    await interaction.reply({ embeds: [embed], files, components: [actionRow] });
+    replyMsg = await interaction.reply({ embeds: [embed], files, components: actionRows, fetchReply: true });
+  }
+
+  if (replyMsg?.id) {
+    await repo.updateSessionMessageId(session.id, replyMsg.id);
   }
 }
 
@@ -1081,13 +1321,18 @@ export async function executeManualSettlement(
       }
     }
 
-    const { createNextRoundActionRow } = await import('../ui/components');
-    const actionRow = createNextRoundActionRow(session.id, false, settlement.isBalanced);
+    const { createSettlementBillActionRows } = await import('../ui/components');
+    const actionRows = createSettlementBillActionRows(session.id, false, settlement.isBalanced);
 
+    let replyMsg: any = null;
     if (context.replied || context.deferred) {
-      await context.editReply({ content: prefixNote, embeds: [embed], files, components: [actionRow] });
+      replyMsg = await context.editReply({ content: prefixNote, embeds: [embed], files, components: actionRows });
     } else {
-      await context.reply({ content: prefixNote, embeds: [embed], files, components: [actionRow] });
+      replyMsg = await context.reply({ content: prefixNote, embeds: [embed], files, components: actionRows, fetchReply: true });
+    }
+
+    if (replyMsg?.id) {
+      await repo.updateSessionMessageId(session.id, replyMsg.id);
     }
   } catch (err: any) {
     console.error('Failed to execute manual settlement:', err);
@@ -1097,6 +1342,54 @@ export async function executeManualSettlement(
     } else {
       await context.reply({ content: errorMsg, ephemeral: true });
     }
+  }
+}
+
+export async function refreshSessionBillMessage(context: any, session: repo.SessionRow) {
+  try {
+    if (!session.message_id) return;
+    const channel =
+      context.channel ||
+      (context.client ? await context.client.channels.fetch(session.channel_id).catch(() => null) : null);
+    if (!channel) return;
+    const msg = await channel.messages.fetch(session.message_id).catch(() => null);
+    if (!msg) return;
+
+    const players = await repo.getSessionPlayers(session.id);
+    const playerInputs = players.map(p => ({
+      userId: p.user_id,
+      name: p.display_name || p.username,
+      buyIn: p.buy_in,
+      cashOut: p.cash_out ?? 0,
+    }));
+    const { calculateSettlements } = await import('../services/settlement');
+    const settlement = calculateSettlements(playerInputs);
+
+    // Merge DB statuses
+    const dbSettlements = await repo.getSessionSettlements(session.id);
+    for (const tx of settlement.transactions) {
+      const match = dbSettlements.find(
+        s => s.from_user_id === tx.fromUserId && s.to_user_id === tx.toUserId
+      );
+      if (match) {
+        tx.id = match.id;
+        tx.status = match.status;
+      }
+    }
+
+    const ppMap: Record<string, { promptpay: string | null; qrImageUrl: string | null }> = {};
+    for (const p of players) {
+      ppMap[p.user_id] = { promptpay: p.promptpay, qrImageUrl: p.qr_image_url };
+    }
+
+    const { createSummaryEmbed } = await import('../ui/embeds');
+    const { createSettlementBillActionRows } = await import('../ui/components');
+    const embed = createSummaryEmbed(session, settlement, ppMap);
+    const actionRows = createSettlementBillActionRows(session.id, false, settlement.isBalanced);
+
+    await msg.edit({ embeds: [embed], components: actionRows });
+  } catch (err) {
+    console.warn('Failed to refresh session bill message:', err);
   }
 }
 

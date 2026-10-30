@@ -244,6 +244,122 @@ client.on('interactionCreate', async (interaction: Interaction) => {
         return;
       }
 
+      // KhunThong Debt & Slip Buttons
+      if (interaction.customId.startsWith('btn_poker_attach_slip_')) {
+        await interaction.reply({
+          content:
+            '📸 **วิธีส่งสลิปเพื่อตัดหนี้อัตโนมัติ (ทำได้ 2 วิธีง่ายๆ):**\n\n' +
+            '1. 💬 **โยนรูปสลิปลงในห้องนี้ได้ทันที!** (บอทมี AI ตรวจจับรูปสลิปและตัดหนี้ให้อัตโนมัติ)\n' +
+            '2. ⌨️ หรือพิมพ์คำสั่ง `/poker slip` แล้วแนบรูปภาพสลิปครับ',
+          ephemeral: true,
+        });
+        return;
+      }
+
+      if (interaction.customId.startsWith('btn_poker_remind_')) {
+        const parts = interaction.customId.split('_');
+        const targetSessionId = parseInt(parts[parts.length - 1], 10);
+        const targetSession = await repo.getSessionById(targetSessionId);
+        if (!targetSession) {
+          await interaction.reply({ content: '❌ ไม่พบข้อมูลรอบ Poker ครับ', ephemeral: true });
+          return;
+        }
+
+        const settlements = await repo.getSessionSettlements(targetSessionId);
+        const pending = settlements.filter(s => s.status !== 'paid');
+
+        if (pending.length === 0) {
+          await interaction.reply({
+            content: `🎉 โต๊ะ Session #${targetSessionId} เคลียร์หนี้ครบทุกคนแล้ว ไม่มีใครค้างจ่ายครับ! 💚`,
+            ephemeral: true,
+          });
+          return;
+        }
+
+        const isHost = user.id === targetSession.host_id;
+        const isCreditor = pending.some(s => s.to_user_id === user.id);
+        const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild);
+
+        if (!isHost && !isCreditor && !isAdmin) {
+          await interaction.reply({
+            content: '❌ เฉพาะเจ้าหนี้ หรือ Host ประจำโต๊ะเท่านั้นที่สามารถกดสะกิดทวงเงินได้ครับ',
+            ephemeral: true,
+          });
+          return;
+        }
+
+        await interaction.deferReply();
+        const reminderCount = await repo.incrementSettlementReminder(targetSessionId);
+
+        const lines = pending.map((s, i) => {
+          return `**${i + 1}.** <@${s.from_user_id}> 👉 โอนให้ <@${s.to_user_id}> จำนวน **${s.amount.toLocaleString()} บาท**`;
+        });
+
+        const funnyReminders = [
+          'เพื่อนๆ รอเงินซื้อข้าวอยู่น้าา รีบโอนด่วนจ้าา 💸',
+          'อย่าลืมโอนน้าา โต๊ะรอบใหม่รอคุณอยู่ 🃏',
+          `ทวงรอบที่ ${reminderCount} แล้วนะเพื่อน รีบเคลียร์ให้ไวเลย! 🏃💨`,
+          'เจ้าหนี้เริ่มกินแกลบแล้วนะ ช่วยโอนหน่อยคร้าบบบ 🐟',
+        ];
+        const joke = funnyReminders[(reminderCount - 1) % funnyReminders.length];
+
+        const content =
+          `🔔 **สะกิดทวงเงินรอบ #${targetSessionId} (ขุนทอง Poker Alert 💸)**\n\n` +
+          lines.join('\n') +
+          `\n\n💡 *"${joke}"*\n*(สามารถโยนสลิปลงห้องนี้ได้เลย หรือใช้คำสั่ง \`/poker slip\` หรือกดปุ่ม [💸 แนบสลิป])*`;
+
+        await interaction.editReply({ content });
+        return;
+      }
+
+      if (interaction.customId.startsWith('btn_poker_confirm_paid_')) {
+        const parts = interaction.customId.split('_');
+        const targetSessionId = parseInt(parts[parts.length - 1], 10);
+        const targetSession = await repo.getSessionById(targetSessionId);
+        if (!targetSession) {
+          await interaction.reply({ content: '❌ ไม่พบข้อมูลรอบ Poker ครับ', ephemeral: true });
+          return;
+        }
+
+        const settlements = await repo.getSessionSettlements(targetSessionId);
+        const isHost = user.id === targetSession.host_id;
+        const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild);
+
+        let myDebts = settlements.filter(s => s.to_user_id === user.id && s.status !== 'paid');
+        if (myDebts.length === 0 && (isHost || isAdmin)) {
+          myDebts = settlements.filter(s => s.status !== 'paid');
+        }
+
+        if (myDebts.length === 0) {
+          await interaction.reply({
+            content: '⚠️ ไม่พบรายการหนี้ค้างชำระที่ต้องจ่ายให้คุณในรอบนี้ครับ (หรืออาจจะชำระครบแล้ว)',
+            ephemeral: true,
+          });
+          return;
+        }
+
+        const debt = myDebts[0];
+        await repo.markSettlementPaid(debt.id);
+        await interaction.reply({
+          content: `✅ <@${user.id}> ได้ยืนยันว่าได้รับเงิน **${debt.amount.toLocaleString()} บาท** จาก <@${debt.from_user_id}> เรียบร้อยแล้ว!`,
+        });
+
+        const { refreshSessionBillMessage } = await import('./commands/poker');
+        await refreshSessionBillMessage(interaction, targetSession);
+        return;
+      }
+
+      if (interaction.customId.startsWith('btn_poker_unpay_')) {
+        const parts = interaction.customId.split('_');
+        const settlementId = parseInt(parts[parts.length - 1], 10);
+
+        await repo.revertSettlementPaid(settlementId);
+        await interaction.reply({
+          content: `⚠️ <@${user.id}> ได้ยกเลิกสถานะการชำระเงินของสลิปนี้แล้ว ยอดหนี้ถูกปรับกลับเป็น **[⏳ รอชำระ]** เรียบร้อยครับ`,
+        });
+        return;
+      }
+
       const session = await repo.getActiveSession(channelId);
 
       if (!session) {
@@ -825,6 +941,73 @@ client.on('interactionCreate', async (interaction: Interaction) => {
     } catch (replyErr) {
       console.error('Failed to send error reply:', replyErr);
     }
+  }
+});
+
+// Auto-detect slips sent directly into chat (KhunThong style)
+client.on('messageCreate', async (message: Message) => {
+  try {
+    if (message.author.bot || !message.guild) return;
+
+    // Check for image attachments
+    const imageAttachment = message.attachments.find(a => a.contentType?.startsWith('image/'));
+    if (!imageAttachment) return;
+
+    // Check if the author owes any pending debts in this channel
+    const pendingDebts = await repo.getPendingSettlementsForUser(message.author.id, message.channelId);
+    if (!pendingDebts || pendingDebts.length === 0) return; // User has no debts here, ignore silently!
+
+    // React with 🔍 to indicate bot is inspecting slip
+    await message.react('🔍').catch(() => {});
+
+    const targetDebt = pendingDebts[0];
+    const { verifyBankSlip } = await import('./services/slip-verifier');
+
+    const verification = await verifyBankSlip(
+      imageAttachment.url,
+      targetDebt.amount,
+      targetDebt.to_promptpay,
+      targetDebt.to_bank_name || targetDebt.to_name
+    );
+
+    // Remove 🔍
+    await message.reactions.removeAll().catch(() => {});
+
+    if (verification.success) {
+      await message.react('✅').catch(() => {});
+      await repo.markSettlementPaid(targetDebt.id, imageAttachment.url, verification.data?.transRef);
+
+      const { createSlipReceiptEmbed } = await import('./ui/embeds');
+      const { createDebtorContestRow } = await import('./ui/components');
+      const receipt = createSlipReceiptEmbed(
+        message.author.id,
+        targetDebt.to_user_id,
+        targetDebt.amount,
+        verification.data,
+        imageAttachment.url
+      );
+
+      await message.reply({
+        embeds: [receipt],
+        components: [createDebtorContestRow(targetDebt.id)],
+      });
+
+      const session = await repo.getSessionById(targetDebt.session_id);
+      if (session) {
+        const { refreshSessionBillMessage } = await import('./commands/poker');
+        await refreshSessionBillMessage({ channel: message.channel, client }, session);
+      }
+    } else {
+      if (verification.isSlip) {
+        // Recognized as a bank slip, but amount or recipient mismatched
+        await message.react('⚠️').catch(() => {});
+        await message.reply({
+          content: `⚠️ **ตรวจพบสลิปโอนเงิน แต่ไม่สามารถตัดหนี้ได้:**\n${verification.reason}\n*(หากต้องการตรวจใหม่ กรุณาแนบรูปใหม่อีกครั้ง หรือให้เจ้าหนี้กดยืนยันด้วยมือ)*`,
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('Auto-slip detection error:', err);
   }
 });
 

@@ -1,8 +1,43 @@
 import { getSupabase } from './supabase';
-import { UserRow, SessionRow, SessionPlayerRow, UserStats, RankedPlayerStats, ManualPlayerEntry } from './repo';
+import {
+  UserRow,
+  SessionRow,
+  SessionPlayerRow,
+  UserStats,
+  RankedPlayerStats,
+  ManualPlayerEntry,
+  SettlementRow,
+} from './repo';
 import { calculateSettlements, SettlementResult } from '../services/settlement';
 import fs from 'fs';
 import path from 'path';
+
+let hasSettlementStatusCol: boolean | null = null;
+let hasUserBankNameCol: boolean | null = null;
+
+export async function checkSettlementStatusCol(): Promise<boolean> {
+  if (hasSettlementStatusCol !== null) return hasSettlementStatusCol;
+  try {
+    const sb = getSupabase();
+    const { error } = await sb.from('settlements').select('status').limit(1);
+    hasSettlementStatusCol = !error;
+  } catch {
+    hasSettlementStatusCol = false;
+  }
+  return hasSettlementStatusCol;
+}
+
+export async function checkUserBankNameCol(): Promise<boolean> {
+  if (hasUserBankNameCol !== null) return hasUserBankNameCol;
+  try {
+    const sb = getSupabase();
+    const { error } = await sb.from('users').select('bank_name').limit(1);
+    hasUserBankNameCol = !error;
+  } catch {
+    hasUserBankNameCol = false;
+  }
+  return hasUserBankNameCol;
+}
 
 export async function upsertUser(id: string, username: string, displayName?: string | null): Promise<void> {
   const supabase = getSupabase();
@@ -45,6 +80,20 @@ export async function setUserQrImage(userId: string, qrImageUrl: string): Promis
 export async function clearUserQrImage(userId: string): Promise<void> {
   const supabase = getSupabase();
   await supabase.from('users').update({ qr_image_url: null }).eq('id', userId);
+}
+
+export async function setUserBankName(userId: string, bankName: string): Promise<void> {
+  const supabase = getSupabase();
+  const hasCol = await checkUserBankNameCol();
+  if (!hasCol) return;
+  await supabase.from('users').update({ bank_name: bankName }).eq('id', userId);
+}
+
+export async function clearUserBankName(userId: string): Promise<void> {
+  const supabase = getSupabase();
+  const hasCol = await checkUserBankNameCol();
+  if (!hasCol) return;
+  await supabase.from('users').update({ bank_name: null }).eq('id', userId);
 }
 
 export async function getActiveSession(channelId: string): Promise<SessionRow | undefined> {
@@ -380,13 +429,28 @@ export async function finalizeSession(
   await supabase.from('settlements').delete().eq('session_id', sessionId);
 
   if (settlement.transactions.length > 0) {
-    const records = settlement.transactions.map(tx => ({
-      session_id: sessionId,
-      from_user_id: tx.fromUserId,
-      to_user_id: tx.toUserId,
-      amount: tx.amount,
-    }));
-    await supabase.from('settlements').insert(records);
+    const hasStatus = await checkSettlementStatusCol();
+    const records = settlement.transactions.map(tx => {
+      const row: any = {
+        session_id: sessionId,
+        from_user_id: tx.fromUserId,
+        to_user_id: tx.toUserId,
+        amount: tx.amount,
+      };
+      if (hasStatus) {
+        row.status = 'pending';
+      }
+      return row;
+    });
+    const { data: inserted } = await supabase.from('settlements').insert(records).select();
+    if (inserted) {
+      inserted.forEach((row: any, i: number) => {
+        if (settlement.transactions[i]) {
+          settlement.transactions[i].id = row.id;
+          settlement.transactions[i].status = row.status || 'pending';
+        }
+      });
+    }
   }
 
   const now = new Date().toISOString();
@@ -481,17 +545,196 @@ export async function saveOrUpdateManualSession(
   const settlement = calculateSettlements(playerInputs);
 
   if (settlement.transactions.length > 0) {
-    const txRows = settlement.transactions.map(tx => ({
-      session_id: sessionId,
-      from_user_id: tx.fromUserId,
-      to_user_id: tx.toUserId,
-      amount: tx.amount,
-      created_at: now,
-    }));
-    await supabase.from('settlements').insert(txRows);
+    const hasStatus = await checkSettlementStatusCol();
+    const txRows = settlement.transactions.map(tx => {
+      const row: any = {
+        session_id: sessionId,
+        from_user_id: tx.fromUserId,
+        to_user_id: tx.toUserId,
+        amount: tx.amount,
+        created_at: now,
+      };
+      if (hasStatus) {
+        row.status = 'pending';
+      }
+      return row;
+    });
+    const { data: inserted } = await supabase.from('settlements').insert(txRows).select();
+    if (inserted) {
+      inserted.forEach((row: any, i: number) => {
+        if (settlement.transactions[i]) {
+          settlement.transactions[i].id = row.id;
+          settlement.transactions[i].status = row.status || 'pending';
+        }
+      });
+    }
   }
 
   return { settlement, session };
+}
+
+// Settlement Operations & KhunThong Debt Tracking
+export async function getSessionSettlements(sessionId: number): Promise<SettlementRow[]> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('settlements')
+    .select('*')
+    .eq('session_id', sessionId)
+    .order('id', { ascending: true });
+
+  if (error || !data) return [];
+
+  const userIds = new Set<string>();
+  data.forEach((r: any) => {
+    userIds.add(r.from_user_id);
+    userIds.add(r.to_user_id);
+  });
+
+  const { data: users } = await supabase
+    .from('users')
+    .select('id, username, display_name, promptpay, qr_image_url, bank_name')
+    .in('id', Array.from(userIds));
+
+  const userMap = new Map((users || []).map((u: any) => [u.id, u]));
+
+  return data.map((r: any) => {
+    const fromUser = userMap.get(r.from_user_id);
+    const toUser = userMap.get(r.to_user_id);
+    return {
+      ...r,
+      status: r.status || 'pending',
+      from_name: fromUser ? (fromUser.display_name || fromUser.username) : r.from_user_id,
+      to_name: toUser ? (toUser.display_name || toUser.username) : r.to_user_id,
+      to_promptpay: toUser?.promptpay || null,
+      to_bank_name: toUser?.bank_name || null,
+    };
+  });
+}
+
+export async function getPendingSettlementsForUser(
+  userId: string,
+  channelId?: string
+): Promise<SettlementRow[]> {
+  const supabase = getSupabase();
+  const hasStatus = await checkSettlementStatusCol();
+
+  let query = supabase.from('settlements').select('*').eq('from_user_id', userId);
+  if (hasStatus) {
+    query = query.neq('status', 'paid');
+  }
+
+  const { data, error } = await query;
+  if (error || !data || data.length === 0) return [];
+
+  let filteredData = data;
+  if (channelId) {
+    const sessionIds = Array.from(new Set(data.map((r: any) => r.session_id)));
+    if (sessionIds.length > 0) {
+      const { data: channelSessions } = await supabase
+        .from('sessions')
+        .select('id')
+        .eq('channel_id', channelId)
+        .in('id', sessionIds);
+      const validSessionIds = new Set((channelSessions || []).map((s: any) => s.id));
+      filteredData = data.filter((r: any) => validSessionIds.has(r.session_id));
+    }
+  }
+
+  const userIds = new Set<string>();
+  filteredData.forEach((r: any) => {
+    userIds.add(r.from_user_id);
+    userIds.add(r.to_user_id);
+  });
+
+  const { data: users } = await supabase
+    .from('users')
+    .select('id, username, display_name, promptpay, qr_image_url, bank_name')
+    .in('id', Array.from(userIds));
+
+  const userMap = new Map((users || []).map((u: any) => [u.id, u]));
+
+  return filteredData.map((r: any) => {
+    const fromUser = userMap.get(r.from_user_id);
+    const toUser = userMap.get(r.to_user_id);
+    return {
+      ...r,
+      status: r.status || 'pending',
+      from_name: fromUser ? (fromUser.display_name || fromUser.username) : r.from_user_id,
+      to_name: toUser ? (toUser.display_name || toUser.username) : r.to_user_id,
+      to_promptpay: toUser?.promptpay || null,
+      to_bank_name: toUser?.bank_name || null,
+    };
+  });
+}
+
+export async function markSettlementPaid(
+  settlementId: number,
+  slipUrl?: string,
+  transRef?: string
+): Promise<boolean> {
+  const supabase = getSupabase();
+  const hasStatus = await checkSettlementStatusCol();
+  if (!hasStatus) {
+    console.warn('Note: settlements.status column missing in Supabase, update skipped.');
+    return true;
+  }
+
+  const payload: any = {
+    status: 'paid',
+    paid_at: new Date().toISOString(),
+  };
+  if (slipUrl) payload.slip_url = slipUrl;
+  if (transRef) payload.trans_ref = transRef;
+
+  const { error } = await supabase.from('settlements').update(payload).eq('id', settlementId);
+  return !error;
+}
+
+export async function revertSettlementPaid(settlementId: number): Promise<boolean> {
+  const supabase = getSupabase();
+  const hasStatus = await checkSettlementStatusCol();
+  if (!hasStatus) return true;
+
+  const { error } = await supabase
+    .from('settlements')
+    .update({ status: 'pending', paid_at: null })
+    .eq('id', settlementId);
+  return !error;
+}
+
+export async function isTransRefUsed(transRef: string): Promise<boolean> {
+  if (!transRef || transRef.trim().length === 0) return false;
+  const supabase = getSupabase();
+  const hasStatus = await checkSettlementStatusCol();
+  if (!hasStatus) return false;
+
+  const { count } = await supabase
+    .from('settlements')
+    .select('*', { count: 'exact', head: true })
+    .eq('trans_ref', transRef.trim());
+  return !!(count && count > 0);
+}
+
+export async function incrementSettlementReminder(sessionId: number): Promise<number> {
+  const supabase = getSupabase();
+  const hasStatus = await checkSettlementStatusCol();
+  if (!hasStatus) return 1;
+
+  const { data } = await supabase
+    .from('settlements')
+    .select('id, reminder_count')
+    .eq('session_id', sessionId)
+    .neq('status', 'paid');
+
+  let maxReminders = 1;
+  if (data && data.length > 0) {
+    for (const item of data) {
+      const nextCount = (item.reminder_count || 0) + 1;
+      maxReminders = Math.max(maxReminders, nextCount);
+      await supabase.from('settlements').update({ reminder_count: nextCount }).eq('id', item.id);
+    }
+  }
+  return maxReminders;
 }
 
 export async function getUserStats(userId: string): Promise<UserStats> {

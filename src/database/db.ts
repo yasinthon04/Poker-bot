@@ -5,6 +5,7 @@ export interface UserRecord {
   id: string;
   username: string;
   display_name: string | null;
+  bank_name?: string | null;
   promptpay: string | null;
   qr_image_url: string | null;
   created_at: string;
@@ -39,6 +40,11 @@ export interface SettlementRecord {
   from_user_id: string;
   to_user_id: string;
   amount: number;
+  status: 'pending' | 'paid';
+  slip_url?: string | null;
+  trans_ref?: string | null;
+  paid_at?: string | null;
+  reminder_count?: number;
   created_at: string;
 }
 

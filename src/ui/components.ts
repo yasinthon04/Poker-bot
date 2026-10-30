@@ -139,6 +139,58 @@ export function createPreviewSessionModal(
   return modal;
 }
 
+export function createSettlementBillActionRows(
+  sessionId: number,
+  disabled: boolean = false,
+  isBalanced: boolean = true
+): ActionRowBuilder<ButtonBuilder>[] {
+  const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`btn_poker_attach_slip_${sessionId}`)
+      .setLabel('💸 แนบสลิปโอนเงิน')
+      .setStyle(ButtonStyle.Success)
+      .setDisabled(disabled),
+    new ButtonBuilder()
+      .setCustomId(`btn_poker_remind_${sessionId}`)
+      .setLabel('🔔 สะกิดทวงเงิน')
+      .setStyle(ButtonStyle.Primary)
+      .setDisabled(disabled),
+    new ButtonBuilder()
+      .setCustomId(`btn_poker_confirm_paid_${sessionId}`)
+      .setLabel('✅ ได้รับเงินแล้ว (Manual)')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(disabled)
+  );
+
+  const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`btn_poker_edit_${sessionId}`)
+      .setLabel(isBalanced ? '✏️ แก้ไขยอดเงิน (Edit)' : '⚠️ แก้ไขยอดเงิน (ไม่บาลานซ์)')
+      .setStyle(isBalanced ? ButtonStyle.Secondary : ButtonStyle.Danger)
+      .setDisabled(disabled),
+    new ButtonBuilder()
+      .setCustomId(`btn_poker_next_round_${sessionId}`)
+      .setLabel('🔄 เริ่มรอบใหม่')
+      .setStyle(ButtonStyle.Success)
+      .setDisabled(disabled),
+    new ButtonBuilder()
+      .setCustomId('btn_poker_leaderboard')
+      .setLabel('🏆 ดูอันดับ')
+      .setStyle(ButtonStyle.Secondary)
+  );
+
+  return [row1, row2];
+}
+
+export function createDebtorContestRow(settlementId: number): ActionRowBuilder<ButtonBuilder> {
+  return new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`btn_poker_unpay_${settlementId}`)
+      .setLabel('❌ เงินไม่เข้า (ยกเลิกการชำระ)')
+      .setStyle(ButtonStyle.Danger)
+  );
+}
+
 export function createNextRoundActionRow(
   sessionId: number,
   disabled: boolean = false,

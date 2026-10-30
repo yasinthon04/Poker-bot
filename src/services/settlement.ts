@@ -8,11 +8,15 @@ export interface PlayerBalance {
 }
 
 export interface SettlementTransaction {
+  id?: number;
   fromUserId: string;
   fromName: string;
   toUserId: string;
   toName: string;
   amount: number;
+  status?: 'pending' | 'paid';
+  slipUrl?: string | null;
+  paidAt?: string | null;
 }
 
 export interface SettlementResult {

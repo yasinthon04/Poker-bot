@@ -118,13 +118,29 @@ export function createSummaryEmbed(
         : tx.toUserId.startsWith('guest_')
         ? `👤 **${tx.toName}**`
         : `<@${tx.toUserId}>`;
-      return `**${idx + 1}.** ${fromLabel} โอนให้ ${toLabel} 👉 **${tx.amount.toLocaleString()} บาท**${ppText}`;
+      let statusBadge = '';
+      if (!isPreview) {
+        statusBadge = tx.status === 'paid' ? ' `[✅ จ่ายแล้ว]`' : ' `[⏳ รอชำระ]`';
+      }
+      return `**${idx + 1}.** ${fromLabel} โอนให้ ${toLabel} 👉 **${tx.amount.toLocaleString()} บาท**${statusBadge}${ppText}`;
     });
 
+    const allPaid = !isPreview && settlement.transactions.length > 0 && settlement.transactions.every(t => t.status === 'paid');
+
     embed.addFields({
-      name: isPreview ? '💸 รายการโอนเงิน (โต๊ะยังไม่ปิด)' : '💸 รายการโอนเงิน (เคลียร์หนี้ให้น้อยรอบที่สุด)',
+      name: isPreview
+        ? '💸 รายการโอนเงิน (โต๊ะยังไม่ปิด)'
+        : allPaid
+        ? '💸 รายการโอนเงิน (✅ ชำระครบทุกคนแล้ว)'
+        : '💸 รายการโอนเงิน (ขุนทอง Debt Tracker)',
       value: txLines.join('\n\n'),
     });
+
+    if (allPaid) {
+      embed.setDescription(
+        ((embed.data.description || '') + '\n\n🎉 **ทุกคนชำระเงินครบถ้วนแล้ว 100%!** เคลียร์บิลเรียบร้อย 💚').trim()
+      );
+    }
   } else {
     embed.addFields({
       name: '💸 รายการโอนเงิน',
@@ -147,6 +163,56 @@ export function createSummaryEmbed(
     });
   }
 
+  embed.setTimestamp();
+  return embed;
+}
+
+export function createSlipReceiptEmbed(
+  fromUserId: string,
+  toUserId: string,
+  amount: number,
+  slipData?: any,
+  slipImageUrl?: string
+): EmbedBuilder {
+  const embed = new EmbedBuilder()
+    .setTitle('🧾 ตรวจพบสลิปโอนเงินสำเร็จ')
+    .setColor(0x2ecc71)
+    .setDescription(
+      `🎉 <@${fromUserId}> ได้โอนเงินให้ <@${toUserId}> เรียบร้อยแล้ว!\nระบบได้ตัดหนี้และอัปเดตสถานะบิลเป็น **[✅ จ่ายแล้ว]** ทันที`
+    )
+    .addFields(
+      { name: '💸 ยอดเงินโอน', value: `**${amount.toLocaleString()} บาท**`, inline: true },
+      {
+        name: '👤 ผู้โอน',
+        value: `<@${fromUserId}>${slipData?.senderName ? `\n*(${slipData.senderName})*` : ''}`,
+        inline: true,
+      },
+      {
+        name: '🎯 ปลายทาง',
+        value: `<@${toUserId}>${slipData?.recipientName ? `\n*(${slipData.recipientName})*` : ''}`,
+        inline: true,
+      }
+    );
+
+  if (slipData?.bankName || slipData?.transRef || slipData?.transDate) {
+    const details = [
+      slipData?.bankName ? `• ธนาคาร: **${slipData.bankName}**` : '',
+      slipData?.transRef ? `• รหัสอ้างอิง: \`${slipData.transRef}\`` : '',
+      slipData?.transDate ? `• วันเวลา: \`${slipData.transDate} ${slipData.transTime || ''}\`` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    if (details) {
+      embed.addFields({ name: '📑 ข้อมูลในสลิป', value: details });
+    }
+  }
+
+  if (slipImageUrl) {
+    embed.setThumbnail(slipImageUrl);
+  }
+
+  embed.setFooter({ text: '🤖 ตรวจสอบด้วย AI Vision • หากเงินไม่เข้าจริง เจ้าหนี้สามารถกดยกเลิกได้' });
   embed.setTimestamp();
   return embed;
 }
