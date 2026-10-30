@@ -335,7 +335,11 @@ export const pokerCommand = {
       const attachment = interaction.options.getAttachment('image', true);
       const specifiedSessionId = interaction.options.getInteger('session_id');
 
-      if (!attachment.contentType?.startsWith('image/')) {
+      const isImage =
+        attachment.contentType?.startsWith('image/') ||
+        /\.(png|jpe?g|webp|gif|heic)$/i.test(attachment.name || '');
+
+      if (!isImage) {
         await interaction.reply({
           content: '❌ ไฟล์ที่แนบต้องเป็นรูปภาพสลิปโอนเงินเท่านั้นครับ (PNG, JPG, WEBP)',
           ephemeral: true,
@@ -347,6 +351,9 @@ export const pokerCommand = {
 
       // Look up pending debt for this user
       let pendingDebts = await repo.getPendingSettlementsForUser(user.id, channelId);
+      if (pendingDebts.length === 0) {
+        pendingDebts = await repo.getPendingSettlementsForUser(user.id);
+      }
       if (specifiedSessionId) {
         pendingDebts = pendingDebts.filter(d => d.session_id === specifiedSessionId);
       }
@@ -358,22 +365,17 @@ export const pokerCommand = {
         return;
       }
 
-      const targetDebt = pendingDebts[0];
-      const { verifyBankSlip } = await import('../services/slip-verifier');
+      const { verifyAndMatchSlip } = await import('../services/slip-verifier');
+      const verification = await verifyAndMatchSlip(attachment.url, pendingDebts);
 
-      const verification = await verifyBankSlip(
-        attachment.url,
-        targetDebt.amount,
-        targetDebt.to_promptpay,
-        targetDebt.to_bank_name || targetDebt.to_name
-      );
-
-      if (!verification.success) {
+      if (!verification.success || !verification.matchedDebt) {
         await interaction.editReply({
           content: `❌ **ไม่สามารถยืนยันสลิปได้:**\n${verification.reason}`,
         });
         return;
       }
+
+      const targetDebt = verification.matchedDebt;
 
       // Mark paid in database
       await repo.markSettlementPaid(targetDebt.id, attachment.url, verification.data?.transRef);

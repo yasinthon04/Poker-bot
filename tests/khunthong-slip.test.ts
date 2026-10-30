@@ -168,4 +168,50 @@ describe('KhunThong Debt Tracking & Slip Verification Engine', () => {
     assert.strictEqual(resMeme.success, false);
     assert.strictEqual(resMeme.isSlip, false);
   });
+
+  test('verifyAndMatchSlip matches the correct debt when debtor owes multiple people', async () => {
+    const mockDebts: any[] = [
+      {
+        id: 101,
+        session_id: 1,
+        from_user_id: 'debtor_1',
+        to_user_id: 'creditor_chii',
+        amount: 65,
+        status: 'pending',
+        to_name: 'Chii',
+      },
+      {
+        id: 102,
+        session_id: 1,
+        from_user_id: 'debtor_1',
+        to_user_id: 'creditor_ploy',
+        amount: 35,
+        status: 'pending',
+        to_name: 'P.ploy',
+      },
+    ];
+
+    // Mock slip for 35฿
+    setMockSlipVerifier(async () => {
+      return {
+        success: true,
+        isSlip: true,
+        reason: 'สลิปถูกต้อง',
+        data: {
+          isBankSlip: true,
+          transAmount: 35,
+          bankName: 'KBANK',
+          recipientName: 'นางสาว สุกัญญา ปรีสิทธิ์',
+          transRef: 'REF35',
+        },
+      };
+    });
+
+    const { verifyAndMatchSlip } = await import('../src/services/slip-verifier');
+    const res35 = await verifyAndMatchSlip('http://slip35.png', mockDebts);
+    assert.strictEqual(res35.success, true);
+    assert.strictEqual(res35.matchedDebt?.id, 102);
+    assert.strictEqual(res35.matchedDebt?.to_user_id, 'creditor_ploy');
+  });
 });
+

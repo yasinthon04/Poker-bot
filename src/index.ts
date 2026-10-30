@@ -949,31 +949,30 @@ client.on('messageCreate', async (message: Message) => {
   try {
     if (message.author.bot || !message.guild) return;
 
-    // Check for image attachments
-    const imageAttachment = message.attachments.find(a => a.contentType?.startsWith('image/'));
+    // Check for image attachments (by contentType or extension)
+    const imageAttachment = message.attachments.find(
+      a => a.contentType?.startsWith('image/') || /\.(png|jpe?g|webp|gif|heic)$/i.test(a.name || '')
+    );
     if (!imageAttachment) return;
 
-    // Check if the author owes any pending debts in this channel
-    const pendingDebts = await repo.getPendingSettlementsForUser(message.author.id, message.channelId);
+    // Check if the author owes any pending debts in this channel or guild
+    let pendingDebts = await repo.getPendingSettlementsForUser(message.author.id, message.channelId);
+    if (!pendingDebts || pendingDebts.length === 0) {
+      pendingDebts = await repo.getPendingSettlementsForUser(message.author.id);
+    }
     if (!pendingDebts || pendingDebts.length === 0) return; // User has no debts here, ignore silently!
 
     // React with 🔍 to indicate bot is inspecting slip
     await message.react('🔍').catch(() => {});
 
-    const targetDebt = pendingDebts[0];
-    const { verifyBankSlip } = await import('./services/slip-verifier');
+    const { verifyAndMatchSlip } = await import('./services/slip-verifier');
+    const verification = await verifyAndMatchSlip(imageAttachment.url, pendingDebts);
 
-    const verification = await verifyBankSlip(
-      imageAttachment.url,
-      targetDebt.amount,
-      targetDebt.to_promptpay,
-      targetDebt.to_bank_name || targetDebt.to_name
-    );
+    // Remove bot's own 🔍 reaction
+    await message.reactions.resolve('🔍')?.users.remove(client.user?.id).catch(() => {});
 
-    // Remove 🔍
-    await message.reactions.removeAll().catch(() => {});
-
-    if (verification.success) {
+    if (verification.success && verification.matchedDebt) {
+      const targetDebt = verification.matchedDebt;
       await message.react('✅').catch(() => {});
       await repo.markSettlementPaid(targetDebt.id, imageAttachment.url, verification.data?.transRef);
 

@@ -1,5 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
-import { isTransRefUsed } from '../database/repo';
+import { isTransRefUsed, SettlementRow } from '../database/repo';
 
 export interface SlipData {
   isBankSlip: boolean;
@@ -42,6 +42,7 @@ function isPromptPayMatch(slipPromptPay?: string, expectedPromptPay?: string): b
   if (!slipPromptPay || !expectedPromptPay) return false;
   const cleanExpected = cleanDigits(expectedPromptPay);
   const cleanSlip = cleanDigits(slipPromptPay);
+  if (!cleanExpected || !cleanSlip) return false;
 
   // Exact match
   if (cleanExpected === cleanSlip) return true;
@@ -61,26 +62,16 @@ function isPromptPayMatch(slipPromptPay?: string, expectedPromptPay?: string): b
  */
 function isNameMatch(slipName?: string, expectedName?: string): boolean {
   if (!slipName || !expectedName) return false;
-  const s = slipName.toLowerCase().replace(/นาย|นางสาว|นาง|mr\.|mrs\.|ms\./gi, '').trim();
-  const e = expectedName.toLowerCase().replace(/นาย|นางสาว|นาง|mr\.|mrs\.|ms\./gi, '').trim();
+  const s = slipName.toLowerCase().replace(/นาย|นางสาว|นาง|น\.ส\.|ด\.ช\.|ด\.ญ\.|mr\.|mrs\.|ms\./gi, '').replace(/\s+/g, '').trim();
+  const e = expectedName.toLowerCase().replace(/นาย|นางสาว|นาง|น\.ส\.|ด\.ช\.|ด\.ญ\.|mr\.|mrs\.|ms\./gi, '').replace(/\s+/g, '').trim();
   if (s.length === 0 || e.length === 0) return false;
   return s.includes(e) || e.includes(s);
 }
 
 /**
- * Verifies a bank transfer slip image using Gemini Vision AI
+ * Extract bank slip details using Gemini Vision AI
  */
-export async function verifyBankSlip(
-  imageUrl: string,
-  expectedAmount: number,
-  expectedRecipientPromptPay?: string | null,
-  expectedRecipientName?: string | null,
-  expectedSenderRealName?: string | null
-): Promise<SlipVerificationResult> {
-  if (mockSlipVerifier) {
-    return await mockSlipVerifier(imageUrl, expectedAmount);
-  }
-
+export async function extractSlipData(imageUrl: string): Promise<SlipData> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey || apiKey === 'your_gemini_api_key_here') {
     throw new Error('GEMINI_API_KEY is not configured in .env');
@@ -89,11 +80,7 @@ export async function verifyBankSlip(
   // 1. Download image
   const response = await fetch(imageUrl);
   if (!response.ok) {
-    return {
-      success: false,
-      isSlip: false,
-      reason: `ไม่สามารถดาวน์โหลดรูปภาพได้ (${response.statusText})`,
-    };
+    throw new Error(`ไม่สามารถดาวน์โหลดรูปภาพได้ (${response.statusText})`);
   }
   const arrayBuffer = await response.arrayBuffer();
   const base64Data = Buffer.from(arrayBuffer).toString('base64');
@@ -134,10 +121,11 @@ Return ONLY a valid JSON object matching this structure:
 
   const modelsToTry = [
     process.env.GEMINI_MODEL,
-    'gemini-2.5-flash',
+    'gemini-3.5-flash-lite',
+    'gemini-flash-lite-latest',
+    'gemini-3.5-flash',
+    'gemini-3.8-flash',
     'gemini-flash-latest',
-    'gemini-2.5-flash-lite',
-    'gemini-2.0-flash',
   ].filter(Boolean) as string[];
 
   let parsed: SlipData | null = null;
@@ -187,14 +175,42 @@ Return ONLY a valid JSON object matching this structure:
   }
 
   if (!parsed) {
-    return {
-      success: false,
-      isSlip: false,
-      reason: `เกิดข้อผิดพลาดในการวิเคราะห์สลิป: ${lastError?.message || 'AI ไม่สามารถประมวลผลรูปได้'}`,
-    };
+    throw new Error(lastError?.message || 'AI ไม่สามารถประมวลผลรูปได้');
   }
 
-  // 3. Validation Logic
+  return parsed;
+}
+
+/**
+ * Verifies and automatically matches a bank transfer slip against a list of pending debts
+ */
+export async function verifyAndMatchSlip(
+  imageUrl: string,
+  pendingDebts: SettlementRow[]
+): Promise<SlipVerificationResult & { matchedDebt?: SettlementRow }> {
+  let parsed: SlipData;
+  if (mockSlipVerifier) {
+    const expected = pendingDebts[0]?.amount || 0;
+    const res = await mockSlipVerifier(imageUrl, expected);
+    if (!res.isSlip || !res.data) {
+      return {
+        ...res,
+        matchedDebt: pendingDebts[0],
+      };
+    }
+    parsed = res.data;
+  } else {
+    try {
+      parsed = await extractSlipData(imageUrl);
+    } catch (err: any) {
+      return {
+        success: false,
+        isSlip: false,
+        reason: `เกิดข้อผิดพลาดในการวิเคราะห์สลิป: ${err.message || 'AI ไม่สามารถประมวลผลรูปได้'}`,
+      };
+    }
+  }
+
   if (!parsed.isBankSlip || parsed.transAmount === undefined || parsed.transAmount === null) {
     return {
       success: false,
@@ -204,18 +220,7 @@ Return ONLY a valid JSON object matching this structure:
     };
   }
 
-  // Check Amount (Allow float precision variance within 0.5 THB)
-  const amountDiff = parsed.transAmount - expectedAmount;
-  if (amountDiff < -0.5) {
-    return {
-      success: false,
-      isSlip: true,
-      reason: `ยอดเงินในสลิป (**${parsed.transAmount.toLocaleString()}฿**) น้อยกว่ายอดหนี้ที่ต้องชำระ (**${expectedAmount.toLocaleString()}฿**)`,
-      data: parsed,
-    };
-  }
-
-  // Check Trans Ref (Duplicate protection)
+  // Duplicate Trans Ref check
   if (parsed.transRef) {
     const isUsed = await isTransRefUsed(parsed.transRef);
     if (isUsed) {
@@ -228,19 +233,65 @@ Return ONLY a valid JSON object matching this structure:
     }
   }
 
-  // Check Recipient (PromptPay or Name matching)
-  if (expectedRecipientPromptPay || expectedRecipientName) {
-    const ppMatch = isPromptPayMatch(parsed.recipientPromptPay, expectedRecipientPromptPay || undefined);
-    const nameMatch = isNameMatch(parsed.recipientName, expectedRecipientName || undefined);
+  if (pendingDebts.length === 0) {
+    return {
+      success: false,
+      isSlip: true,
+      reason: 'ไม่พบรายการหนี้ค้างชำระของคุณในระบบครับ',
+      data: parsed,
+    };
+  }
 
-    // If both promptpay and name are present on slip, at least one should match
+  // Match best debt from pending debts
+  let bestDebt: SettlementRow | null = null;
+  const amountMatches = pendingDebts.filter(d => Math.abs(d.amount - (parsed.transAmount || 0)) <= 0.5);
+
+  if (amountMatches.length === 1) {
+    bestDebt = amountMatches[0];
+  } else if (amountMatches.length > 1) {
+    // If multiple debts have the exact same amount, try matching recipient
+    bestDebt =
+      amountMatches.find(d => {
+        const pp = isPromptPayMatch(parsed.recipientPromptPay, d.to_promptpay || undefined);
+        const name = isNameMatch(parsed.recipientName, d.to_bank_name || d.to_name);
+        return pp || name;
+      }) || amountMatches[0];
+  } else {
+    // No exact amount match. Check if slip amount is >= some debt amount
+    const partialMatches = pendingDebts.filter(d => (parsed.transAmount || 0) >= d.amount);
+    if (partialMatches.length > 0) {
+      bestDebt = partialMatches[0];
+    } else {
+      bestDebt = pendingDebts[0];
+    }
+  }
+
+  // Validate against the chosen debt
+  const amountDiff = (parsed.transAmount || 0) - bestDebt.amount;
+  if (amountDiff < -0.5) {
+    const pendingListStr = pendingDebts.map(d => `${d.amount.toLocaleString()}฿ ให้ <@${d.to_user_id}>`).join(', ');
+    return {
+      success: false,
+      isSlip: true,
+      reason: `ยอดเงินในสลิป (**${parsed.transAmount.toLocaleString()}฿**) น้อยกว่ายอดหนี้ที่ต้องชำระ (**${bestDebt.amount.toLocaleString()}฿**)\n*(รายการหนี้ที่ค้าง: ${pendingListStr})*`,
+      data: parsed,
+      matchedDebt: bestDebt,
+    };
+  }
+
+  // Check Recipient match if creditor has configured promptpay or bank_name
+  if (bestDebt.to_promptpay || bestDebt.to_bank_name) {
+    const ppMatch = isPromptPayMatch(parsed.recipientPromptPay, bestDebt.to_promptpay || undefined);
+    const nameMatch = isNameMatch(parsed.recipientName, bestDebt.to_bank_name || undefined);
+
     if (parsed.recipientPromptPay || parsed.recipientName) {
       if (!ppMatch && !nameMatch) {
         return {
           success: false,
           isSlip: true,
-          reason: `ปลายทางในสลิป (${parsed.recipientName || parsed.recipientPromptPay || 'ไม่ระบุ'}) ไม่ตรงกับเจ้าหนี้ (${expectedRecipientName || expectedRecipientPromptPay})`,
+          reason: `ปลายทางในสลิป (${parsed.recipientName || parsed.recipientPromptPay || 'ไม่ระบุ'}) ไม่ตรงกับเจ้าหนี้ <@${bestDebt.to_user_id}> (${bestDebt.to_bank_name || bestDebt.to_promptpay})`,
           data: parsed,
+          matchedDebt: bestDebt,
         };
       }
     }
@@ -249,7 +300,32 @@ Return ONLY a valid JSON object matching this structure:
   return {
     success: true,
     isSlip: true,
-    reason: `สลิปถูกต้อง โอนสำเร็จจำนวน **${parsed.transAmount.toLocaleString()} บาท**`,
+    reason: `สลิปถูกต้อง โอนสำเร็จจำนวน **${parsed.transAmount.toLocaleString()} บาท** ให้ <@${bestDebt.to_user_id}>`,
     data: parsed,
+    matchedDebt: bestDebt,
   };
+}
+
+/**
+ * Verifies a bank transfer slip image against a specific expected amount and recipient
+ */
+export async function verifyBankSlip(
+  imageUrl: string,
+  expectedAmount: number,
+  expectedRecipientPromptPay?: string | null,
+  expectedRecipientName?: string | null,
+  expectedSenderRealName?: string | null
+): Promise<SlipVerificationResult> {
+  const mockDebt: any = {
+    id: 0,
+    session_id: 0,
+    from_user_id: '',
+    to_user_id: '',
+    amount: expectedAmount,
+    status: 'pending',
+    to_promptpay: expectedRecipientPromptPay,
+    to_bank_name: expectedRecipientName,
+    to_name: expectedRecipientName,
+  };
+  return await verifyAndMatchSlip(imageUrl, [mockDebt]);
 }
