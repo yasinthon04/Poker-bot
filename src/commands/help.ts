@@ -40,6 +40,7 @@ export const helpCommand = {
             '• `/poker set-chips @player <chips>` : [Host] กำหนดชิปตอนจบให้เพื่อน',
             '• `/poker set-buyin @player <amount>` : [Host] แก้ไขยอด Buy-in ของผู้เล่น',
             '• `/poker end` : ปิดโต๊ะและคำนวณเงินเคลียร์หนี้ (แบบกรอกตัวเลข)',
+            '• `/poker reset-all confirm:True` : [Admin] ล้างประวัติเกม โต๊ะ และหนี้ทั้งหมด',
           ].join('\n'),
         },
         {

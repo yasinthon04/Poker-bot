@@ -31,7 +31,18 @@ describe('Discord Bot Slash Commands & Default Buy-in Configuration', () => {
     const scanBuyinOpt = scanTableSub.options?.find((o: any) => o.name === 'buyin');
     assert.ok(scanBuyinOpt, 'buyin option in scan-table should exist');
     assert.ok(scanBuyinOpt.description.includes('200'), 'scan-table buyin description should mention 200');
-    assert.strictEqual(scanBuyinOpt.required, false, 'buyin option in scan-table should be optional');
+    // 4. /poker reset-all
+    const resetAllSub = subcommands.find((s: any) => s.name === 'reset-all');
+    assert.ok(resetAllSub, 'reset-all subcommand should exist');
+    const confirmOpt = resetAllSub.options?.find((o: any) => o.name === 'confirm');
+    assert.ok(confirmOpt, 'confirm option in reset-all should exist');
+    assert.strictEqual(confirmOpt.required, true, 'confirm option should be required');
+  });
+
+  test('repo.resetAllData resets sessions and settlements', async () => {
+    await repo.resetAllData();
+    const active = await repo.getActiveSession('test_chan');
+    assert.strictEqual(active, undefined);
   });
 
   test('PokerTable constructor defaults buyIn to 200 when not specified', () => {

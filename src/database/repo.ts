@@ -663,3 +663,14 @@ export async function getRankedStats(
 
   return results.sort((a, b) => b.totalProfit - a.totalProfit);
 }
+
+export async function resetAllData(): Promise<void> {
+  if (isSupabaseConfigured()) {
+    return supabaseRepo.resetAllData();
+  }
+  const db = getMemoryDb();
+  db.sessions = {};
+  db.session_players = {};
+  db.settlements = {};
+  persistDb();
+}

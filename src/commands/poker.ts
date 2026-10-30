@@ -209,6 +209,17 @@ export const pokerCommand = {
     )
     .addSubcommand(sub =>
       sub
+        .setName('reset-all')
+        .setDescription('[Admin] ล้างประวัติโต๊ะ การเล่น และหนี้ทั้งหมดออกจากระบบเพื่อเริ่มใหม่')
+        .addBooleanOption(opt =>
+          opt
+            .setName('confirm')
+            .setDescription('ยืนยันว่าต้องการล้างข้อมูลทั้งหมดจริงหรือไม่ (เลือก True)')
+            .setRequired(true)
+        )
+    )
+    .addSubcommand(sub =>
+      sub
         .setName('help')
         .setDescription('ดูคู่มือและคำสั่งทั้งหมดของบอท Poker Bot')
     ),
@@ -237,6 +248,37 @@ export const pokerCommand = {
     if (subcommand === 'help') {
       const { helpCommand } = await import('./help');
       await helpCommand.execute(interaction);
+      return;
+    }
+
+    // RESET-ALL (Admin only)
+    if (subcommand === 'reset-all') {
+      if (
+        !interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) &&
+        !interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)
+      ) {
+        await interaction.reply({
+          content: '❌ เฉพาะผู้ดูแลเซิร์ฟเวอร์ (Admin / Manage Server) เท่านั้นที่สามารถใช้คำสั่งนี้ได้ครับ',
+          ephemeral: true,
+        });
+        return;
+      }
+
+      const confirm = interaction.options.getBoolean('confirm', true);
+      if (!confirm) {
+        await interaction.reply({
+          content: '❌ กรุณาเลือก `confirm: True` เพื่อยืนยันการล้างข้อมูลทั้งหมด',
+          ephemeral: true,
+        });
+        return;
+      }
+
+      await interaction.deferReply();
+      await repo.resetAllData();
+      await interaction.editReply({
+        content:
+          '🗑️ **ล้างข้อมูลโต๊ะโป๊กเกอร์ การเล่น และการคำนวณหนี้ทั้งหมดออกจากระบบเรียบร้อยแล้วครับ!**\n💡 โต๊ะและฐานข้อมูลสะอาดพร้อมเริ่มเล่นรอบใหม่ได้ทันทีด้วย `/poker start`',
+      });
       return;
     }
 
@@ -340,11 +382,11 @@ export const pokerCommand = {
 
     // 1. START (Standard)
     if (subcommand === 'start') {
+      await interaction.deferReply();
       const activeSession = await repo.getActiveSession(channelId);
       if (activeSession) {
-        await interaction.reply({
+        await interaction.editReply({
           content: `⚠️ มีโต๊ะ Poker Session #${activeSession.id} กำลังเล่นอยู่ในห้องนี้แล้ว! กรุณาเล่นให้จบหรือกดยกเลิกก่อน`,
-          ephemeral: true,
         });
         return;
       }
@@ -359,10 +401,9 @@ export const pokerCommand = {
       const embed = createTableEmbed(session, players);
       const rows = createTableActionRows(session.default_buyin);
 
-      const reply = await interaction.reply({
+      const reply = await interaction.editReply({
         embeds: [embed],
         components: rows,
-        fetchReply: true,
       });
 
       await repo.updateSessionMessageId(session.id, reply.id);
@@ -371,20 +412,19 @@ export const pokerCommand = {
 
     // 2. START-VOICE (Auto-join everyone in voice channel)
     if (subcommand === 'start-voice') {
+      await interaction.deferReply();
       const activeSession = await repo.getActiveSession(channelId);
       if (activeSession) {
-        await interaction.reply({
+        await interaction.editReply({
           content: `⚠️ มีโต๊ะ Poker Session #${activeSession.id} กำลังเล่นอยู่ในห้องนี้แล้ว! กรุณาเล่นให้จบหรือกดยกเลิกก่อน`,
-          ephemeral: true,
         });
         return;
       }
 
       const guild = interaction.guild;
       if (!guild) {
-        await interaction.reply({
+        await interaction.editReply({
           content: '❌ คำสั่งนี้ใช้ได้เฉพาะใน Discord Server เท่านั้นครับ',
-          ephemeral: true,
         });
         return;
       }
@@ -404,10 +444,9 @@ export const pokerCommand = {
       }
 
       if (!targetChannelId) {
-        await interaction.reply({
+        await interaction.editReply({
           content:
             '❌ คุณต้องอยู่ในห้อง Voice Call (ห้องพูดคุย) ก่อนใช้คำสั่งนี้ หรือเลือกห้องเสียงในตัวเลือก `channel` เพื่อให้บอทดึงเพื่อนในห้องเข้ามาได้ครับ',
-          ephemeral: true,
         });
         return;
       }
@@ -418,9 +457,8 @@ export const pokerCommand = {
         (voiceChannel.type !== ChannelType.GuildVoice &&
           voiceChannel.type !== ChannelType.GuildStageVoice)
       ) {
-        await interaction.reply({
+        await interaction.editReply({
           content: '❌ ไม่พบห้องเสียง หรือห้องที่เลือกไม่ใช่ห้อง Voice Call ครับ',
-          ephemeral: true,
         });
         return;
       }
@@ -449,9 +487,8 @@ export const pokerCommand = {
       const voiceMembers = Array.from(memberMap.values());
 
       if (voiceMembers.length === 0) {
-        await interaction.reply({
+        await interaction.editReply({
           content: `❌ ไม่พบผู้เล่น (ที่ไม่ใช่บอท) ในห้องเสียง **${voiceChannel.name}** ครับ`,
-          ephemeral: true,
         });
         return;
       }
@@ -469,11 +506,10 @@ export const pokerCommand = {
       const embed = createTableEmbed(session, players);
       const rows = createTableActionRows(session.default_buyin);
 
-      const reply = await interaction.reply({
+      const reply = await interaction.editReply({
         content: `🎙️ ตรวจพบห้องเสียง **${voiceChannel.name}** ดึงผู้เล่นเข้าโต๊ะอัตโนมัติ **${players.length} คน** เรียบร้อยแล้ว!`,
         embeds: [embed],
         components: rows,
-        fetchReply: true,
       });
 
       await repo.updateSessionMessageId(session.id, reply.id);
@@ -482,29 +518,27 @@ export const pokerCommand = {
 
     // NEXT-ROUND (Start next round with players from previous session)
     if (subcommand === 'next-round') {
+      await interaction.deferReply();
       const activeSession = await repo.getActiveSession(channelId);
       if (activeSession) {
-        await interaction.reply({
+        await interaction.editReply({
           content: `⚠️ มีโต๊ะ Poker Session #${activeSession.id} กำลังเล่นอยู่ในห้องนี้อยู่แล้ว! กรุณาเล่นให้จบหรือกดยกเลิกก่อน`,
-          ephemeral: true,
         });
         return;
       }
 
       const lastSession = await repo.getLastSession(channelId);
       if (!lastSession) {
-        await interaction.reply({
+        await interaction.editReply({
           content: '❌ ยังไม่มีประวัติการเล่นโต๊ะ Poker ในห้องนี้มาก่อนครับ ให้ใช้ `/poker start` หรือ `/poker start-voice` เพื่อเริ่มโต๊ะแรก',
-          ephemeral: true,
         });
         return;
       }
 
       const lastPlayers = await repo.getSessionPlayers(lastSession.id);
       if (lastPlayers.length === 0) {
-        await interaction.reply({
+        await interaction.editReply({
           content: '❌ ไม่พบรายชื่อผู้เล่นจากโต๊ะรอบที่แล้วครับ',
-          ephemeral: true,
         });
         return;
       }
@@ -522,11 +556,10 @@ export const pokerCommand = {
       const embed = createTableEmbed(newSession, players);
       const rows = createTableActionRows(newSession.default_buyin);
 
-      const reply = await interaction.reply({
+      const reply = await interaction.editReply({
         content: `🎉 **เริ่มรอบใหม่ (Session #${newSession.id}) เรียบร้อยแล้ว!** ดึงผู้เล่นเดิม **${players.length} คน** เข้าโต๊ะอัตโนมัติ (Buy-in: **${newSession.default_buyin}฿**)`,
         embeds: [embed],
         components: rows,
-        fetchReply: true,
       });
 
       await repo.updateSessionMessageId(newSession.id, reply.id);
@@ -681,10 +714,11 @@ export const pokerCommand = {
 
     // 4. STATUS
     if (subcommand === 'status') {
+      await interaction.deferReply();
       const players = await repo.getSessionPlayers(session.id);
       const embed = createTableEmbed(session, players);
       const rows = createTableActionRows(session.default_buyin);
-      const reply = await interaction.reply({ embeds: [embed], components: rows, fetchReply: true });
+      const reply = await interaction.editReply({ embeds: [embed], components: rows });
       await repo.updateSessionMessageId(session.id, reply.id);
       return;
     }
@@ -830,8 +864,9 @@ export const pokerCommand = {
         return;
       }
 
+      await interaction.deferReply();
       await repo.cancelSession(session.id);
-      await interaction.reply({ content: `🛑 โต๊ะ Poker Session #${session.id} ถูกยกเลิกเรียบร้อยแล้ว` });
+      await interaction.editReply({ content: `🛑 โต๊ะ Poker Session #${session.id} ถูกยกเลิกเรียบร้อยแล้ว` });
       return;
     }
 
@@ -935,7 +970,9 @@ export async function finalizeAndDisplaySummary(
   const { createNextRoundActionRow } = await import('../ui/components');
   const actionRow = createNextRoundActionRow(session.id, false, settlement.isBalanced);
 
-  if (interaction.replied || interaction.deferred) {
+  if (interaction.deferred && !interaction.replied) {
+    await interaction.editReply({ embeds: [embed], files, components: [actionRow] });
+  } else if (interaction.replied) {
     await interaction.followUp({ embeds: [embed], files, components: [actionRow] });
   } else {
     await interaction.reply({ embeds: [embed], files, components: [actionRow] });

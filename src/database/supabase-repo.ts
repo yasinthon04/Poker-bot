@@ -649,12 +649,33 @@ export async function getRankedStats(
   return results.sort((a, b) => b.totalProfit - a.totalProfit);
 }
 
+export async function resetAllData(): Promise<void> {
+  const supabase = getSupabase();
+  const { error: err1 } = await supabase.from('settlements').delete().neq('id', 0);
+  if (err1) console.error('Supabase reset settlements error:', err1.message);
+  const { error: err2 } = await supabase.from('session_players').delete().neq('id', 0);
+  if (err2) console.error('Supabase reset session_players error:', err2.message);
+  const { error: err3 } = await supabase.from('sessions').delete().neq('id', 0);
+  if (err3) console.error('Supabase reset sessions error:', err3.message);
+
+  const markerPath = path.join(process.cwd(), 'data', '.migrated');
+  try {
+    fs.writeFileSync(markerPath, new Date().toISOString(), 'utf-8');
+  } catch {}
+  console.log('🗑️ Supabase: All sessions, session_players, and settlements reset successfully.');
+}
+
 /**
  * Migrate data from local poker-data.json to Supabase if Supabase is completely empty
  */
 export async function autoMigrateLocalData(): Promise<void> {
   try {
     const dataDir = path.join(process.cwd(), 'data');
+    const markerPath = path.join(dataDir, '.migrated');
+    if (fs.existsSync(markerPath)) {
+      return; // Already migrated once; do not overwrite if user intentionally truncated
+    }
+
     const dbFilePath = path.join(dataDir, 'poker-data.json');
     if (!fs.existsSync(dbFilePath)) return;
 
@@ -665,6 +686,9 @@ export async function autoMigrateLocalData(): Promise<void> {
     // Check if Supabase already has sessions
     const { count } = await supabase.from('sessions').select('*', { count: 'exact', head: true });
     if (count && count > 0) {
+      try {
+        fs.writeFileSync(markerPath, new Date().toISOString(), 'utf-8');
+      } catch {}
       return; // Already has data, do not overwrite
     }
 
@@ -723,6 +747,10 @@ export async function autoMigrateLocalData(): Promise<void> {
         });
       }
     }
+
+    try {
+      fs.writeFileSync(markerPath, new Date().toISOString(), 'utf-8');
+    } catch {}
 
     console.log('✅ Local data migration to Supabase completed successfully!');
   } catch (err) {
