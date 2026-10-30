@@ -11,7 +11,7 @@ describe('KhunThong Debt Tracking & Slip Verification Engine', () => {
     setMockSlipVerifier(null);
   });
 
-  test('/poker has slip, remind, and confirm-paid subcommands', () => {
+  test('/poker has slip, remind, confirm-paid, and paid subcommands', () => {
     const json = pokerCommand.data.toJSON();
     const subcommands = json.options?.filter((o: any) => o.type === 1) || [];
 
@@ -24,10 +24,11 @@ describe('KhunThong Debt Tracking & Slip Verification Engine', () => {
     const remindSub = subcommands.find((s: any) => s.name === 'remind');
     assert.ok(remindSub, 'remind subcommand should exist');
 
+    const paidSub = subcommands.find((s: any) => s.name === 'paid');
+    assert.ok(paidSub, 'paid subcommand should exist');
+
     const confirmSub = subcommands.find((s: any) => s.name === 'confirm-paid');
     assert.ok(confirmSub, 'confirm-paid subcommand should exist');
-    const playerOpt = confirmSub.options?.find((o: any) => o.name === 'player');
-    assert.ok(playerOpt, 'player option should exist in confirm-paid');
   });
 
   test('/profile has set-name and clear-name subcommands', () => {

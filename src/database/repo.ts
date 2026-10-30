@@ -655,6 +655,25 @@ export async function revertSettlementPaid(settlementId: number): Promise<boolea
   return true;
 }
 
+export async function getSettlementById(settlementId: number): Promise<SettlementRow | undefined> {
+  if (isSupabaseConfigured()) {
+    return supabaseRepo.getSettlementById(settlementId);
+  }
+  const db = getMemoryDb();
+  const s = db.settlements[String(settlementId)];
+  if (!s) return undefined;
+  const fromUser = db.users[s.from_user_id];
+  const toUser = db.users[s.to_user_id];
+  return {
+    ...s,
+    status: s.status || 'pending',
+    from_name: fromUser?.display_name || fromUser?.username || s.from_user_id,
+    to_name: toUser?.display_name || toUser?.username || s.to_user_id,
+    to_promptpay: toUser?.promptpay || null,
+    to_bank_name: toUser?.bank_name || null,
+  };
+}
+
 export async function isTransRefUsed(transRef: string): Promise<boolean> {
   if (!transRef || transRef.trim().length === 0) return false;
   if (isSupabaseConfigured()) {

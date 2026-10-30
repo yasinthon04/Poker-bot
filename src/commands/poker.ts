@@ -250,13 +250,42 @@ export const pokerCommand = {
     )
     .addSubcommand(sub =>
       sub
+        .setName('paid')
+        .setDescription('💵 บันทึกว่าจ่ายเงินแล้ว / จ่ายเงินสด (กันสลิปผิดพลาด หรือจ่ายเงินสดตรงข้ามโต๊ะ)')
+        .addUserOption(opt =>
+          opt
+            .setName('player')
+            .setDescription('ระบุผู้เล่น (เจ้าหนี้ระบุลูกหนี้ที่จ่าย หรือ ลูกหนี้ระบุเจ้าหนี้ที่ตนจ่ายให้)')
+            .setRequired(false)
+        )
+        .addStringOption(opt =>
+          opt
+            .setName('method')
+            .setDescription('วิธีชำระ (ค่าเริ่มต้น: เงินสด)')
+            .setRequired(false)
+            .addChoices(
+              { name: '💵 เงินสด (Cash)', value: 'เงินสด' },
+              { name: '📱 โอนตรง/นอกรอบ (Direct Transfer)', value: 'โอนตรงนอกรอบ' },
+              { name: '🤝 เคลียร์ยอดแล้ว (Settled)', value: 'เคลียร์ยอดแล้ว' }
+            )
+        )
+        .addIntegerOption(opt =>
+          opt
+            .setName('session_id')
+            .setDescription('เลข Session ID (ไม่ใส่จะใช้รอบล่าสุดในห้องนี้)')
+            .setRequired(false)
+            .setMinValue(1)
+        )
+    )
+    .addSubcommand(sub =>
+      sub
         .setName('confirm-paid')
         .setDescription('✅ [เจ้าหนี้/Host] กดยืนยันว่าได้รับเงินแล้วด้วยตนเอง (Manual)')
         .addUserOption(opt =>
           opt
             .setName('player')
             .setDescription('ผู้เล่นที่โอนเงินให้คุณแล้ว')
-            .setRequired(true)
+            .setRequired(false)
         )
         .addIntegerOption(opt =>
           opt
@@ -465,54 +494,159 @@ export const pokerCommand = {
       return;
     }
 
-    // CONFIRM-PAID (Manual verification by creditor or host)
-    if (subcommand === 'confirm-paid') {
-      const targetPlayer = interaction.options.getUser('player', true);
+    // PAID / CONFIRM-PAID (Manual payment, Cash, or Direct transfer)
+    if (subcommand === 'paid' || subcommand === 'confirm-paid') {
+      const targetPlayer = interaction.options.getUser('player');
       const specifiedSessionId = interaction.options.getInteger('session_id');
+      const method = (interaction.options as any).getString?.('method') || 'เงินสด';
 
       const targetSession = specifiedSessionId
         ? await repo.getSessionById(specifiedSessionId)
         : await repo.getLastSession(channelId);
 
       if (!targetSession) {
-        await interaction.reply({ content: '❌ ไม่พบข้อมูลรอบ Poker ครับ', ephemeral: true });
-        return;
-      }
-
-      const settlements = await repo.getSessionSettlements(targetSession.id);
-      const debt = settlements.find(
-        s => s.from_user_id === targetPlayer.id && s.to_user_id === user.id && s.status !== 'paid'
-      );
-
-      if (!debt) {
-        const isHostOrAdmin =
-          user.id === targetSession.host_id ||
-          interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild);
-
-        if (isHostOrAdmin) {
-          const anyDebt = settlements.find(
-            s => s.from_user_id === targetPlayer.id && s.status !== 'paid'
-          );
-          if (anyDebt) {
-            await repo.markSettlementPaid(anyDebt.id);
-            await interaction.reply({
-              content: `✅ Host ยืนยันการรับเงินของ <@${targetPlayer.id}> (ยอด **${anyDebt.amount.toLocaleString()}฿**) เรียบร้อยแล้ว!`,
-            });
-            await refreshSessionBillMessage(interaction, targetSession);
-            return;
-          }
-        }
-
         await interaction.reply({
-          content: `❌ ไม่พบรายการหนี้ที่ <@${targetPlayer.id}> ต้องโอนให้คุณในรอบ #${targetSession.id} (หรืออาจจะชำระไปแล้ว)`,
+          content: '❌ ไม่พบข้อมูลรอบ Poker ในห้องนี้ครับ (หรือระบุ session_id ที่ต้องการ)',
           ephemeral: true,
         });
         return;
       }
 
-      await repo.markSettlementPaid(debt.id);
+      const settlements = await repo.getSessionSettlements(targetSession.id);
+      const pending = settlements.filter(s => s.status !== 'paid');
+
+      if (pending.length === 0) {
+        await interaction.reply({
+          content: `🎉 โต๊ะ Session #${targetSession.id} เคลียร์หนี้ครบทุกคนแล้ว ไม่มีใครค้างจ่ายครับ! 💚`,
+          ephemeral: true,
+        });
+        return;
+      }
+
+      const isHost = user.id === targetSession.host_id;
+      const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild);
+
+      // Determine which debt to settle
+      let matchedDebt: repo.SettlementRow | undefined;
+
+      if (targetPlayer) {
+        // 1. User is Creditor and targetPlayer is Debtor
+        matchedDebt = pending.find(s => s.from_user_id === targetPlayer.id && s.to_user_id === user.id);
+        // 2. User is Debtor and targetPlayer is Creditor
+        if (!matchedDebt) {
+          matchedDebt = pending.find(s => s.from_user_id === user.id && s.to_user_id === targetPlayer.id);
+        }
+        // 3. Host or Admin confirming on behalf of players
+        if (!matchedDebt && (isHost || isAdmin)) {
+          matchedDebt = pending.find(
+            s => s.from_user_id === targetPlayer.id || s.to_user_id === targetPlayer.id
+          );
+        }
+      } else {
+        // No player specified:
+        // 1. Check if user is Creditor
+        const myCreditDebts = pending.filter(s => s.to_user_id === user.id);
+        if (myCreditDebts.length === 1) {
+          matchedDebt = myCreditDebts[0];
+        } else if (myCreditDebts.length > 1) {
+          const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = await import('discord.js');
+          const row = new ActionRowBuilder<ButtonBuilder>();
+          myCreditDebts.slice(0, 5).forEach(d => {
+            row.addComponents(
+              new ButtonBuilder()
+                .setCustomId(`btn_poker_quick_paid_${d.id}_${encodeURIComponent(method)}`)
+                .setLabel(`${d.from_name || d.from_user_id}: ${d.amount.toLocaleString()}฿`)
+                .setStyle(ButtonStyle.Success)
+            );
+          });
+          await interaction.reply({
+            content: `💵 **คุณมีรายการที่ต้องได้รับเงิน ${myCreditDebts.length} รายการ**\nเลือกว่าได้รับเงิน (${method}) จากใคร:`,
+            components: [row],
+            ephemeral: true,
+          });
+          return;
+        }
+
+        // 2. Check if user is Debtor
+        if (!matchedDebt) {
+          const myDebts = pending.filter(s => s.from_user_id === user.id);
+          if (myDebts.length === 1) {
+            matchedDebt = myDebts[0];
+          } else if (myDebts.length > 1) {
+            const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = await import('discord.js');
+            const row = new ActionRowBuilder<ButtonBuilder>();
+            myDebts.slice(0, 5).forEach(d => {
+              row.addComponents(
+                new ButtonBuilder()
+                  .setCustomId(`btn_poker_quick_paid_${d.id}_${encodeURIComponent(method)}`)
+                  .setLabel(`จ่ายให้ ${d.to_name || d.to_user_id}: ${d.amount.toLocaleString()}฿`)
+                  .setStyle(ButtonStyle.Primary)
+              );
+            });
+            await interaction.reply({
+              content: `💵 **คุณมียอดหนี้ค้างชำระ ${myDebts.length} รายการ**\nเลือกรายการที่คุณชำระแล้ว (${method}):`,
+              components: [row],
+              ephemeral: true,
+            });
+            return;
+          }
+        }
+
+        // 3. Host or Admin
+        if (!matchedDebt && (isHost || isAdmin)) {
+          if (pending.length === 1) {
+            matchedDebt = pending[0];
+          } else {
+            const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = await import('discord.js');
+            const row = new ActionRowBuilder<ButtonBuilder>();
+            pending.slice(0, 5).forEach(d => {
+              row.addComponents(
+                new ButtonBuilder()
+                  .setCustomId(`btn_poker_quick_paid_${d.id}_${encodeURIComponent(method)}`)
+                  .setLabel(`${d.from_name || d.from_user_id} ➔ ${d.to_name || d.to_user_id} (${d.amount}฿)`)
+                  .setStyle(ButtonStyle.Secondary)
+              );
+            });
+            await interaction.reply({
+              content: `👑 **[Host/Admin] เลือกว่ารายการไหนชำระเงินแล้ว (${method}):**`,
+              components: [row],
+              ephemeral: true,
+            });
+            return;
+          }
+        }
+      }
+
+      if (!matchedDebt) {
+        await interaction.reply({
+          content:
+            `❌ ไม่พบรายการหนี้ที่เกี่ยวข้องกับคุณในรอบ #${targetSession.id}\n` +
+            `💡 หากต้องการระบุผู้เล่น กรุณาพิมพ์ \`/poker paid player:@ชื่อเพื่อน\``,
+          ephemeral: true,
+        });
+        return;
+      }
+
+      // Mark the debt as paid
+      await repo.markSettlementPaid(matchedDebt.id, undefined, `MANUAL_${method.toUpperCase()}`);
+
+      const { createDebtorContestRow } = await import('../ui/components');
+
+      const isDebtorPayer = user.id === matchedDebt.from_user_id;
+      const isCreditorReceiver = user.id === matchedDebt.to_user_id;
+
+      let replyMsg = '';
+      if (isCreditorReceiver) {
+        replyMsg = `✅ <@${user.id}> ได้ยืนยันว่าได้รับเงิน **${matchedDebt.amount.toLocaleString()} บาท** (${method}) จาก <@${matchedDebt.from_user_id}> เรียบร้อยแล้ว!`;
+      } else if (isDebtorPayer) {
+        replyMsg = `💵 <@${user.id}> ได้บันทึกการชำระเงิน **${matchedDebt.amount.toLocaleString()} บาท** (${method}) ให้กับ <@${matchedDebt.to_user_id}> เรียบร้อยแล้ว!`;
+      } else {
+        replyMsg = `✅ <@${user.id}> (Host/Admin) ได้ยืนยันการชำระเงิน **${matchedDebt.amount.toLocaleString()} บาท** (${method}) ของ <@${matchedDebt.from_user_id}> 👉 <@${matchedDebt.to_user_id}> เรียบร้อยแล้ว!`;
+      }
+
       await interaction.reply({
-        content: `✅ คุณ <@${user.id}> ได้ยืนยันว่าได้รับเงิน **${debt.amount.toLocaleString()} บาท** จาก <@${targetPlayer.id}> เรียบร้อยแล้ว! [Manual Confirmation]`,
+        content: `${replyMsg}\n*(บอทอัปเดตสถานะบิลเป็น [✅ จ่ายแล้ว] เรียบร้อย หากยังไม่ได้รับเงิน เจ้าหนี้สามารถกดปุ่มยกเลิกด้านล่างได้ทันที)*`,
+        components: [createDebtorContestRow(matchedDebt.id)],
       });
 
       await refreshSessionBillMessage(interaction, targetSession);

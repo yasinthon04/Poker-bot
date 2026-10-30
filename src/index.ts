@@ -4,6 +4,9 @@ import {
   Interaction,
   Message,
   PermissionFlagsBits,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
 } from 'discord.js';
 import dotenv from 'dotenv';
 import { pokerCommand, refreshTableMessage, finalizeAndDisplaySummary } from './commands/poker';
@@ -312,6 +315,34 @@ client.on('interactionCreate', async (interaction: Interaction) => {
         return;
       }
 
+      if (interaction.customId.startsWith('btn_poker_quick_paid_')) {
+        const raw = interaction.customId.replace('btn_poker_quick_paid_', '');
+        const parts = raw.split('_');
+        const debtId = parseInt(parts[0], 10);
+        const method = parts[1] ? decodeURIComponent(parts[1]) : 'เงินสด';
+
+        const debt = await repo.getSettlementById(debtId);
+        if (!debt) {
+          await interaction.reply({ content: '❌ ไม่พบข้อมูลรายการหนี้นี้ครับ', ephemeral: true });
+          return;
+        }
+
+        await repo.markSettlementPaid(debtId, undefined, `MANUAL_${method.toUpperCase()}`);
+        const { createDebtorContestRow } = await import('./ui/components');
+
+        await interaction.update({
+          content: `✅ บันทึกชำระเงิน **${debt.amount.toLocaleString()}฿** (${method}) ระหว่าง <@${debt.from_user_id}> 👉 <@${debt.to_user_id}> เรียบร้อยแล้ว!`,
+          components: [createDebtorContestRow(debt.id)],
+        });
+
+        const targetSession = await repo.getSessionById(debt.session_id);
+        if (targetSession) {
+          const { refreshSessionBillMessage } = await import('./commands/poker');
+          await refreshSessionBillMessage({ channel: interaction.channel, client }, targetSession);
+        }
+        return;
+      }
+
       if (interaction.customId.startsWith('btn_poker_confirm_paid_')) {
         const parts = interaction.customId.split('_');
         const targetSessionId = parseInt(parts[parts.length - 1], 10);
@@ -331,17 +362,52 @@ client.on('interactionCreate', async (interaction: Interaction) => {
         }
 
         if (myDebts.length === 0) {
+          // Check if user is a debtor who owes money
+          const myOwedDebts = settlements.filter(s => s.from_user_id === user.id && s.status !== 'paid');
+          if (myOwedDebts.length > 0) {
+            const debt = myOwedDebts[0];
+            await repo.markSettlementPaid(debt.id, undefined, 'MANUAL_CASH');
+            const { createDebtorContestRow } = await import('./ui/components');
+            await interaction.reply({
+              content: `💵 <@${user.id}> ได้บันทึกการชำระเงิน **${debt.amount.toLocaleString()} บาท** (เงินสด/นอกรอบ) ให้กับ <@${debt.to_user_id}> เรียบร้อยแล้ว!\n*(หากยังไม่ได้รับเงิน เจ้าหนี้สามารถกดปุ่มยกเลิกด้านล่างได้ทันที)*`,
+              components: [createDebtorContestRow(debt.id)],
+            });
+            const { refreshSessionBillMessage } = await import('./commands/poker');
+            await refreshSessionBillMessage(interaction, targetSession);
+            return;
+          }
+
           await interaction.reply({
-            content: '⚠️ ไม่พบรายการหนี้ค้างชำระที่ต้องจ่ายให้คุณในรอบนี้ครับ (หรืออาจจะชำระครบแล้ว)',
+            content: '⚠️ ไม่พบรายการหนี้ค้างชำระที่เกี่ยวข้องกับคุณในรอบนี้ครับ (หรืออาจจะชำระครบแล้ว)',
+            ephemeral: true,
+          });
+          return;
+        }
+
+        if (myDebts.length > 1) {
+          const row = new ActionRowBuilder<ButtonBuilder>();
+          myDebts.slice(0, 5).forEach(d => {
+            row.addComponents(
+              new ButtonBuilder()
+                .setCustomId(`btn_poker_quick_paid_${d.id}_%E0%B9%80%E0%B8%87%E0%B8%B4%E0%B8%99%E0%B8%AA%E0%B8%94`)
+                .setLabel(`${d.from_name || d.from_user_id}: ${d.amount.toLocaleString()}฿`)
+                .setStyle(ButtonStyle.Success)
+            );
+          });
+          await interaction.reply({
+            content: `💵 **มีรายการค้างรับเงิน ${myDebts.length} รายการ**\nเลือกว่าได้รับเงินสดจากใคร:`,
+            components: [row],
             ephemeral: true,
           });
           return;
         }
 
         const debt = myDebts[0];
-        await repo.markSettlementPaid(debt.id);
+        await repo.markSettlementPaid(debt.id, undefined, 'MANUAL_CONFIRMED');
+        const { createDebtorContestRow } = await import('./ui/components');
         await interaction.reply({
           content: `✅ <@${user.id}> ได้ยืนยันว่าได้รับเงิน **${debt.amount.toLocaleString()} บาท** จาก <@${debt.from_user_id}> เรียบร้อยแล้ว!`,
+          components: [createDebtorContestRow(debt.id)],
         });
 
         const { refreshSessionBillMessage } = await import('./commands/poker');
@@ -353,10 +419,19 @@ client.on('interactionCreate', async (interaction: Interaction) => {
         const parts = interaction.customId.split('_');
         const settlementId = parseInt(parts[parts.length - 1], 10);
 
+        const debt = await repo.getSettlementById(settlementId);
         await repo.revertSettlementPaid(settlementId);
         await interaction.reply({
-          content: `⚠️ <@${user.id}> ได้ยกเลิกสถานะการชำระเงินของสลิปนี้แล้ว ยอดหนี้ถูกปรับกลับเป็น **[⏳ รอชำระ]** เรียบร้อยครับ`,
+          content: `⚠️ <@${user.id}> ได้ยกเลิกสถานะการชำระเงินของรายการนี้แล้ว ยอดหนี้ถูกปรับกลับเป็น **[⏳ รอชำระ]** เรียบร้อยครับ`,
         });
+
+        if (debt) {
+          const targetSession = await repo.getSessionById(debt.session_id);
+          if (targetSession) {
+            const { refreshSessionBillMessage } = await import('./commands/poker');
+            await refreshSessionBillMessage({ channel: interaction.channel, client }, targetSession);
+          }
+        }
         return;
       }
 

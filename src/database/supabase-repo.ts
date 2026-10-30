@@ -702,6 +702,30 @@ export async function revertSettlementPaid(settlementId: number): Promise<boolea
   return !error;
 }
 
+export async function getSettlementById(settlementId: number): Promise<SettlementRow | undefined> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase.from('settlements').select('*').eq('id', settlementId).maybeSingle();
+  if (error || !data) return undefined;
+
+  const { data: users } = await supabase
+    .from('users')
+    .select('id, username, display_name, promptpay, qr_image_url, bank_name')
+    .in('id', [data.from_user_id, data.to_user_id]);
+
+  const userMap = new Map((users || []).map((u: any) => [u.id, u]));
+  const fromUser = userMap.get(data.from_user_id);
+  const toUser = userMap.get(data.to_user_id);
+
+  return {
+    ...data,
+    status: data.status || 'pending',
+    from_name: fromUser ? (fromUser.display_name || fromUser.username) : data.from_user_id,
+    to_name: toUser ? (toUser.display_name || toUser.username) : data.to_user_id,
+    to_promptpay: toUser?.promptpay || null,
+    to_bank_name: toUser?.bank_name || null,
+  };
+}
+
 export async function isTransRefUsed(transRef: string): Promise<boolean> {
   if (!transRef || transRef.trim().length === 0) return false;
   const supabase = getSupabase();
