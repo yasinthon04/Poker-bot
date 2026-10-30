@@ -18,24 +18,28 @@ export const helpCommand = {
       )
       .addFields(
         {
-          name: '🃏 จัดการโต๊ะโป๊กเกอร์ (`/poker`)',
+          name: '🎮 เปิดโต๊ะและเล่นไพ่ (`/poker`)',
           value: [
-            '🎮 `/poker play` : เปิดโต๊ะเล่น Texas Hold\'em แบบสด (Discord Activity / Web Table) มี Bot และตั้งค่าโต๊ะได้',
-            '📝 `/poker record [players] [buyin]` : คิดเงินแบบพิมพ์เอง (คำนวณหนี้ + บันทึกลง Leaderboard ทันที + แยก buyin ต่อคนได้)',
-            '✏️ `/poker edit [session_id] [players] [buyin]` : [Host] แก้ไขยอดเงินหรือผู้เล่นของรอบที่บันทึกไว้ได้ตลอดเวลา',
-            '🌟 `/poker start-voice [buyin] [channel]` : เปิดโต๊ะและดึงทุกคนในห้องเสียงเข้าโต๊ะอัตโนมัติ (ค่าเริ่มต้น 200 บาท) *(แนะนำ)*',
-            '📸 `/poker scan-table <image> [buyin] [preview] [leaver] [leaver_chips]` : สแกนรูปโต๊ะคิดเงินทันทีโดยไม่ต้องเปิดโต๊ะล่วงหน้า (ค่าเริ่มต้น 200 บาท)',
-            '🔍 `/poker preview` : ดูพรีวิวยอดเงินและคำนวณหนี้ปัจจุบันโดยไม่ต้องปิดโต๊ะ',
-            '🔄 `/poker next-round [buyin]` : เริ่มรอบใหม่ทันทีโดยดึงผู้เล่นจากรอบล่าสุดเข้าโต๊ะอัตโนมัติ',
-            '• `/poker start [buyin]` : เปิดโต๊ะใหม่แบบปกติ (ค่าเริ่มต้น 200 บาท)',
-            '• `/poker join [amount]` : ซื้อชิปเข้าร่วมโต๊ะ',
-            '• `/poker rebuy [amount]` : เติมชิปเพิ่มเมื่อหมดตัว',
+            '• `/poker play` : เปิดโต๊ะเล่น Texas Hold\'em แบบสด (Web / Discord Activity)',
+            '• `/poker start-voice [buyin]` : เปิดโต๊ะดึงทุกคนในห้องเสียงเข้าเล่นอัตโนมัติ (เริ่มต้น 200฿)',
+            '• `/poker start [buyin]` : เปิดโต๊ะใหม่แบบปกติในห้องนี้',
+            '• `/poker join [amount]` / `/poker rebuy [amount]` : ซื้อชิป / เติมชิป',
             '• `/poker leave <chips>` : ขอออกก่อน (Early Cash-out) ล็อคยอดชิปไว้',
-            '• `/poker set-buyin @player <amount>` : [Host] แก้ไขยอด Buy-in เผื่อใครกด Rebuy พลาด',
-            '• `/poker set-chips @player <chips>` : [Host] กำหนดชิปตอนจบให้เพื่อน',
-            '• `/poker end` : ปิดโต๊ะและคำนวณเงินเคลียร์หนี้ (แบบกรอกตัวเลข)',
             '• `/poker status` : ดูสถานะโต๊ะปัจจุบันในห้องนี้',
             '• `/poker cancel` : [Host] ยกเลิกโต๊ะที่กำลังเล่นอยู่',
+          ].join('\n'),
+        },
+        {
+          name: '📝 คิดเงิน & เคลียร์หนี้ (`/poker`)',
+          value: [
+            '• `/poker record [players] [buyin]` : คิดเงินแบบพิมพ์เอง (คำนวณหนี้ + บันทึก Leaderboard)',
+            '• `/poker edit [session_id]` : [Host] แก้ไขยอดเงินหรือผู้เล่นของรอบที่บันทึกไว้ได้ตลอดเวลา',
+            '• `/poker scan-table <image>` : 📸 สแกนรูปโต๊ะคิดเงินทันทีโดยไม่ต้องเปิดโต๊ะล่วงหน้า',
+            '• `/poker preview` : ดูพรีวิวยอดเงินและคำนวณหนี้ปัจจุบันโดยไม่ต้องปิดโต๊ะ',
+            '• `/poker next-round [buyin]` : เริ่มรอบใหม่ทันทีโดยดึงผู้เล่นเดิมเข้าโต๊ะ',
+            '• `/poker set-chips @player <chips>` : [Host] กำหนดชิปตอนจบให้เพื่อน',
+            '• `/poker set-buyin @player <amount>` : [Host] แก้ไขยอด Buy-in ของผู้เล่น',
+            '• `/poker end` : ปิดโต๊ะและคำนวณเงินเคลียร์หนี้ (แบบกรอกตัวเลข)',
           ].join('\n'),
         },
         {

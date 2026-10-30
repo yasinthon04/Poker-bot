@@ -42,6 +42,28 @@ describe('Discord Bot Slash Commands & Default Buy-in Configuration', () => {
     assert.strictEqual(table.minRaise, 20);
   });
 
+  test('helpCommand executes successfully and all fields are <= 1024 characters', async () => {
+    let repliedPayload: any = null;
+    const fakeInteraction: any = {
+      reply: async (obj: any) => {
+        repliedPayload = obj;
+      },
+    };
+
+    await helpCommand.execute(fakeInteraction);
+    assert.ok(repliedPayload, 'helpCommand should reply with payload');
+    assert.ok(repliedPayload.embeds && repliedPayload.embeds.length > 0, 'should have embeds');
+
+    const embed = repliedPayload.embeds[0].data;
+    assert.ok(embed.title.includes('คู่มือและคำสั่งทั้งหมด'));
+    for (const field of embed.fields || []) {
+      assert.ok(
+        field.value.length <= 1024,
+        `Field "${field.name}" length (${field.value.length}) exceeds 1024 char limit`
+      );
+    }
+  });
+
   test('processTableScan can scan without an open session and uses default buyin 200', async () => {
     // Mock parsePokerScreenshot
     vision.setMockPokerScreenshotParser(async () => [

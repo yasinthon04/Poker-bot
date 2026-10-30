@@ -6,6 +6,7 @@ dotenv.config();
 let supabaseInstance: SupabaseClient | null = null;
 
 export function isSupabaseConfigured(): boolean {
+  if (process.env.NODE_ENV === 'test') return false;
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
   return Boolean(url && key && url !== 'your_supabase_url_here' && key !== 'your_supabase_key_here');
