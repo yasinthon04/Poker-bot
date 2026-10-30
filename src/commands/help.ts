@@ -21,6 +21,8 @@ export const helpCommand = {
           name: '🃏 จัดการโต๊ะโป๊กเกอร์ (`/poker`)',
           value: [
             '🎮 `/poker play` : เปิดโต๊ะเล่น Texas Hold\'em แบบสด (Discord Activity / Web Table) มี Bot และตั้งค่าโต๊ะได้',
+            '📝 `/poker record [players] [buyin]` : คิดเงินแบบพิมพ์เอง (คำนวณหนี้ + บันทึกลง Leaderboard ทันที + แยก buyin ต่อคนได้)',
+            '✏️ `/poker edit [session_id] [players] [buyin]` : [Host] แก้ไขยอดเงินหรือผู้เล่นของรอบที่บันทึกไว้ได้ตลอดเวลา',
             '🌟 `/poker start-voice [buyin] [channel]` : เปิดโต๊ะและดึงทุกคนในห้องเสียงเข้าโต๊ะอัตโนมัติ (ค่าเริ่มต้น 200 บาท) *(แนะนำ)*',
             '📸 `/poker scan-table <image> [buyin] [preview] [leaver] [leaver_chips]` : สแกนรูปโต๊ะคิดเงินทันทีโดยไม่ต้องเปิดโต๊ะล่วงหน้า (ค่าเริ่มต้น 200 บาท)',
             '🔍 `/poker preview` : ดูพรีวิวยอดเงินและคำนวณหนี้ปัจจุบันโดยไม่ต้องปิดโต๊ะ',

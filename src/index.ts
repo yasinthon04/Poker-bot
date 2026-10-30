@@ -191,8 +191,11 @@ client.on('interactionCreate', async (interaction: Interaction) => {
         return;
       }
 
-      // Recalculate button (can be clicked on completed session summary)
-      if (interaction.customId.startsWith('btn_poker_recalc_')) {
+      // Edit / Recalculate button (can be clicked on completed session summary)
+      if (
+        interaction.customId.startsWith('btn_poker_edit_') ||
+        interaction.customId.startsWith('btn_poker_recalc_')
+      ) {
         const parts = interaction.customId.split('_');
         const targetSessionId = parseInt(parts[parts.length - 1], 10);
 
@@ -211,23 +214,18 @@ client.on('interactionCreate', async (interaction: Interaction) => {
           !interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)
         ) {
           await interaction.reply({
-            content: '❌ เฉพาะ Host ของโต๊ะนี้เท่านั้นที่สามารถกดคำนวณใหม่ได้ครับ',
+            content: '❌ เฉพาะ Host ของโต๊ะนี้หรือแอดมินเท่านั้นที่สามารถแก้ไขข้อมูลได้ครับ',
             ephemeral: true,
           });
           return;
         }
 
         const players = await repo.getSessionPlayers(targetSessionId);
-        if (players.length > 5) {
-          await interaction.reply({
-            content: `⚠️ โต๊ะนี้มีผู้เล่นถึง ${players.length} คน (เกินขีดจำกัด 5 ช่องของ Discord Modal)\n💡 กรุณาใช้คำสั่ง \`/poker set-chips @ผู้เล่น [ชิป]\` เพื่อแก้ไขชิปทีละคน หรือใช้ \`/poker scan-table <รูปภาพ>\` เพื่อสแกนใหม่ครับ`,
-            ephemeral: true,
-          });
-          return;
-        }
+        const { formatPlayersForModal } = await import('./services/manual-parser');
+        const { createManualEditModal } = await import('./ui/components');
+        const prefilledText = formatPlayersForModal(targetSession.default_buyin, players);
 
-        const { createRecalculateModal } = await import('./ui/components');
-        await interaction.showModal(createRecalculateModal(targetSessionId, players));
+        await interaction.showModal(createManualEditModal(targetSessionId, targetSession.default_buyin, prefilledText));
         return;
       }
 
@@ -620,6 +618,32 @@ client.on('interactionCreate', async (interaction: Interaction) => {
         }
 
         await finalizeAndDisplaySummary(interaction, targetSession, activeChipsMap);
+        return;
+      }
+
+      // Manual Record Modal Submit
+      if (interaction.customId === 'modal_poker_manual_record') {
+        const rawBuyin = interaction.fields.getTextInputValue('input_buyin');
+        const rawPlayers = interaction.fields.getTextInputValue('input_players');
+        const buyIn = parseFloat(rawBuyin) || 200;
+
+        await interaction.deferReply();
+        const { executeManualSettlement } = await import('./commands/poker');
+        await executeManualSettlement(interaction, rawPlayers, buyIn);
+        return;
+      }
+
+      // Manual Edit Modal Submit
+      if (interaction.customId.startsWith('modal_poker_manual_edit_')) {
+        const parts = interaction.customId.split('_');
+        const targetSessionId = parseInt(parts[parts.length - 1], 10);
+        const rawBuyin = interaction.fields.getTextInputValue('input_buyin');
+        const rawPlayers = interaction.fields.getTextInputValue('input_players');
+        const buyIn = parseFloat(rawBuyin) || 200;
+
+        await interaction.deferReply();
+        const { executeManualSettlement } = await import('./commands/poker');
+        await executeManualSettlement(interaction, rawPlayers, buyIn, targetSessionId);
         return;
       }
 

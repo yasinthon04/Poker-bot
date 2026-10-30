@@ -1,5 +1,5 @@
 import { getSupabase } from './supabase';
-import { UserRow, SessionRow, SessionPlayerRow, UserStats, RankedPlayerStats } from './repo';
+import { UserRow, SessionRow, SessionPlayerRow, UserStats, RankedPlayerStats, ManualPlayerEntry } from './repo';
 import { calculateSettlements, SettlementResult } from '../services/settlement';
 import fs from 'fs';
 import path from 'path';
@@ -397,6 +397,99 @@ export async function finalizeSession(
 
   session.status = 'completed';
   session.ended_at = now;
+
+  return { settlement, session };
+}
+
+export async function saveOrUpdateManualSession(
+  guildId: string,
+  channelId: string,
+  hostId: string,
+  defaultBuyIn: number,
+  playerEntries: ManualPlayerEntry[],
+  existingSessionId?: number
+): Promise<{ settlement: SettlementResult; session: SessionRow }> {
+  const supabase = getSupabase();
+  const now = new Date().toISOString();
+
+  let session: SessionRow;
+  let sessionId: number;
+
+  if (existingSessionId) {
+    sessionId = existingSessionId;
+    const { data, error } = await supabase
+      .from('sessions')
+      .update({
+        default_buyin: defaultBuyIn,
+        status: 'completed',
+        ended_at: now,
+      })
+      .eq('id', sessionId)
+      .select('*')
+      .single();
+
+    if (error || !data) {
+      throw new Error(`Failed to update session #${sessionId}: ${error?.message}`);
+    }
+    session = data as SessionRow;
+
+    // Delete existing session_players and settlements for clean overwrite
+    await supabase.from('session_players').delete().eq('session_id', sessionId);
+    await supabase.from('settlements').delete().eq('session_id', sessionId);
+  } else {
+    const { data, error } = await supabase
+      .from('sessions')
+      .insert({
+        guild_id: guildId,
+        channel_id: channelId,
+        host_id: hostId,
+        default_buyin: defaultBuyIn,
+        status: 'completed',
+        created_at: now,
+        ended_at: now,
+      })
+      .select('*')
+      .single();
+
+    if (error || !data) {
+      throw new Error(`Failed to create session: ${error?.message}`);
+    }
+    session = data as SessionRow;
+    sessionId = session.id;
+  }
+
+  // Insert player records
+  if (playerEntries.length > 0) {
+    const playerRows = playerEntries.map(entry => ({
+      session_id: sessionId,
+      user_id: entry.userId,
+      buy_in: Math.round(entry.buyIn * 100) / 100,
+      cash_out: Math.round(entry.cashOut * 100) / 100,
+      status: 'playing',
+      created_at: now,
+    }));
+    await supabase.from('session_players').insert(playerRows);
+  }
+
+  // Calculate settlement
+  const playerInputs = playerEntries.map(p => ({
+    userId: p.userId,
+    name: p.name,
+    buyIn: p.buyIn,
+    cashOut: p.cashOut,
+  }));
+  const settlement = calculateSettlements(playerInputs);
+
+  if (settlement.transactions.length > 0) {
+    const txRows = settlement.transactions.map(tx => ({
+      session_id: sessionId,
+      from_user_id: tx.fromUserId,
+      to_user_id: tx.toUserId,
+      amount: tx.amount,
+      created_at: now,
+    }));
+    await supabase.from('settlements').insert(txRows);
+  }
 
   return { settlement, session };
 }

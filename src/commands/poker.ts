@@ -166,6 +166,49 @@ export const pokerCommand = {
     )
     .addSubcommand(sub =>
       sub
+        .setName('record')
+        .setDescription('บันทึกและคิดเงินแบบพิมพ์เอง (คำนวณหนี้, บันทึกลง Leaderboard และแก้ไขได้ตลอด)')
+        .addStringOption(opt =>
+          opt
+            .setName('players')
+            .setDescription('รายชื่อและยอดเงิน (เช่น @A 350, @B 50 หรือ @A 350 buyin:400) หากไม่ใส่จะเปิดฟอร์มกรอก')
+            .setRequired(false)
+        )
+        .addNumberOption(opt =>
+          opt
+            .setName('buyin')
+            .setDescription('ยอด Buy-in พื้นฐานสำหรับทุกคน (ค่าเริ่มต้น 200 บาท)')
+            .setRequired(false)
+            .setMinValue(1)
+        )
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('edit')
+        .setDescription('[Host] แก้ไขยอดเงินหรือผู้เล่นของรอบที่บันทึกไว้ (อัปเดต Leaderboard อัตโนมัติ)')
+        .addIntegerOption(opt =>
+          opt
+            .setName('session_id')
+            .setDescription('เลข Session ID ที่ต้องการแก้ไข (เว้นว่างไว้จะใช้รอบล่าสุดในห้องนี้)')
+            .setRequired(false)
+            .setMinValue(1)
+        )
+        .addStringOption(opt =>
+          opt
+            .setName('players')
+            .setDescription('ข้อมูลผู้เล่นและยอดเงินใหม่ (เว้นว่างไว้จะเปิดฟอร์มแก้ไข)')
+            .setRequired(false)
+        )
+        .addNumberOption(opt =>
+          opt
+            .setName('buyin')
+            .setDescription('ยอด Buy-in พื้นฐานใหม่')
+            .setRequired(false)
+            .setMinValue(1)
+        )
+    )
+    .addSubcommand(sub =>
+      sub
         .setName('help')
         .setDescription('ดูคู่มือและคำสั่งทั้งหมดของบอท Poker Bot')
     ),
@@ -229,6 +272,69 @@ export const pokerCommand = {
         embeds: [embed],
         components: [row],
       });
+      return;
+    }
+
+    // RECORD (Manual settlement typing or modal)
+    if (subcommand === 'record') {
+      const playersOption = interaction.options.getString('players');
+      const buyinOption = interaction.options.getNumber('buyin') ?? 200;
+
+      if (playersOption) {
+        await interaction.deferReply();
+        await executeManualSettlement(interaction, playersOption, buyinOption);
+      } else {
+        const { createManualRecordModal } = await import('../ui/components');
+        await interaction.showModal(createManualRecordModal(buyinOption));
+      }
+      return;
+    }
+
+    // EDIT (Edit completed or manual session)
+    if (subcommand === 'edit') {
+      const sessionIdOption = interaction.options.getInteger('session_id');
+      const playersOption = interaction.options.getString('players');
+      const buyinOption = interaction.options.getNumber('buyin');
+
+      let targetSession: repo.SessionRow | null = null;
+      if (sessionIdOption) {
+        targetSession = (await repo.getSessionById(sessionIdOption)) || null;
+      } else {
+        targetSession = (await repo.getLastSession(channelId)) || (await repo.getActiveSession(channelId)) || null;
+      }
+
+      if (!targetSession) {
+        await interaction.reply({
+          content: '❌ ไม่พบข้อมูลโต๊ะหรือรอบ Poker ที่ต้องการแก้ไขครับ',
+          ephemeral: true,
+        });
+        return;
+      }
+
+      // Check Host or Admin permission
+      if (
+        interaction.user.id !== targetSession.host_id &&
+        !interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)
+      ) {
+        await interaction.reply({
+          content: '❌ เฉพาะ Host ของโต๊ะนี้หรือแอดมินเท่านั้นที่สามารถแก้ไขข้อมูลรอบนี้ได้ครับ',
+          ephemeral: true,
+        });
+        return;
+      }
+
+      const finalBuyIn = buyinOption ?? targetSession.default_buyin ?? 200;
+
+      if (playersOption) {
+        await interaction.deferReply();
+        await executeManualSettlement(interaction, playersOption, finalBuyIn, targetSession.id);
+      } else {
+        const players = await repo.getSessionPlayers(targetSession.id);
+        const { formatPlayersForModal } = await import('../services/manual-parser');
+        const prefilledText = formatPlayersForModal(finalBuyIn, players);
+        const { createManualEditModal } = await import('../ui/components');
+        await interaction.showModal(createManualEditModal(targetSession.id, finalBuyIn, prefilledText));
+      }
       return;
     }
 
@@ -835,6 +941,118 @@ export async function finalizeAndDisplaySummary(
     await interaction.reply({ embeds: [embed], files, components: [actionRow] });
   }
 }
+
+export async function executeManualSettlement(
+  context: any,
+  rawPlayersText: string,
+  defaultBuyIn: number = 200,
+  existingSessionId?: number
+) {
+  const { parseManualInputLines, resolvePlayerDiscordMembers } = await import('../services/manual-parser');
+  const parsed = parseManualInputLines(rawPlayersText, defaultBuyIn);
+
+  if (parsed.errors.length > 0 && parsed.players.length === 0) {
+    const errorMsg = `❌ **ไม่สามารถบันทึกข้อมูลได้:**\n${parsed.errors.join('\n')}\n\n💡 **ตัวอย่างรูปแบบที่ถูกต้อง:**\n\`@Ton 350\`\n\`@Nadear 50 buyin:400\`\n\`@JJ 200\``;
+    if (context.replied || context.deferred) {
+      await context.editReply({ content: errorMsg });
+    } else {
+      await context.reply({ content: errorMsg, ephemeral: true });
+    }
+    return;
+  }
+
+  const guildId = context.guildId || context.guild?.id || '';
+  const channelId = context.channelId || context.channel?.id || '';
+  const hostId = context.user?.id || context.member?.id || 'host';
+
+  let voiceChannelId: string | undefined;
+  try {
+    const callerMember = context.member;
+    voiceChannelId =
+      callerMember?.voice?.channelId ||
+      (context.user && context.guild?.voiceStates?.cache?.get(context.user.id)?.channelId);
+  } catch {}
+
+  const resolvedPlayers = await resolvePlayerDiscordMembers(parsed.players, context.guild, voiceChannelId);
+
+  for (const p of resolvedPlayers) {
+    if (!p.userId.startsWith('guest_')) {
+      await repo.upsertUser(p.userId, p.name);
+    }
+  }
+
+  const { settlement, session } = await repo.saveOrUpdateManualSession(
+    guildId,
+    channelId,
+    hostId,
+    defaultBuyIn,
+    resolvedPlayers,
+    existingSessionId
+  );
+
+  const sessionPlayers = await repo.getSessionPlayers(session.id);
+  const ppMap: Record<string, { promptpay: string | null; qrImageUrl: string | null }> = {};
+  for (const p of sessionPlayers) {
+    ppMap[p.user_id] = { promptpay: p.promptpay, qrImageUrl: p.qr_image_url };
+  }
+  const { createSummaryEmbed } = await import('../ui/embeds');
+  const embed = createSummaryEmbed(session, settlement, ppMap);
+
+  let prefixNote = existingSessionId
+    ? `✏️ **แก้ไขและคำนวณเงินใหม่สำหรับ Session #${session.id} สำเร็จ!** (อัปเดตตาราง Leaderboard เรียบร้อย)\n`
+    : `📝 **บันทึกและคิดเงิน Poker Session #${session.id} สำเร็จ!** (บันทึกลงตาราง Leaderboard เรียบร้อย)\n`;
+
+  if (parsed.errors.length > 0) {
+    prefixNote += `⚠️ *ข้อสังเกตบางรายการ:*\n${parsed.errors.join('\n')}\n\n`;
+  }
+
+  const topCreditor = settlement.players.find(
+    p =>
+      p.net > 0 &&
+      !p.isBot &&
+      !p.userId.startsWith('bot_') &&
+      !p.userId.startsWith('guest_') &&
+      (ppMap[p.userId]?.qrImageUrl || ppMap[p.userId]?.promptpay)
+  );
+
+  const files: any[] = [];
+  if (topCreditor) {
+    const pInfo = ppMap[topCreditor.userId];
+    const qrResult = await resolvePaymentAttachment(
+      {
+        userId: topCreditor.userId,
+        name: topCreditor.name,
+        promptpay: pInfo?.promptpay,
+        qrImageUrl: pInfo?.qrImageUrl,
+      },
+      topCreditor.net
+    );
+    if (qrResult) {
+      embed.setImage(`attachment://${qrResult.imageFileName}`);
+      embed.addFields({
+        name:
+          qrResult.sourceType === 'custom_qr'
+            ? `📱 QR Code รับเงินของ ${topCreditor.name} (${topCreditor.net.toLocaleString()}฿)`
+            : `📱 QR Code พร้อมเพย์ของ ${topCreditor.name} (${topCreditor.net.toLocaleString()}฿)`,
+        value:
+          qrResult.sourceType === 'custom_qr'
+            ? `สแกน QR Code ด้านล่างเพื่อโอนเงินเข้าบัญชีได้ทันที (QR ที่ผู้เล่นอัปโหลดไว้)`
+            : `สามารถสแกน QR Code ด้านล่างเพื่อโอนเงินได้ทันที (สร้างยอดอัตโนมัติ ${topCreditor.net.toLocaleString()} บาท)`,
+      });
+      files.push(qrResult.attachment);
+    }
+  }
+
+  const { createNextRoundActionRow } = await import('../ui/components');
+  const actionRow = createNextRoundActionRow(session.id, false, settlement.isBalanced);
+
+  if (context.replied || context.deferred) {
+    await context.editReply({ content: prefixNote, embeds: [embed], files, components: [actionRow] });
+  } else {
+    await context.reply({ content: prefixNote, embeds: [embed], files, components: [actionRow] });
+  }
+}
+
 
 export async function processTableScan(
   context: any,

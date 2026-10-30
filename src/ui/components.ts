@@ -146,20 +146,80 @@ export function createNextRoundActionRow(
 ): ActionRowBuilder<ButtonBuilder> {
   return new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
+      .setCustomId(`btn_poker_edit_${sessionId}`)
+      .setLabel(isBalanced ? '✏️ แก้ไขยอดเงิน (Edit)' : '⚠️ แก้ไขยอดเงิน (ไม่บาลานซ์)')
+      .setStyle(isBalanced ? ButtonStyle.Secondary : ButtonStyle.Danger)
+      .setDisabled(disabled),
+    new ButtonBuilder()
       .setCustomId(`btn_poker_next_round_${sessionId}`)
       .setLabel('🔄 เริ่มรอบใหม่ (ดึงผู้เล่นเดิมเข้าโต๊ะ)')
       .setStyle(ButtonStyle.Success)
-      .setDisabled(disabled),
-    new ButtonBuilder()
-      .setCustomId(`btn_poker_recalc_${sessionId}`)
-      .setLabel(isBalanced ? '🧮 คำนวณใหม่ (แก้ไขชิป)' : '⚠️ คำนวณใหม่ (ยอดไม่บาลานซ์)')
-      .setStyle(isBalanced ? ButtonStyle.Secondary : ButtonStyle.Danger)
       .setDisabled(disabled),
     new ButtonBuilder()
       .setCustomId('btn_poker_leaderboard')
       .setLabel('🏆 ดูอันดับ (Leaderboard)')
       .setStyle(ButtonStyle.Primary)
   );
+}
+
+export function createManualRecordModal(defaultBuyIn: number = 200): ModalBuilder {
+  const modal = new ModalBuilder()
+    .setCustomId('modal_poker_manual_record')
+    .setTitle('📝 คิดเงิน Poker (พิมพ์เอง)');
+
+  const buyInInput = new TextInputBuilder()
+    .setCustomId('input_buyin')
+    .setLabel('ยอด Buy-in ต่อคน (บาท)')
+    .setStyle(TextInputStyle.Short)
+    .setValue(String(defaultBuyIn))
+    .setPlaceholder('เช่น 200 หรือ 500')
+    .setRequired(true);
+
+  const playersInput = new TextInputBuilder()
+    .setCustomId('input_players')
+    .setLabel('รายชื่อผู้เล่น และยอดชิป/Buy-in')
+    .setStyle(TextInputStyle.Paragraph)
+    .setPlaceholder('พิมพ์คนละบรรทัด เช่น:\n@Ton 350\n@Nadear 50\n@JJ 200\n(หรือแยก buy-in: @Nadear 50 buyin:400)')
+    .setRequired(true);
+
+  modal.addComponents(
+    new ActionRowBuilder<TextInputBuilder>().addComponents(buyInInput),
+    new ActionRowBuilder<TextInputBuilder>().addComponents(playersInput)
+  );
+
+  return modal;
+}
+
+export function createManualEditModal(
+  sessionId: number,
+  defaultBuyIn: number,
+  prefilledPlayersText: string
+): ModalBuilder {
+  const modal = new ModalBuilder()
+    .setCustomId(`modal_poker_manual_edit_${sessionId}`)
+    .setTitle(`✏️ แก้ไขยอดเงิน (Session #${sessionId})`);
+
+  const buyInInput = new TextInputBuilder()
+    .setCustomId('input_buyin')
+    .setLabel('ยอด Buy-in พื้นฐาน (บาท)')
+    .setStyle(TextInputStyle.Short)
+    .setValue(String(defaultBuyIn))
+    .setPlaceholder('เช่น 200 หรือ 500')
+    .setRequired(true);
+
+  const playersInput = new TextInputBuilder()
+    .setCustomId('input_players')
+    .setLabel('รายชื่อผู้เล่น และยอดชิป/Buy-in')
+    .setStyle(TextInputStyle.Paragraph)
+    .setValue(prefilledPlayersText)
+    .setRequired(true);
+
+  modal.addComponents(
+    new ActionRowBuilder<TextInputBuilder>().addComponents(buyInInput),
+    new ActionRowBuilder<TextInputBuilder>().addComponents(playersInput)
+  );
+
+  return modal;
 }
 
 export function createRecalculateModal(

@@ -79,7 +79,11 @@ export function createSummaryEmbed(
     const icon = p.net > 0 ? '🟢' : p.net < 0 ? '🔴' : '⚪';
     const sign = p.net > 0 ? '+' : '';
     const medal = idx === 0 && p.net > 0 ? '👑 ' : '';
-    const userLabel = p.isBot || p.userId.startsWith('bot_') ? `🤖 **${p.name} (Bot)**` : `<@${p.userId}>`;
+    const userLabel = p.isBot || p.userId.startsWith('bot_')
+      ? `🤖 **${p.name} (Bot)**`
+      : p.userId.startsWith('guest_')
+      ? `👤 **${p.name}**`
+      : `<@${p.userId}>`;
     return `${medal}${icon} ${userLabel} : **${sign}${p.net.toLocaleString()} บาท** *(Buy-in ${p.buyIn} ➜ เหลือ ${p.cashOut})*`;
   });
 
@@ -104,8 +108,16 @@ export function createSummaryEmbed(
           ppText = ` 🖼️ *(มีรูป QR รับเงิน)*`;
         }
       }
-      const fromLabel = tx.fromUserId.startsWith('bot_') ? `🤖 **${tx.fromName} (Bot)**` : `<@${tx.fromUserId}>`;
-      const toLabel = tx.toUserId.startsWith('bot_') ? `🤖 **${tx.toName} (Bot)**` : `<@${tx.toUserId}>`;
+      const fromLabel = tx.fromUserId.startsWith('bot_')
+        ? `🤖 **${tx.fromName} (Bot)**`
+        : tx.fromUserId.startsWith('guest_')
+        ? `👤 **${tx.fromName}**`
+        : `<@${tx.fromUserId}>`;
+      const toLabel = tx.toUserId.startsWith('bot_')
+        ? `🤖 **${tx.toName} (Bot)**`
+        : tx.toUserId.startsWith('guest_')
+        ? `👤 **${tx.toName}**`
+        : `<@${tx.toUserId}>`;
       return `**${idx + 1}.** ${fromLabel} โอนให้ ${toLabel} 👉 **${tx.amount.toLocaleString()} บาท**${ppText}`;
     });
 
@@ -200,16 +212,18 @@ export function createRankedLeaderboardEmbed(
     return embed;
   }
 
+  const formatUser = (uid: string) => (uid.startsWith('guest_') ? `👤 **${uid.replace(/^guest_/, '')}**` : `<@${uid}>`);
+
   // Top winner (Shark 🦈) & Top loser (Sponsor 🐟)
   const shark = statsList[0];
   const sponsor = statsList[statsList.length - 1];
 
   let headerNote = '';
   if (shark && shark.totalProfit > 0) {
-    headerNote += `🦈 **Shark ประจำตาราง:** <@${shark.userId}> (+${shark.totalProfit.toLocaleString()}฿)\n`;
+    headerNote += `🦈 **Shark ประจำตาราง:** ${formatUser(shark.userId)} (+${shark.totalProfit.toLocaleString()}฿)\n`;
   }
   if (sponsor && sponsor.totalProfit < 0 && sponsor.userId !== shark?.userId) {
-    headerNote += `🐟 **ผู้สนับสนุนหลัก (Sponsor):** <@${sponsor.userId}> (${sponsor.totalProfit.toLocaleString()}฿)\n`;
+    headerNote += `🐟 **ผู้สนับสนุนหลัก (Sponsor):** ${formatUser(sponsor.userId)} (${sponsor.totalProfit.toLocaleString()}฿)\n`;
   }
   if (headerNote) {
     embed.setDescription(headerNote + '\n──────────────────────────────');
@@ -224,7 +238,7 @@ export function createRankedLeaderboardEmbed(
     const profitSign = p.totalProfit > 0 ? '+' : '';
     const icon = p.totalProfit > 0 ? '🟢' : p.totalProfit < 0 ? '🔴' : '⚪';
 
-    return `${rankBadge} <@${p.userId}> : ${icon} **${profitSign}${p.totalProfit.toLocaleString()}฿** *(เล่น ${p.gamesPlayed} เกม | Win Rate ${p.winRate}%)*`;
+    return `${rankBadge} ${formatUser(p.userId)} : ${icon} **${profitSign}${p.totalProfit.toLocaleString()}฿** *(เล่น ${p.gamesPlayed} เกม | Win Rate ${p.winRate}%)*`;
   });
 
   embed.addFields({

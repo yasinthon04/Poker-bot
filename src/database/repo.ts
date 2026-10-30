@@ -419,6 +419,113 @@ export async function finalizeSession(
   return { settlement, session };
 }
 
+export interface ManualPlayerEntry {
+  userId: string;
+  name: string;
+  buyIn: number;
+  cashOut: number;
+}
+
+export async function saveOrUpdateManualSession(
+  guildId: string,
+  channelId: string,
+  hostId: string,
+  defaultBuyIn: number,
+  playerEntries: ManualPlayerEntry[],
+  existingSessionId?: number
+): Promise<{ settlement: SettlementResult; session: SessionRow }> {
+  if (isSupabaseConfigured()) {
+    return supabaseRepo.saveOrUpdateManualSession(
+      guildId,
+      channelId,
+      hostId,
+      defaultBuyIn,
+      playerEntries,
+      existingSessionId
+    );
+  }
+  const db = getMemoryDb();
+
+  let session: SessionRecord;
+  let sessionId: number;
+
+  if (existingSessionId && db.sessions[String(existingSessionId)]) {
+    sessionId = existingSessionId;
+    session = db.sessions[String(sessionId)];
+    session.default_buyin = defaultBuyIn;
+    session.status = 'completed';
+    session.ended_at = new Date().toISOString();
+
+    // Remove existing players for this session for a clean overwrite
+    for (const [key, p] of Object.entries(db.session_players)) {
+      if (p.session_id === sessionId) {
+        delete db.session_players[key];
+      }
+    }
+  } else {
+    sessionId = ++db.counters.sessionId;
+    session = {
+      id: sessionId,
+      guild_id: guildId,
+      channel_id: channelId,
+      host_id: hostId,
+      default_buyin: defaultBuyIn,
+      status: 'completed',
+      message_id: null,
+      created_at: new Date().toISOString(),
+      ended_at: new Date().toISOString(),
+    };
+    db.sessions[String(sessionId)] = session;
+  }
+
+  // Insert player records
+  for (const entry of playerEntries) {
+    const pId = ++db.counters.sessionPlayerId;
+    db.session_players[String(pId)] = {
+      id: pId,
+      session_id: sessionId,
+      user_id: entry.userId,
+      buy_in: Math.round(entry.buyIn * 100) / 100,
+      cash_out: Math.round(entry.cashOut * 100) / 100,
+      status: 'playing',
+      left_at: null,
+      created_at: new Date().toISOString(),
+    };
+  }
+
+  // Calculate settlement
+  const playerInputs = playerEntries.map(p => ({
+    userId: p.userId,
+    name: p.name,
+    buyIn: p.buyIn,
+    cashOut: p.cashOut,
+  }));
+  const settlement = calculateSettlements(playerInputs);
+
+  // Clear existing settlements for this session
+  for (const [key, s] of Object.entries(db.settlements)) {
+    if (s.session_id === sessionId) {
+      delete db.settlements[key];
+    }
+  }
+
+  // Insert new settlements
+  for (const tx of settlement.transactions) {
+    const sId = ++db.counters.settlementId;
+    db.settlements[String(sId)] = {
+      id: sId,
+      session_id: sessionId,
+      from_user_id: tx.fromUserId,
+      to_user_id: tx.toUserId,
+      amount: tx.amount,
+      created_at: new Date().toISOString(),
+    };
+  }
+
+  persistDb();
+  return { settlement, session };
+}
+
 // Statistics Queries
 export async function getUserStats(userId: string): Promise<UserStats> {
   if (isSupabaseConfigured()) {
