@@ -61,6 +61,21 @@ PokerGameManager.getInstance().attachToHttpServer(server);
 
 server.listen(port, () => {
   console.log(`🌐 Health check & Poker Activity server listening on port ${port}`);
+
+  // Auto keep-alive: Prevent Render Free Tier web service from spinning down after 15 mins
+  const keepAliveUrl = process.env.RENDER_EXTERNAL_URL || process.env.APP_URL;
+  if (keepAliveUrl) {
+    const PING_INTERVAL = 8 * 60 * 1000; // Every 8 minutes
+    setInterval(async () => {
+      try {
+        const res = await fetch(keepAliveUrl);
+        console.log(`💓 Keep-alive ping sent to ${keepAliveUrl} (Status: ${res.status})`);
+      } catch (err: any) {
+        console.warn(`⚠️ Keep-alive ping error:`, err.message);
+      }
+    }, PING_INTERVAL);
+    console.log(`⏱️ Keep-alive auto-pinger active for ${keepAliveUrl} (every 8 mins)`);
+  }
 });
 
 const client = new Client({
