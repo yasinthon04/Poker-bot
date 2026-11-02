@@ -347,6 +347,7 @@
       <a href="javascript:void(0)" onclick="openStatsModal()" class="hover:text-white transition cursor-pointer">Stats</a>
       <a href="javascript:void(0)" onclick="openSettingsModal()" class="hover:text-white transition cursor-pointer">Table Settings</a>
       <a href="javascript:void(0)" onclick="document.getElementById('addBotBtn').click()" class="text-indigo-400 hover:text-indigo-300 transition cursor-pointer">+ Add Bot</a>
+      <a href="javascript:void(0)" onclick="openRemoveBotModal()" class="text-rose-400 hover:text-rose-300 transition cursor-pointer flex items-center gap-1"><span>🗑️</span> Remove Bot</a>
     </nav>
 
     <!-- Right Profile Pill & Action Buttons -->
@@ -999,6 +1000,31 @@
     </div>
   </div>
 
+  <!-- MODAL: REMOVE BOT / MANAGE BOTS -->
+  <div id="removeBotModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="font-bold text-base text-rose-400 flex items-center gap-2">
+          <span>🤖</span> จัดการ / ลบ Bot
+        </h3>
+        <button onclick="closeRemoveBotModal()" class="text-slate-400 hover:text-white text-lg cursor-pointer">&times;</button>
+      </div>
+
+      <div id="removeBotList" class="space-y-2 max-h-60 overflow-y-auto pr-1">
+        <!-- Injected dynamically -->
+      </div>
+
+      <div class="flex flex-col gap-2 pt-2 border-t border-slate-800">
+        <button id="removeAllBotsBtn" onclick="confirmRemoveAllBots()" class="w-full bg-rose-600/90 hover:bg-rose-500 text-white py-2 rounded-xl text-xs font-bold shadow flex items-center justify-center gap-1.5 transition cursor-pointer">
+          <span>🗑️</span> ลบ Bot ทั้งหมด (Remove All Bots)
+        </button>
+        <button onclick="closeRemoveBotModal()" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer">
+          ปิดหน้าต่าง
+        </button>
+      </div>
+    </div>
+  </div>
+
   <button id="addBotBtn" class="hidden"></button>
 
   <!-- ==================== JAVASCRIPT ==================== -->
@@ -1305,6 +1331,9 @@
           handleTableEvents(tableState);
           updateSidebarStats(currentUserStats, tableState);
           recordHandHistoryIfEnded(tableState);
+          if (document.getElementById('removeBotModal') && !document.getElementById('removeBotModal').classList.contains('hidden')) {
+            renderRemoveBotList();
+          }
           break;
         }
         case 'leaderboard_data': {
@@ -1661,10 +1690,17 @@
               ` : ''}
             </div>
 
-            <div class="flex flex-col text-left min-w-0 pr-1">
-              <span class="text-[10px] sm:text-[11px] font-bold text-white truncate max-w-[80px] sm:max-w-[95px]">
-                ${seat.isBot ? '🤖 ' : ''}${seat.displayName}
-              </span>
+            <div class="flex flex-col text-left min-w-0 pr-1 flex-1">
+              <div class="flex items-center justify-between gap-1">
+                <span class="text-[10px] sm:text-[11px] font-bold text-white truncate max-w-[70px] sm:max-w-[85px]">
+                  ${seat.isBot ? '🤖 ' : ''}${seat.displayName}
+                </span>
+                ${seat.isBot ? `
+                  <button onclick="event.stopPropagation(); confirmRemoveBot(${idx}, '${escapeHtml(seat.displayName)}')" class="text-rose-400 hover:text-rose-300 hover:bg-rose-950/80 p-0.5 rounded transition text-[10px] leading-none cursor-pointer" title="ลบ Bot นี้ออกจากโต๊ะ">
+                    🗑️
+                  </button>
+                ` : ''}
+              </div>
               <span class="text-[9px] ${seatStatusColor} font-mono font-medium truncate max-w-[85px] sm:max-w-[100px]">
                 ${seatStatusText}
               </span>
@@ -2139,9 +2175,16 @@
           if (headerStartBtn) headerStartBtn.classList.remove('hidden');
           if (promptContainer) {
             promptContainer.innerHTML = `
-              <button onclick="requestStartGame()" class="px-5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold text-xs sm:text-sm rounded-full shadow-2xl border border-blue-400 animate-pulse transition transform hover:scale-105 active:scale-95 flex items-center gap-2 cursor-pointer">
-                <span class="text-base">▶️</span> เริ่มเกมแจกไพ่ (Start Game)
-              </button>
+              <div class="flex items-center gap-2">
+                <button onclick="requestStartGame()" class="px-5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold text-xs sm:text-sm rounded-full shadow-2xl border border-blue-400 animate-pulse transition transform hover:scale-105 active:scale-95 flex items-center gap-2 cursor-pointer">
+                  <span class="text-base">▶️</span> เริ่มเกมแจกไพ่ (Start Game)
+                </button>
+                ${state.hasBots ? `
+                  <button onclick="openRemoveBotModal()" class="px-3 py-2 bg-rose-950/80 hover:bg-rose-900 border border-rose-500/40 text-rose-300 text-xs rounded-full font-bold shadow flex items-center gap-1 transition hover:scale-105 active:scale-95 cursor-pointer" title="จัดการหรือลบ Bot ออกจากโต๊ะ">
+                    <span>🗑️</span> ลบ Bot
+                  </button>
+                ` : ''}
+              </div>
             `;
           }
         } else {
@@ -2152,9 +2195,14 @@
                 <span class="text-xs text-blue-300 font-medium bg-black/60 px-3 py-1 rounded-full border border-blue-500/30">
                   👥 รอผู้เล่นอีก ${Math.max(1, 2 - eligiblePlayers.length)} คน
                 </span>
-                <button onclick="document.getElementById('addBotBtn').click()" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded-full font-bold shadow flex items-center gap-1 transition hover:scale-105 active:scale-95">
+                <button onclick="document.getElementById('addBotBtn').click()" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded-full font-bold shadow flex items-center gap-1 transition hover:scale-105 active:scale-95 cursor-pointer">
                   <span>🤖</span> + เพิ่ม Bot
                 </button>
+                ${state.hasBots ? `
+                  <button onclick="openRemoveBotModal()" class="px-2.5 py-1 bg-rose-950/80 hover:bg-rose-900 border border-rose-500/40 text-rose-300 text-xs rounded-full font-bold shadow flex items-center gap-1 transition hover:scale-105 active:scale-95 cursor-pointer" title="จัดการหรือลบ Bot ออกจากโต๊ะ">
+                    <span>🗑️</span> ลบ Bot
+                  </button>
+                ` : ''}
               </div>
             `;
           }
@@ -2737,6 +2785,96 @@
         }));
       }
       closeAddBotModal();
+    }
+
+    // Remove / Manage Bot Logic
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function openRemoveBotModal() {
+      renderRemoveBotList();
+      document.getElementById('removeBotModal').classList.remove('hidden');
+    }
+
+    function closeRemoveBotModal() {
+      document.getElementById('removeBotModal').classList.add('hidden');
+    }
+
+    function renderRemoveBotList() {
+      const container = document.getElementById('removeBotList');
+      const removeAllBtn = document.getElementById('removeAllBotsBtn');
+      if (!container) return;
+
+      const bots = (tableState?.seats || []).filter(s => s && s.isBot);
+      if (bots.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-6 text-slate-400 text-xs">
+            <span class="text-2xl block mb-1">🤖</span>
+            ไม่มี Bot อยู่ในโต๊ะขณะนี้
+          </div>
+        `;
+        if (removeAllBtn) removeAllBtn.classList.add('hidden');
+        return;
+      }
+
+      if (removeAllBtn) {
+        removeAllBtn.classList.remove('hidden');
+        removeAllBtn.innerHTML = `<span>🗑️</span> ลบ Bot ทั้งหมด (${bots.length} ตัว)`;
+      }
+
+      container.innerHTML = bots.map(b => `
+        <div class="flex items-center justify-between p-2.5 bg-slate-950/80 rounded-xl border border-slate-800 hover:border-slate-700 transition">
+          <div class="flex items-center gap-2.5 min-w-0 pr-2">
+            <img src="${b.avatarUrl || 'https://api.dicebear.com/7.x/bottts/svg?seed=' + b.userId}" class="w-8 h-8 rounded-full border border-indigo-500/40 bg-slate-800 object-cover flex-shrink-0">
+            <div class="flex flex-col text-left min-w-0">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="text-xs font-bold text-white truncate max-w-[110px]">${escapeHtml(b.displayName)}</span>
+                <span class="text-[9px] px-1.5 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-700/60 font-mono uppercase font-bold">${b.botDifficulty || 'bot'}</span>
+              </div>
+              <span class="text-[10px] text-slate-400 font-mono">ที่นั่งที่ ${b.seatIndex + 1} • ฿${b.chips.toLocaleString()}</span>
+            </div>
+          </div>
+          <button onclick="confirmRemoveBot(${b.seatIndex}, '${escapeHtml(b.displayName)}')" class="px-2.5 py-1 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white rounded-lg text-xs font-bold border border-rose-500/30 transition flex items-center gap-1 flex-shrink-0 cursor-pointer">
+            <span>🗑️</span> ลบ
+          </button>
+        </div>
+      `).join('');
+    }
+
+    function confirmRemoveBot(seatIndex, name) {
+      if (confirm(`คุณต้องการนำ ${name} ออกจากโต๊ะใช่หรือไม่?`)) {
+        if (ws) {
+          ws.send(JSON.stringify({
+            type: 'remove_bot',
+            seatIndex
+          }));
+        }
+        setTimeout(() => {
+          if (document.getElementById('removeBotModal') && !document.getElementById('removeBotModal').classList.contains('hidden')) {
+            renderRemoveBotList();
+          }
+        }, 100);
+      }
+    }
+
+    function confirmRemoveAllBots() {
+      const bots = (tableState?.seats || []).filter(s => s && s.isBot);
+      if (bots.length === 0) return;
+      if (confirm(`คุณต้องการลบ Bot ทั้งหมด (${bots.length} ตัว) ออกจากโต๊ะใช่หรือไม่?`)) {
+        if (ws) {
+          ws.send(JSON.stringify({
+            type: 'remove_all_bots'
+          }));
+        }
+        closeRemoveBotModal();
+      }
     }
 
     // Winner Confetti Particles

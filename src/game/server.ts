@@ -174,6 +174,15 @@ export class PokerGameManager {
         break;
       }
 
+      case 'remove_all_bots': {
+        if (!conn.channelId) return;
+        const table = this.tables.get(conn.channelId);
+        if (!table) return;
+
+        table.removeAllBots();
+        break;
+      }
+
       case 'action': {
         if (!conn.channelId || !conn.userId) return;
         const table = this.tables.get(conn.channelId);

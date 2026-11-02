@@ -87,6 +87,7 @@ export interface TablePlayerPublic {
   isFolded: boolean;
   isAllIn: boolean;
   isBot: boolean;
+  botDifficulty?: BotDifficulty;
   lastAction?: string;
   connected: boolean;
   hasCards: boolean;
@@ -284,10 +285,91 @@ export class PokerTable {
     const player = this.seats[seatIndex];
     if (!player || !player.isBot) return false;
 
+    player.isFolded = true;
     this.seats[seatIndex] = null;
+
+    const wasCurrentTurn = this.currentTurnSeat === seatIndex;
+
+    // If mid-hand, check if only 1 player remains in the hand
+    if (this.phase !== 'waiting' && this.phase !== 'hand_ended' && this.phase !== 'showdown') {
+      const remainingInHand = this.seats.filter(p => p !== null && !p.isFolded && p.holeCards.length > 0);
+      if (remainingInHand.length <= 1) {
+        if (remainingInHand.length === 1) {
+          this.awardPotToSingleWinner(remainingInHand[0]!);
+        } else {
+          this.clearTurnTimer();
+          this.phase = 'hand_ended';
+          this.checkAutoStart();
+        }
+      } else if (this.isBettingRoundComplete()) {
+        this.advancePhase();
+      } else if (wasCurrentTurn) {
+        this.advanceTurn();
+      }
+    } else {
+      if (wasCurrentTurn) {
+        this.advanceTurn();
+      }
+    }
+
+    const eligible = this.seats.filter(p => p !== null && p.chips > 0);
+    if (eligible.length < 2 && this.phase === 'waiting') {
+      this.currentTurnSeat = null;
+    }
+
     this.lastActionMessage = `🗑️ นำ ${player.displayName} ออกจากโต๊ะ`;
     this.emitChange();
     return true;
+  }
+
+  public removeAllBots(): number {
+    const botIndices = this.seats
+      .map((p, idx) => (p && p.isBot ? idx : -1))
+      .filter(idx => idx !== -1);
+
+    if (botIndices.length === 0) return 0;
+
+    let wasCurrentTurn = false;
+    for (const seatIndex of botIndices) {
+      const player = this.seats[seatIndex];
+      if (!player) continue;
+      player.isFolded = true;
+      if (this.currentTurnSeat === seatIndex) {
+        wasCurrentTurn = true;
+      }
+      this.seats[seatIndex] = null;
+    }
+
+    // If mid-hand, check if only 1 player remains in the hand
+    if (this.phase !== 'waiting' && this.phase !== 'hand_ended' && this.phase !== 'showdown') {
+      const remainingInHand = this.seats.filter(p => p !== null && !p.isFolded && p.holeCards.length > 0);
+      if (remainingInHand.length <= 1) {
+        if (remainingInHand.length === 1) {
+          this.awardPotToSingleWinner(remainingInHand[0]!);
+        } else {
+          this.clearTurnTimer();
+          this.phase = 'hand_ended';
+          this.checkAutoStart();
+        }
+      } else if (this.isBettingRoundComplete()) {
+        this.advancePhase();
+      } else if (wasCurrentTurn) {
+        this.advanceTurn();
+      }
+    } else {
+      if (wasCurrentTurn) {
+        this.advanceTurn();
+      }
+    }
+
+    const eligible = this.seats.filter(p => p !== null && p.chips > 0);
+    if (eligible.length < 2 && this.phase === 'waiting') {
+      this.currentTurnSeat = null;
+    }
+
+    this.lastActionMessage = `🗑️ นำ Bot ทั้งหมด (${botIndices.length} ตัว) ออกจากโต๊ะ`;
+    this.emitChange();
+    return botIndices.length;
   }
 
   public updatePlayerProfile(userId: string, displayName: string, avatarUrl?: string): boolean {
@@ -959,6 +1041,7 @@ export class PokerTable {
           isFolded: p.isFolded,
           isAllIn: p.isAllIn,
           isBot: p.isBot,
+          botDifficulty: p.botDifficulty,
           lastAction: p.lastAction,
           connected: p.connected,
           hasCards: p.holeCards.length > 0,

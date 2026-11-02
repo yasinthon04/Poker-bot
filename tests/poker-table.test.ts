@@ -371,4 +371,75 @@ describe('Texas Hold\'em Poker Table State Machine', () => {
     assert.strictEqual(table.currentTurnSeat, null);
     assert.strictEqual(table.communityCards.length, 0);
   });
+
+  test('removeBot mid-hand folds bot and awards pot to remaining player', () => {
+    const table = new PokerTable('tab18', 'chan18', 'user1', 100);
+    table.sitDown(0, { id: 'u1', username: 'alice', displayName: 'Alice' }, 200);
+    table.addBot(1, 'Bot Alpha', 'medium', 200);
+
+    table.dealerSeat = 0;
+    table.startHand(); // Alice SB (10), Bot BB (20). Pot = 30.
+
+    assert.strictEqual(table.phase, 'preflop');
+    assert.strictEqual(table.seats[1]?.isBot, true);
+
+    // Remove bot mid-hand
+    const removed = table.removeBot(1);
+    assert.strictEqual(removed, true);
+    assert.strictEqual(table.seats[1], null);
+    assert.strictEqual(table.hasBots, false);
+
+    // Alice should be awarded the pot as sole remaining player
+    assert.strictEqual(table.phase, 'hand_ended');
+    assert.strictEqual(table.handWinners?.[0]?.userId, 'u1');
+    assert.strictEqual(table.seats[0]?.chips, 210); // 200 - 10 + 30
+  });
+
+  test('removeAllBots removes multiple bots cleanly', () => {
+    const table = new PokerTable('tab19', 'chan19', 'user1', 100);
+    table.sitDown(0, { id: 'u1', username: 'alice', displayName: 'Alice' }, 200);
+    table.addBot(1, 'Bot One', 'easy', 200);
+    table.addBot(2, 'Bot Two', 'hard', 200);
+
+    assert.strictEqual(table.hasBots, true);
+    assert.strictEqual(table.seats.filter(p => p !== null).length, 3);
+
+    const count = table.removeAllBots();
+    assert.strictEqual(count, 2);
+    assert.strictEqual(table.hasBots, false);
+    assert.strictEqual(table.seats[1], null);
+    assert.strictEqual(table.seats[2], null);
+    assert.strictEqual(table.seats[0]?.displayName, 'Alice');
+  });
+
+  test('removeBot when it is bot turn advances turn to next player cleanly', () => {
+    const table = new PokerTable('tab20', 'chan20', 'user1', 100);
+    table.sitDown(0, { id: 'u1', username: 'alice', displayName: 'Alice' }, 200);
+    table.sitDown(1, { id: 'u2', username: 'bob', displayName: 'Bob' }, 200);
+    table.addBot(2, 'Bot Charlie', 'medium', 200);
+
+    table.dealerSeat = 0;
+    table.startHand(); // 3 players: Dealer=0, SB=1 (Bob 10), BB=2 (Bot 20). UTG acts first = Alice (0).
+
+    assert.strictEqual(table.currentTurnSeat, 0);
+    // Alice calls BB (20)
+    table.handleAction('u1', 'call');
+
+    // Bob calls BB (adds 10)
+    assert.strictEqual(table.currentTurnSeat, 1);
+    table.handleAction('u2', 'call');
+
+    // Now it is Bot's turn (seat 2, BB option)
+    assert.strictEqual(table.currentTurnSeat, 2);
+
+    // Remove bot during its turn
+    const removed = table.removeBot(2);
+    assert.strictEqual(removed, true);
+    assert.strictEqual(table.seats[2], null);
+
+    // Turn should have advanced / betting round completed (Alice and Bob called, moving to flop)
+    // Flop dealt because remaining players matched the bet!
+    assert.strictEqual(table.phase, 'flop');
+    assert.strictEqual(table.communityCards.length, 3);
+  });
 });
