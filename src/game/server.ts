@@ -352,9 +352,16 @@ export class PokerGameManager {
         break;
       }
 
-      case 'settle_and_close': {
+      case 'settle_and_close':
+      case 'close_and_clear_table': {
         if (!conn.channelId) return;
-        this.settleAndCloseTable(conn.channelId, conn.userId);
+        this.closeAndClearTable(conn.channelId, conn.userId);
+        break;
+      }
+
+      case 'clear_table_seats': {
+        if (!conn.channelId) return;
+        this.clearAllPlayersFromTable(conn.channelId);
         break;
       }
     }
@@ -377,14 +384,18 @@ export class PokerGameManager {
   }
 
   /**
-   * Finalizes table session and calculates settlement with bot exclusion!
+   * Finalizes table session and calculates settlement with bot exclusion, then clears everyone out!
    */
   public async settleAndCloseTable(channelId: string, requestedByUserId?: string) {
     const table = this.tables.get(channelId);
     if (!table) return;
 
     const seatedPlayers = table.seats.filter((p): p is TablePlayer => p !== null);
-    if (seatedPlayers.length === 0) return;
+    if (seatedPlayers.length === 0) {
+      table.clearAllPlayers();
+      this.broadcastTableState(channelId);
+      return;
+    }
 
     const playerInputs = seatedPlayers.map(p => ({
       userId: p.userId,
@@ -397,10 +408,18 @@ export class PokerGameManager {
     // Calculate zero-sum settlement (skips transactions if bots exist!)
     const settlement = calculateSettlements(playerInputs);
 
+    // Clear all seated players from the table
+    table.clearAllPlayers();
+    this.broadcastTableState(channelId);
+
     // Broadcast close to WebSocket clients
     for (const conn of this.clients) {
       if (conn.channelId === channelId && conn.ws.readyState === WebSocket.OPEN) {
-        conn.ws.send(JSON.stringify({ type: 'table_closed', settlement }));
+        conn.ws.send(JSON.stringify({
+          type: 'table_closed',
+          settlement,
+          message: '🛑 โต๊ะถูกปิดและเคลียร์ผู้เล่นทุกคนออกจากโต๊ะเรียบร้อยแล้ว'
+        }));
       }
     }
 
@@ -480,5 +499,42 @@ export class PokerGameManager {
 
     // Remove table instance
     this.tables.delete(channelId);
+  }
+
+  public async closeAndClearTable(channelId: string, requestedByUserId?: string) {
+    const table = this.tables.get(channelId);
+    if (!table) return;
+
+    const seatedPlayers = table.seats.filter((p): p is TablePlayer => p !== null);
+    if (seatedPlayers.length > 0) {
+      await this.settleAndCloseTable(channelId, requestedByUserId);
+    } else {
+      table.clearAllPlayers();
+      this.broadcastTableState(channelId);
+      for (const conn of this.clients) {
+        if (conn.channelId === channelId && conn.ws.readyState === WebSocket.OPEN) {
+          conn.ws.send(JSON.stringify({
+            type: 'table_cleared',
+            message: '🛑 โต๊ะถูกปิดและเคลียร์ผู้เล่นออกจากโต๊ะเรียบร้อยแล้ว'
+          }));
+        }
+      }
+      this.tables.delete(channelId);
+    }
+  }
+
+  public clearAllPlayersFromTable(channelId: string) {
+    const table = this.tables.get(channelId);
+    if (!table) return;
+    table.clearAllPlayers();
+    this.broadcastTableState(channelId);
+    for (const conn of this.clients) {
+      if (conn.channelId === channelId && conn.ws.readyState === WebSocket.OPEN) {
+        conn.ws.send(JSON.stringify({
+          type: 'table_cleared',
+          message: '🛑 เคลียร์ผู้เล่นทุกคนออกจากโต๊ะเรียบร้อยแล้ว'
+        }));
+      }
+    }
   }
 }

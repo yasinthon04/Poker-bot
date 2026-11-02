@@ -296,6 +296,26 @@ export class PokerTable {
     return player;
   }
 
+  public clearAllPlayers(): TablePlayer[] {
+    if (this.turnTimeout) {
+      clearTimeout(this.turnTimeout);
+      this.turnTimeout = null;
+    }
+    const cleared = this.seats.filter((p): p is TablePlayer => p !== null);
+    this.seats = Array(9).fill(null);
+    this.phase = 'waiting';
+    this.currentTurnSeat = null;
+    this.currentHighBet = 0;
+    this.deck = [];
+    this.communityCards = [];
+    this.pots = [];
+    this.handWinners = undefined;
+    this.lastActionMessage = '🛑 โต๊ะถูกปิดและเคลียร์ผู้เล่นทุกคนออกจากโต๊ะเรียบร้อยแล้ว';
+    this.lastEvent = undefined;
+    this.emitChange();
+    return cleared;
+  }
+
   public earlyLeave(userId: string, chips: number): boolean {
     const player = this.seats.find(p => p?.userId === userId);
     if (!player) return false;

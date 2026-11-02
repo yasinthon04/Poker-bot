@@ -289,4 +289,20 @@ describe('Texas Hold\'em Poker Table State Machine', () => {
     assert.strictEqual(table.minRaise, 50);
     assert.strictEqual(table.getPublicState().totalPot, 75);
   });
+
+  test('clearAllPlayers empties all seats and resets game phase to waiting', () => {
+    const table = new PokerTable('tab17', 'chan17', 'user1', 200);
+    table.sitDown(0, { id: 'u1', username: 'alice', displayName: 'Alice' }, 200);
+    table.sitDown(1, { id: 'u2', username: 'bob', displayName: 'Bob' }, 200);
+    table.addBot(2, 'Bot Alpha');
+
+    assert.strictEqual(table.seats.filter(p => p !== null).length, 3);
+
+    const cleared = table.clearAllPlayers();
+    assert.strictEqual(cleared.length, 3);
+    assert.strictEqual(table.seats.filter(p => p !== null).length, 0);
+    assert.strictEqual(table.phase, 'waiting');
+    assert.strictEqual(table.currentTurnSeat, null);
+    assert.strictEqual(table.communityCards.length, 0);
+  });
 });
