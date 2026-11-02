@@ -98,6 +98,7 @@ export class PokerTable {
   public channelId: string;
   public hostId: string;
   public seats: (TablePlayer | null)[] = Array(9).fill(null);
+  public earlyLeavers: TablePlayer[] = [];
   public phase: GamePhase = 'waiting';
   public handNumber: number = 0;
   public defaultBuyIn: number = 200;
@@ -202,6 +203,14 @@ export class PokerTable {
     const actualBuyIn = buyIn && buyIn > 0 ? buyIn : this.defaultBuyIn;
     const isHandInProgress = this.phase !== 'waiting' && this.phase !== 'hand_ended' && this.phase !== 'showdown';
 
+    // If player previously left early in this session, restore/aggregate their total buy-in
+    let carriedBuyIn = 0;
+    const leaverIdx = this.earlyLeavers.findIndex(l => l.userId === user.id);
+    if (leaverIdx !== -1) {
+      carriedBuyIn = this.earlyLeavers[leaverIdx].totalBuyIn;
+      this.earlyLeavers.splice(leaverIdx, 1);
+    }
+
     this.seats[seatIndex] = {
       userId: user.id,
       seatIndex,
@@ -210,7 +219,7 @@ export class PokerTable {
       avatarUrl: user.avatarUrl,
       chips: actualBuyIn,
       initialBuyIn: actualBuyIn,
-      totalBuyIn: actualBuyIn,
+      totalBuyIn: carriedBuyIn + actualBuyIn,
       currentRoundBet: 0,
       totalHandBet: 0,
       holeCards: [],
@@ -290,20 +299,6 @@ export class PokerTable {
     return true;
   }
 
-  public standUp(userId: string): TablePlayer | null {
-    const seatIndex = this.seats.findIndex(p => p?.userId === userId);
-    if (seatIndex === -1) return null;
-    const player = this.seats[seatIndex]!;
-    this.seats[seatIndex] = null;
-
-    if (this.currentTurnSeat === seatIndex) {
-      this.advanceTurn();
-    }
-
-    this.emitChange();
-    return player;
-  }
-
   public clearAllPlayers(): TablePlayer[] {
     if (this.turnTimeout) {
       clearTimeout(this.turnTimeout);
@@ -311,6 +306,7 @@ export class PokerTable {
     }
     const cleared = this.seats.filter((p): p is TablePlayer => p !== null);
     this.seats = Array(9).fill(null);
+    this.earlyLeavers = [];
     this.phase = 'waiting';
     this.currentTurnSeat = null;
     this.currentHighBet = 0;
@@ -325,21 +321,60 @@ export class PokerTable {
   }
 
   public earlyLeave(userId: string, chips: number): boolean {
-    const player = this.seats.find(p => p?.userId === userId);
-    if (!player) return false;
+    const seatIndex = this.seats.findIndex(p => p?.userId === userId);
+    if (seatIndex === -1) return false;
+    const player = this.seats[seatIndex]!;
 
     player.chips = chips;
     player.isFolded = true;
     player.isEarlyLeaver = true;
-    this.lastActionMessage = `🏃 ${player.displayName} ขอออกก่อน (ล็อคชิป ${chips}฿)`;
+    this.lastActionMessage = `🏃 ${player.displayName} ขอออกก่อน (ล็อคชิป ${chips.toLocaleString()}฿)`;
     this.lastEvent = { type: 'early_leave', userId, amount: chips, timestamp: Date.now() };
 
-    if (this.currentTurnSeat === player.seatIndex) {
+    // Record to earlyLeavers list for final settlement calculation
+    const existingIdx = this.earlyLeavers.findIndex(l => l.userId === userId);
+    if (existingIdx !== -1) {
+      this.earlyLeavers[existingIdx] = { ...player };
+    } else {
+      this.earlyLeavers.push({ ...player });
+    }
+
+    // Vacate seat immediately so the player is no longer stuck at the table!
+    this.seats[seatIndex] = null;
+
+    if (this.currentTurnSeat === seatIndex) {
       this.advanceTurn();
+    }
+
+    // If mid-hand, check if only 1 player remains in the hand
+    if (this.phase !== 'waiting' && this.phase !== 'hand_ended' && this.phase !== 'showdown') {
+      const remainingInHand = this.seats.filter(p => p !== null && !p.isFolded && p.holeCards.length > 0);
+      if (remainingInHand.length <= 1) {
+        if (remainingInHand.length === 1) {
+          this.awardPotToSingleWinner(remainingInHand[0]!);
+        } else {
+          this.phase = 'hand_ended';
+          this.checkAutoStart();
+        }
+      }
+    }
+
+    const eligible = this.seats.filter(p => p !== null && p.chips > 0);
+    if (eligible.length < 2 && this.phase === 'waiting') {
+      this.currentTurnSeat = null;
     }
 
     this.emitChange();
     return true;
+  }
+
+  public standUp(userId: string): TablePlayer | null {
+    const seatIndex = this.seats.findIndex(p => p?.userId === userId);
+    if (seatIndex === -1) return null;
+    const player = this.seats[seatIndex]!;
+
+    this.earlyLeave(userId, player.chips);
+    return player;
   }
 
   public rebuy(userId: string, amount: number): boolean {

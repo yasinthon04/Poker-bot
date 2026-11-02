@@ -91,7 +91,7 @@ describe('Texas Hold\'em Poker Table State Machine', () => {
     assert.strictEqual(table.currentHighBet, 60);
   });
 
-  test('Early Leave locks chips and marks status', () => {
+  test('Early Leave locks chips, vacates the seat, and records in earlyLeavers', () => {
     const table = new PokerTable('tab5', 'chan5', 'user1', 100);
     table.sitDown(0, { id: 'u1', username: 'alice', displayName: 'Alice' }, 200);
     table.sitDown(1, { id: 'u2', username: 'bob', displayName: 'Bob' }, 200);
@@ -99,10 +99,16 @@ describe('Texas Hold\'em Poker Table State Machine', () => {
     const left = table.earlyLeave('u1', 180);
     assert.strictEqual(left, true);
 
-    const alice = table.seats[0]!;
-    assert.strictEqual(alice.chips, 180);
-    assert.strictEqual(alice.isEarlyLeaver, true);
-    assert.strictEqual(alice.isFolded, true);
+    // Seat must be vacated so character does NOT remain stuck at the table!
+    assert.strictEqual(table.seats[0], null);
+
+    // Early leaver must be recorded for settlement
+    assert.strictEqual(table.earlyLeavers.length, 1);
+    const aliceLeaver = table.earlyLeavers[0];
+    assert.strictEqual(aliceLeaver.userId, 'u1');
+    assert.strictEqual(aliceLeaver.chips, 180);
+    assert.strictEqual(aliceLeaver.isEarlyLeaver, true);
+    assert.strictEqual(aliceLeaver.isFolded, true);
   });
 
   test('Update profile alters displayName and avatarUrl for seated player', () => {

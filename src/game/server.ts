@@ -289,7 +289,8 @@ export class PokerGameManager {
         (async () => {
           try {
             const seatedPlayers = table.seats.filter((p): p is TablePlayer => p !== null);
-            const playerInputs = seatedPlayers.map(p => ({
+            const allPlayers = [...seatedPlayers, ...table.earlyLeavers];
+            const playerInputs = allPlayers.map(p => ({
               userId: p.userId,
               name: p.displayName,
               buyIn: p.totalBuyIn,
@@ -300,7 +301,7 @@ export class PokerGameManager {
 
             // Fetch payment info
             const userPayments: Record<string, { promptpay: string | null; hasQr: boolean }> = {};
-            for (const p of seatedPlayers) {
+            for (const p of allPlayers) {
               const u = await repo.getUser(p.userId);
               userPayments[p.userId] = {
                 promptpay: u?.promptpay || null,
@@ -391,13 +392,14 @@ export class PokerGameManager {
     if (!table) return;
 
     const seatedPlayers = table.seats.filter((p): p is TablePlayer => p !== null);
-    if (seatedPlayers.length === 0) {
+    const allPlayers = [...seatedPlayers, ...table.earlyLeavers];
+    if (allPlayers.length === 0) {
       table.clearAllPlayers();
       this.broadcastTableState(channelId);
       return;
     }
 
-    const playerInputs = seatedPlayers.map(p => ({
+    const playerInputs = allPlayers.map(p => ({
       userId: p.userId,
       name: p.displayName,
       buyIn: p.totalBuyIn,
