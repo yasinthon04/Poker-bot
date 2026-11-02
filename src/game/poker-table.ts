@@ -372,8 +372,8 @@ export class PokerTable {
       }
     }
 
-    // REQUIREMENT: If any bot is sitting at the table, do NOT auto start!
-    if (this.seats.some(p => p && p.isBot)) {
+    // In waiting phase when adding bots, do NOT auto-start (host must click Start Game)
+    if (this.phase === 'waiting' && this.seats.some(p => p && p.isBot)) {
       return;
     }
 

@@ -207,7 +207,7 @@ describe('Texas Hold\'em Poker Table State Machine', () => {
     assert.strictEqual(table.communityCards.length, 0);
   });
 
-  test('Broke bot rebuys automatically and checkAutoStart does NOT auto-start when bot is at the table', () => {
+  test('Broke bot rebuys automatically and checkAutoStart auto-deals next hand on hand_ended', () => {
     const table = new PokerTable('tab12', 'chan12', 'user1', 100);
     table.sitDown(0, { id: 'u1', username: 'alice', displayName: 'Alice' }, 200);
     table.addBot(1, 'Bot Sharky', 'medium', 200);
@@ -218,11 +218,23 @@ describe('Texas Hold\'em Poker Table State Machine', () => {
 
     table.checkAutoStart();
 
-    // Bot should have been reloaded with chips, but table does NOT auto-start because a bot is present!
+    // Bot should have been reloaded with chips and next hand started automatically!
     assert.strictEqual(table.seats[1]!.chips > 0, true);
-    assert.strictEqual(table.phase, 'hand_ended');
+    assert.strictEqual(table.phase, 'preflop');
+    assert.strictEqual(table.handNumber, 1);
+  });
 
-    // When player clicks Start / Next Hand manually:
+  test('Adding bot to waiting table does NOT auto-start match before host manually starts', () => {
+    const table = new PokerTable('tab12w', 'chan12w', 'user1', 100);
+    table.sitDown(0, { id: 'u1', username: 'alice', displayName: 'Alice' }, 200);
+    table.addBot(1, 'Bot Sharky', 'medium', 200);
+
+    // In waiting phase, even with 2 players, checkAutoStart must NOT auto-start match!
+    table.checkAutoStart();
+    assert.strictEqual(table.phase, 'waiting');
+    assert.strictEqual(table.handNumber, 0);
+
+    // When host clicks Start Game:
     const started = table.startHand();
     assert.strictEqual(started, true);
     assert.strictEqual(table.phase, 'preflop');

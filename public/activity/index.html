@@ -2163,55 +2163,38 @@
         if (eligiblePlayers.length >= 2) {
           if (headerStartBtn) headerStartBtn.classList.remove('hidden');
 
-          // REQUIREMENT: If bot is sitting at table, do NOT auto start! Require manual start button.
-          if (state.hasBots) {
-            if (autoDealInterval) {
-              clearInterval(autoDealInterval);
-              autoDealInterval = null;
-            }
-            if (promptContainer) {
-              promptContainer.innerHTML = `
-                <div class="flex items-center gap-2 mt-1">
-                  <button onclick="requestStartGame()" class="px-5 py-2 bg-gradient-to-r from-amber-500 to-emerald-600 hover:from-amber-400 hover:to-emerald-500 text-white font-extrabold text-xs sm:text-sm rounded-full shadow-2xl border border-amber-300 animate-pulse transition transform hover:scale-105 active:scale-95 flex items-center gap-2 cursor-pointer">
-                    <span class="text-base">▶️</span> แจกไพ่รอบต่อไป (Next Hand)
-                  </button>
-                </div>
-              `;
-            }
-          } else {
-            // Live humans table: 3-second countdown to auto-deal
-            if (lastHandEndedHandNum !== state.handNumber) {
-              lastHandEndedHandNum = state.handNumber;
-              autoDealCountdown = 3;
-              if (autoDealInterval) clearInterval(autoDealInterval);
+          // Auto-deal next hand countdown (3s), with button to deal immediately
+          if (lastHandEndedHandNum !== state.handNumber) {
+            lastHandEndedHandNum = state.handNumber;
+            autoDealCountdown = 3;
+            if (autoDealInterval) clearInterval(autoDealInterval);
 
-              autoDealInterval = setInterval(() => {
-                autoDealCountdown--;
-                const timerEl = document.getElementById('autoDealSec');
-                if (timerEl) timerEl.innerText = autoDealCountdown;
+            autoDealInterval = setInterval(() => {
+              autoDealCountdown--;
+              const timerEl = document.getElementById('autoDealSec');
+              if (timerEl) timerEl.innerText = autoDealCountdown;
 
-                if (autoDealCountdown <= 0) {
-                  clearInterval(autoDealInterval);
-                  autoDealInterval = null;
-                  if (tableState && (tableState.phase === 'hand_ended' || tableState.phase === 'showdown')) {
-                    requestStartGame();
-                  }
+              if (autoDealCountdown <= 0) {
+                clearInterval(autoDealInterval);
+                autoDealInterval = null;
+                if (tableState && (tableState.phase === 'hand_ended' || tableState.phase === 'showdown')) {
+                  requestStartGame();
                 }
-              }, 1000);
-            }
+              }
+            }, 1000);
+          }
 
-            if (promptContainer) {
-              promptContainer.innerHTML = `
-                <div class="flex items-center gap-2 mt-1">
-                  <span class="text-xs text-amber-300 font-bold bg-black/70 px-3.5 py-1 rounded-full border border-amber-500/40 shadow flex items-center gap-1.5">
-                    <span>⏱️</span> แจกไพ่รอบต่อไปใน <span id="autoDealSec" class="font-mono font-black text-amber-400 text-sm">${autoDealCountdown}</span>s...
-                  </span>
-                  <button onclick="requestStartGame()" class="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white text-xs rounded-full font-bold shadow-lg border border-blue-400 transition hover:scale-105 active:scale-95 flex items-center gap-1">
-                    <span>▶️</span> แจกไพ่เลย
-                  </button>
-                </div>
-              `;
-            }
+          if (promptContainer) {
+            promptContainer.innerHTML = `
+              <div class="flex items-center gap-2 mt-1">
+                <span class="text-xs text-amber-300 font-bold bg-black/70 px-3.5 py-1 rounded-full border border-amber-500/40 shadow flex items-center gap-1.5">
+                  <span>⏱️</span> แจกไพ่รอบต่อไปใน <span id="autoDealSec" class="font-mono font-black text-amber-400 text-sm">${autoDealCountdown}</span>s...
+                </span>
+                <button onclick="requestStartGame()" class="px-3.5 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs rounded-full font-bold shadow-lg border border-blue-400 transition hover:scale-105 active:scale-95 flex items-center gap-1.5 cursor-pointer">
+                  <span>▶️</span> แจกไพ่เลย
+                </button>
+              </div>
+            `;
           }
         } else {
           if (headerStartBtn) headerStartBtn.classList.add('hidden');
