@@ -90,19 +90,129 @@
     .card-shadow {
       box-shadow: 0 8px 20px rgba(0, 0, 0, 0.65), 0 2px 6px rgba(0, 0, 0, 0.4);
     }
-    .card-flip-enter {
-      animation: flipIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+
+    /* ========================================================
+       ADVANCED CARD ANIMATIONS & TRANSFORMS
+       ======================================================== */
+
+    /* 1. HERO HOLE CARDS FAN-OUT & SQUEEZE PEEK (Individual Transform Properties) */
+    .hero-card {
+      /* Apply identity transformations to prevent stacking context shifts */
+      translate: 0 0;
+      scale: 1;
+      rotate: 0deg;
+      transition: translate 0.28s cubic-bezier(0.34, 1.56, 0.64, 1),
+                  scale 0.28s cubic-bezier(0.34, 1.56, 0.64, 1),
+                  rotate 0.28s cubic-bezier(0.34, 1.56, 0.64, 1),
+                  box-shadow 0.28s ease;
+      cursor: pointer;
     }
-    @keyframes flipIn {
-      0% { transform: perspective(400px) rotateY(90deg) scale(0.85); opacity: 0; }
-      100% { transform: perspective(400px) rotateY(0deg) scale(1); opacity: 1; }
+    .hero-card-left {
+      rotate: -7deg;
+      translate: -4px 0;
+      transform-origin: bottom right;
     }
-    .card-deal-enter {
-      animation: dealIn 0.35s ease-out forwards;
+    .hero-card-right {
+      rotate: 7deg;
+      translate: 4px 0;
+      transform-origin: bottom left;
     }
-    @keyframes dealIn {
-      0% { transform: translateY(-25px) scale(0.6); opacity: 0; }
-      100% { transform: translateY(0) scale(1); opacity: 1; }
+    .hero-card:hover, .hero-card:active {
+      translate: 0 -16px;
+      scale: 1.15;
+      rotate: 0deg;
+      z-index: 50 !important;
+      box-shadow: 0 20px 30px rgba(0, 0, 0, 0.85), 0 0 18px rgba(59, 130, 246, 0.7) !important;
+    }
+
+    /* 2. CASCADING 3D FLOP & STREET REVEAL ANIMATIONS */
+    .card-flop-0 { animation: flopCascadeFlip 0.42s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0ms forwards; }
+    .card-flop-1 { animation: flopCascadeFlip 0.42s cubic-bezier(0.175, 0.885, 0.32, 1.275) 140ms forwards; }
+    .card-flop-2 { animation: flopCascadeFlip 0.42s cubic-bezier(0.175, 0.885, 0.32, 1.275) 280ms forwards; }
+    .card-street-turn { animation: streetDramaticFlip 0.48s cubic-bezier(0.175, 0.885, 0.32, 1.275) 180ms forwards; }
+    .card-street-river { animation: streetDramaticFlip 0.48s cubic-bezier(0.175, 0.885, 0.32, 1.275) 180ms forwards; }
+
+    @keyframes flopCascadeFlip {
+      0% {
+        transform: perspective(600px) rotateY(180deg) translateY(-25px) scale(0.8);
+        box-shadow: 0 25px 35px rgba(0,0,0,0.85);
+        opacity: 0;
+      }
+      60% {
+        transform: perspective(600px) rotateY(18deg) translateY(-6px) scale(1.08);
+        box-shadow: 0 16px 24px rgba(0,0,0,0.6);
+      }
+      100% {
+        transform: perspective(600px) rotateY(0deg) translateY(0) scale(1.0);
+        box-shadow: 0 6px 16px rgba(0,0,0,0.5);
+        opacity: 1;
+      }
+    }
+
+    @keyframes streetDramaticFlip {
+      0% {
+        transform: perspective(600px) rotateY(180deg) translateY(-30px) scale(0.75);
+        box-shadow: 0 25px 40px rgba(0,0,0,0.9);
+        opacity: 0;
+      }
+      70% {
+        transform: perspective(600px) rotateY(-12deg) translateY(-4px) scale(1.12);
+        box-shadow: 0 18px 28px rgba(0,0,0,0.7);
+      }
+      100% {
+        transform: perspective(600px) rotateY(0deg) translateY(0) scale(1.0);
+        box-shadow: 0 6px 16px rgba(0,0,0,0.5);
+        opacity: 1;
+      }
+    }
+
+    /* 3. CARD HIT / CONNECTION GLOW (When board matches hole cards!) */
+    .card-hit-glow {
+      box-shadow: 0 0 16px 3px rgba(56, 189, 248, 0.95), 0 0 28px 7px rgba(59, 130, 246, 0.7) !important;
+      border-color: #38bdf8 !important;
+      animation: hitGlowPulse 1.8s infinite alternate ease-in-out;
+    }
+    @keyframes hitGlowPulse {
+      0% { box-shadow: 0 0 12px 2px rgba(56, 189, 248, 0.8); }
+      100% { box-shadow: 0 0 24px 6px rgba(56, 189, 248, 1), 0 0 35px 10px rgba(59, 130, 246, 0.5); }
+    }
+
+    /* 4. SHOWDOWN WINNER CARDS AURA */
+    .win-card-glow {
+      box-shadow: 0 0 24px 5px rgba(245, 158, 11, 0.95), 0 0 40px 10px rgba(251, 191, 36, 0.75) !important;
+      border-color: #f59e0b !important;
+      translate: 0 -8px;
+      scale: 1.06;
+      z-index: 45 !important;
+      animation: winCardPulse 1.2s infinite alternate ease-in-out;
+    }
+    @keyframes winCardPulse {
+      0% { box-shadow: 0 0 16px 4px rgba(245, 158, 11, 0.8); }
+      100% { box-shadow: 0 0 32px 8px rgba(245, 158, 11, 1), 0 0 45px 12px rgba(251, 191, 36, 0.8); }
+    }
+    .card-dimmed {
+      opacity: 0.45 !important;
+      filter: grayscale(40%) blur(0.4px);
+    }
+
+    /* 5. FLYING DEAL CARD FROM DECK SHOE */
+    .flying-deal-card {
+      position: absolute;
+      width: 38px;
+      height: 54px;
+      background: linear-gradient(135deg, #1d4ed8, #0f172a);
+      border: 1px solid #60a5fa;
+      border-radius: 6px;
+      box-shadow: 0 15px 25px rgba(0, 0, 0, 0.8);
+      pointer-events: none;
+      z-index: 60;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(147, 197, 253, 0.8);
+      font-weight: bold;
+      font-size: 14px;
+      transition: all 0.36s cubic-bezier(0.22, 1, 0.36, 1);
     }
 
     /* GLOWS & PULSE */
@@ -351,15 +461,29 @@
       <!-- TABLE FELT (OVAL STADIUM) -->
       <div id="pokerTable" class="poker-felt-modern relative w-full max-w-4xl h-[470px] sm:h-[530px] rounded-[260px] flex items-center justify-center">
 
-        <!-- CENTER BOARD (POT, COMMUNITY CARDS, ANNOUNCEMENT) -->
+        <!-- CENTER BOARD (POT, DECK SHOE, COMMUNITY CARDS, ANNOUNCEMENT) -->
         <div class="flex flex-col items-center justify-center gap-1.5 z-10 max-w-lg">
-          <!-- Pot Display (Matching Screenshot: "POT: $240") -->
-          <div class="bg-slate-950/80 border border-slate-700/80 px-4 py-1 rounded-full shadow-2xl flex items-center gap-2">
-            <span class="text-slate-400 font-bold text-xs tracking-wider uppercase font-mono">POT:</span>
-            <span id="potAmount" class="text-white font-black text-sm sm:text-base font-mono">0฿</span>
+          <!-- Top Row: Deck Shoe & Pot Display -->
+          <div class="flex items-center gap-2.5">
+            <!-- 3D Deck Shoe graphic on the felt -->
+            <div id="deckShoe" class="relative w-10 h-14 sm:w-11 sm:h-16 flex items-center justify-center cursor-pointer select-none group" title="Deck Shoe">
+              <div class="absolute inset-0 bg-blue-950 border border-blue-500/30 rounded-lg shadow-md translate-x-1 translate-y-1 opacity-60"></div>
+              <div class="absolute inset-0 bg-blue-900 border border-blue-400/40 rounded-lg shadow-md translate-x-0.5 translate-y-0.5 opacity-80"></div>
+              <div class="absolute inset-0 bg-gradient-to-br from-blue-700 via-indigo-950 to-slate-950 border border-blue-400/70 rounded-lg shadow-xl flex items-center justify-center group-hover:scale-105 transition transform">
+                <div class="w-full h-full rounded border border-blue-300/30 flex items-center justify-center text-blue-200/60 text-xs font-black">
+                  ♠
+                </div>
+              </div>
+            </div>
+
+            <!-- Pot Display (Matching Screenshot: "POT: $240") -->
+            <div class="bg-slate-950/85 border border-slate-700/80 px-4 py-1.5 rounded-full shadow-2xl flex items-center gap-2">
+              <span class="text-slate-400 font-bold text-xs tracking-wider uppercase font-mono">POT:</span>
+              <span id="potAmount" class="text-white font-black text-sm sm:text-base font-mono">0฿</span>
+            </div>
           </div>
 
-          <!-- Community Cards (5 slots) -->
+          <!-- Community Cards (5 slots) with 3D Flip Cascade -->
           <div id="communityCards" class="flex gap-1.5 sm:gap-2 p-1.5 rounded-2xl bg-black/40 backdrop-blur-sm border border-white/10 shadow-2xl">
             <div class="w-13 h-19 sm:w-16 sm:h-23 rounded-xl border-2 border-dashed border-white/20 bg-slate-900/40 flex items-center justify-center text-white/30 text-xs sm:text-sm font-bold">Flop</div>
             <div class="w-13 h-19 sm:w-16 sm:h-23 rounded-xl border-2 border-dashed border-white/20 bg-slate-900/40 flex items-center justify-center text-white/30 text-xs sm:text-sm font-bold">Flop</div>
@@ -397,7 +521,6 @@
 
       <!-- History Tab Content -->
       <div id="historyTabContent" class="flex-1 overflow-y-auto space-y-1.5 text-xs pr-1">
-        <!-- Live History Rows (Injected by JS or showing recent results) -->
         <div id="historyRowsList" class="space-y-1.5">
           <!-- Populated dynamically -->
         </div>
@@ -867,7 +990,7 @@
   <!-- ==================== JAVASCRIPT ==================== -->
   <script>
     // ==========================================
-    // 1. CONFIG & AUDIO SYNTHESIZER
+    // 1. CONFIG & ENHANCED AUDIO SYNTHESIZER
     // ==========================================
     const urlParams = new URLSearchParams(window.location.search);
     const channelId = urlParams.get('channel_id') || 'general_table';
@@ -888,6 +1011,10 @@
     let lastProcessedEventTime = 0;
     let turnAnimationTimer = null;
     let lastTickedSecond = -1;
+    let lastCommunityCardCount = 0;
+    let lastHandPhase = '';
+    let lastHandNumberProcessed = -1;
+    let lastHitCount = 0;
 
     // Recent hands history for the right sidebar
     let recentHandsHistory = [
@@ -899,7 +1026,7 @@
       { cards: [{rank:14,suit:'c'},{rank:12,suit:'h'},{rank:3,suit:'s'}], pot: 580, time: '10m' },
     ];
 
-    // Audio synthesizer
+    // Web Audio Synthesizer (Zero-latency synthetic casino sounds)
     let audioCtx = null;
     let isSoundEnabled = localStorage.getItem('poker_sound_enabled') !== 'false';
 
@@ -928,94 +1055,196 @@
       if (!audioCtx) return;
       const now = audioCtx.currentTime;
 
-      if (type === 'deal') {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(400, now);
-        osc.frequency.exponentialRampToValueAtTime(100, now + 0.15);
-        gain.gain.setValueAtTime(0.2, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start(now);
-        osc.stop(now + 0.15);
-      } else if (type === 'check') {
-        [0, 0.08].forEach(d => {
-          const osc = audioCtx.createOscillator();
+      switch (type) {
+        case 'cardSlide': {
+          // Card sliding off the deck
+          const bufferSize = Math.floor(audioCtx.sampleRate * 0.08);
+          const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+          const output = noiseBuffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) {
+            output[i] = Math.random() * 2 - 1;
+          }
+          const whiteNoise = audioCtx.createBufferSource();
+          whiteNoise.buffer = noiseBuffer;
+          const filter = audioCtx.createBiquadFilter();
+          filter.type = 'bandpass';
+          filter.frequency.setValueAtTime(3200, now);
+          filter.frequency.exponentialRampToValueAtTime(800, now + 0.08);
+          filter.Q.value = 3;
           const gain = audioCtx.createGain();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(180, now + d);
-          osc.frequency.exponentialRampToValueAtTime(80, now + d + 0.06);
-          gain.gain.setValueAtTime(0.35, now + d);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + d + 0.06);
-          osc.connect(gain);
+          gain.gain.setValueAtTime(0.18, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+          whiteNoise.connect(filter);
+          filter.connect(gain);
           gain.connect(audioCtx.destination);
-          osc.start(now + d);
-          osc.stop(now + d + 0.07);
-        });
-      } else if (type === 'call') {
-        [2400, 3200].forEach(f => {
+          whiteNoise.start(now);
+          break;
+        }
+
+        case 'cardFeltThud': {
+          // Soft thud when card lands on felt
           const osc = audioCtx.createOscillator();
           const gain = audioCtx.createGain();
           osc.type = 'sine';
-          osc.frequency.setValueAtTime(f, now);
-          gain.gain.setValueAtTime(0.2, now);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+          osc.frequency.setValueAtTime(140, now);
+          osc.frequency.exponentialRampToValueAtTime(45, now + 0.07);
+          gain.gain.setValueAtTime(0.25, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
           osc.connect(gain);
           gain.connect(audioCtx.destination);
           osc.start(now);
-          osc.stop(now + 0.12);
-        });
-      } else if (type === 'raise') {
-        [400, 600, 850].forEach((f, i) => {
+          osc.stop(now + 0.07);
+          break;
+        }
+
+        case 'cardSnap': {
+          // Card squeeze / flick snap sound
           const osc = audioCtx.createOscillator();
           const gain = audioCtx.createGain();
           osc.type = 'triangle';
-          osc.frequency.setValueAtTime(f, now + i * 0.05);
-          gain.gain.setValueAtTime(0.2, now + i * 0.05);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + (i + 1) * 0.08);
+          osc.frequency.setValueAtTime(1800, now);
+          osc.frequency.exponentialRampToValueAtTime(300, now + 0.05);
+          gain.gain.setValueAtTime(0.18, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
           osc.connect(gain);
           gain.connect(audioCtx.destination);
-          osc.start(now + i * 0.05);
-          osc.stop(now + (i + 1) * 0.08);
-        });
-      } else if (type === 'fold') {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(250, now);
-        osc.frequency.exponentialRampToValueAtTime(70, now + 0.2);
-        gain.gain.setValueAtTime(0.25, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start(now);
-        osc.stop(now + 0.2);
-      } else if (type === 'win') {
-        [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
+          osc.start(now);
+          osc.stop(now + 0.05);
+          break;
+        }
+
+        case 'cardHit': {
+          // Harmonious pleasant chime when a pair or draw connects with hand!
+          [880, 1320].forEach((freq, idx) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now + idx * 0.07);
+            gain.gain.setValueAtTime(0.12, now + idx * 0.07);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.07 + 0.15);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now + idx * 0.07);
+            osc.stop(now + idx * 0.07 + 0.16);
+          });
+          break;
+        }
+
+        case 'chipRake': {
+          // Cascade of chips raked towards the winner
+          [1600, 2200, 2800, 3400].forEach((freq, idx) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now + idx * 0.06);
+            gain.gain.setValueAtTime(0.15, now + idx * 0.06);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.06 + 0.1);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now + idx * 0.06);
+            osc.stop(now + idx * 0.06 + 0.1);
+          });
+          break;
+        }
+
+        case 'deal': {
+          playSound('cardSlide');
+          break;
+        }
+
+        case 'check': {
+          [0, 0.08].forEach(d => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(180, now + d);
+            osc.frequency.exponentialRampToValueAtTime(80, now + d + 0.06);
+            gain.gain.setValueAtTime(0.35, now + d);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + d + 0.06);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now + d);
+            osc.stop(now + d + 0.07);
+          });
+          break;
+        }
+
+        case 'call': {
+          [2400, 3200].forEach(f => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(f, now);
+            gain.gain.setValueAtTime(0.2, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now);
+            osc.stop(now + 0.12);
+          });
+          break;
+        }
+
+        case 'raise': {
+          [400, 600, 850].forEach((f, i) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(f, now + i * 0.05);
+            gain.gain.setValueAtTime(0.2, now + i * 0.05);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + (i + 1) * 0.08);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now + i * 0.05);
+            osc.stop(now + (i + 1) * 0.08);
+          });
+          break;
+        }
+
+        case 'fold': {
           const osc = audioCtx.createOscillator();
           const gain = audioCtx.createGain();
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(f, now + i * 0.09);
-          gain.gain.setValueAtTime(0.25, now + i * 0.09);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.09 + 0.25);
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(250, now);
+          osc.frequency.exponentialRampToValueAtTime(70, now + 0.2);
+          gain.gain.setValueAtTime(0.25, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
           osc.connect(gain);
           gain.connect(audioCtx.destination);
-          osc.start(now + i * 0.09);
-          osc.stop(now + i * 0.09 + 0.25);
-        });
-      } else if (type === 'timerTick') {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(880, now);
-        gain.gain.setValueAtTime(0.15, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start(now);
-        osc.stop(now + 0.05);
+          osc.start(now);
+          osc.stop(now + 0.2);
+          break;
+        }
+
+        case 'win': {
+          [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(f, now + i * 0.09);
+            gain.gain.setValueAtTime(0.25, now + i * 0.09);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.09 + 0.25);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now + i * 0.09);
+            osc.stop(now + i * 0.09 + 0.25);
+          });
+          break;
+        }
+
+        case 'timerTick': {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(880, now);
+          gain.gain.setValueAtTime(0.15, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now);
+          osc.stop(now + 0.05);
+          break;
+        }
       }
     }
 
@@ -1093,12 +1322,11 @@
       if (state.lastEvent.timestamp <= lastProcessedEventTime) return;
       lastProcessedEventTime = state.lastEvent.timestamp;
 
-      if (['check', 'call', 'raise', 'fold', 'deal'].includes(state.lastEvent.type)) {
+      if (['check', 'call', 'raise', 'fold'].includes(state.lastEvent.type)) {
         playSound(state.lastEvent.type);
-      } else if (state.lastEvent.type === 'board_deal') {
-        playSound('deal');
       } else if (state.lastEvent.type === 'showdown') {
         playSound('win');
+        playSound('chipRake');
         triggerConfetti();
       }
     }
@@ -1109,6 +1337,19 @@
     let autoDealInterval = null;
     let autoDealCountdown = 3;
     let lastHandEndedHandNum = -1;
+
+    // Oval layout coordinates for 9 seats
+    const seatPositions = [
+      { left: '50%', top: '83%', align: 'top',    betPos: 'top' },    // 0: Bottom Center (Hero)
+      { left: '18%', top: '76%', align: 'right',  betPos: 'top' },    // 1: Bottom Left
+      { left: '9%',  top: '50%', align: 'right',  betPos: 'right' },  // 2: Middle Left
+      { left: '18%', top: '22%', align: 'right',  betPos: 'bottom' }, // 3: Top Left
+      { left: '38%', top: '12%', align: 'bottom', betPos: 'bottom' }, // 4: Top Center-Left
+      { left: '62%', top: '12%', align: 'bottom', betPos: 'bottom' }, // 5: Top Center-Right
+      { left: '82%', top: '22%', align: 'left',   betPos: 'bottom' }, // 6: Top Right
+      { left: '91%', top: '50%', align: 'left',   betPos: 'left' },   // 7: Middle Right
+      { left: '82%', top: '76%', align: 'left',   betPos: 'top' },    // 8: Bottom Right
+    ];
 
     function renderTable(state) {
       if (!state) return;
@@ -1133,12 +1374,30 @@
         modeBadge.innerHTML = '<span>👥</span> Live Arena';
       }
 
-      // Community cards
-      renderCommunityCards(state.communityCards);
+      // Check if new hand started to trigger dealing animation from deck
+      if (state.handNumber !== lastHandNumberProcessed && state.phase === 'preflop') {
+        lastHandNumberProcessed = state.handNumber;
+        triggerClockwiseDealingAnimation(state);
+      }
 
       // Find my seat
       mySeatIndex = state.seats.findIndex(p => p && p.userId === myUser.id);
       const myPlayer = mySeatIndex !== -1 ? state.seats[mySeatIndex] : null;
+
+      // Evaluate Hand Strength & Hit Connections
+      let hitInfo = { description: '', hits: new Set() };
+      if (myPlayer && myPlayer.holeCards && myPlayer.holeCards.length >= 2) {
+        hitInfo = evaluateHandHits(myPlayer.holeCards, state.communityCards);
+        if (hitInfo.hits.size > lastHitCount && state.communityCards.length >= 3) {
+          playSound('cardHit');
+        }
+        lastHitCount = hitInfo.hits.size;
+      } else {
+        lastHitCount = 0;
+      }
+
+      // Render Community Cards with Street Flip and Hit Highlights
+      renderCommunityCards(state.communityCards, hitInfo.hits, state);
 
       // Update sidebar & footer bankrolls
       const myChips = myPlayer ? myPlayer.chips : 0;
@@ -1148,8 +1407,8 @@
       // Start / Auto-deal handling
       handleAutoDealAndStartButtons(state);
 
-      // Render 9 Seats with Modern Capsule HUD (Matching Screenshot!)
-      renderSeats(state);
+      // Render 9 Seats with Capsules, Fan-out & Peeking Squeeze
+      renderSeats(state, hitInfo);
 
       // Update Action Controls Bar
       updateActionDock(state, myPlayer);
@@ -1158,14 +1417,114 @@
       renderHistoryList();
     }
 
-    function renderCommunityCards(cards) {
+    // ==========================================
+    // 4. CLOCKWISE DEALING ANIMATION FROM DECK SHOE
+    // ==========================================
+    function triggerClockwiseDealingAnimation(state) {
+      const activeIndices = [];
+      state.seats.forEach((s, idx) => {
+        if (s && s.chips > 0) activeIndices.push(idx);
+      });
+      if (activeIndices.length === 0) return;
+
+      let delay = 0;
+      // Round 1: 1st card to each active player clockwise
+      activeIndices.forEach(idx => {
+        launchFlyingCard(idx, delay);
+        delay += 75;
+      });
+      // Round 2: 2nd card to each active player clockwise
+      activeIndices.forEach(idx => {
+        launchFlyingCard(idx, delay);
+        delay += 75;
+      });
+    }
+
+    function launchFlyingCard(targetSeatIndex, delayMs = 0) {
+      setTimeout(() => {
+        const table = document.getElementById('pokerTable');
+        if (!table) return;
+
+        const flyCard = document.createElement('div');
+        flyCard.className = 'flying-deal-card';
+        flyCard.innerHTML = '♠';
+
+        // Start at Deck Shoe position
+        flyCard.style.left = '50%';
+        flyCard.style.top = '27%';
+        flyCard.style.transform = 'translate(-50%, -50%) scale(0.5) rotate(0deg)';
+        table.appendChild(flyCard);
+
+        playSound('cardSlide');
+
+        const targetPos = seatPositions[targetSeatIndex] || { left: '50%', top: '83%' };
+
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            flyCard.style.left = targetPos.left;
+            flyCard.style.top = targetPos.top;
+            flyCard.style.transform = 'translate(-50%, -50%) scale(1.0) rotate(12deg)';
+
+            setTimeout(() => {
+              playSound('cardFeltThud');
+              flyCard.remove();
+            }, 360);
+          });
+        });
+      }, delayMs);
+    }
+
+    // ==========================================
+    // 5. COMMUNITY CARDS WITH 3D FLIP & HIGHLIGHTS
+    // ==========================================
+    function renderCommunityCards(cards, hitCardsSet, state) {
       const commContainer = document.getElementById('communityCards');
       commContainer.innerHTML = '';
+
+      const isShowdown = state && (state.phase === 'showdown' || state.phase === 'hand_ended');
+      const hasWinners = isShowdown && state.handWinners && state.handWinners.length > 0;
+
+      // Detect street progression sounds
+      if (cards.length === 3 && lastCommunityCardCount < 3) {
+        playSound('cardSlide');
+      } else if (cards.length > lastCommunityCardCount) {
+        playSound('cardSnap');
+      }
+      lastCommunityCardCount = cards.length;
+
       for (let i = 0; i < 5; i++) {
         const card = cards[i];
         if (card) {
+          const cardKey = `${card.rank}-${card.suit}`;
+          const isHit = hitCardsSet && hitCardsSet.has(cardKey);
+
+          // Check if this community card is part of the winner's best 5 cards
+          let isWinningCard = false;
+          if (hasWinners) {
+            isWinningCard = state.handWinners.some(w =>
+              w.cards?.some(wc => wc.rank === card.rank && wc.suit === card.suit)
+            );
+          }
+
           const cardEl = createCardElement(card);
-          cardEl.classList.add('card-flip-enter');
+
+          // Add cascading 3D flip animation
+          if (i < 3) {
+            cardEl.classList.add(`card-flop-${i}`);
+          } else if (i === 3) {
+            cardEl.classList.add('card-street-turn');
+          } else if (i === 4) {
+            cardEl.classList.add('card-street-river');
+          }
+
+          if (isWinningCard) {
+            cardEl.classList.add('win-card-glow');
+          } else if (isHit && !isShowdown) {
+            cardEl.classList.add('card-hit-glow');
+          } else if (isShowdown && hasWinners && !isWinningCard) {
+            cardEl.classList.add('card-dimmed');
+          }
+
           commContainer.appendChild(cardEl);
         } else {
           const empty = document.createElement('div');
@@ -1176,22 +1535,15 @@
       }
     }
 
-    function renderSeats(state) {
+    // ==========================================
+    // 6. SEAT RENDERING WITH FAN-OUT & SQUEEZE PEEK
+    // ==========================================
+    function renderSeats(state, hitInfo) {
       const container = document.getElementById('seatsContainer');
       container.innerHTML = '';
 
-      // Oval layout coordinates (top, left, alignment)
-      const seatPositions = [
-        { left: '50%', top: '83%', align: 'top',    betPos: 'top' },    // 0: Bottom Center (Hero)
-        { left: '18%', top: '76%', align: 'right',  betPos: 'top' },    // 1: Bottom Left
-        { left: '9%',  top: '50%', align: 'right',  betPos: 'right' },  // 2: Middle Left
-        { left: '18%', top: '22%', align: 'right',  betPos: 'bottom' }, // 3: Top Left
-        { left: '38%', top: '12%', align: 'bottom', betPos: 'bottom' }, // 4: Top Center-Left
-        { left: '62%', top: '12%', align: 'bottom', betPos: 'bottom' }, // 5: Top Center-Right
-        { left: '82%', top: '22%', align: 'left',   betPos: 'bottom' }, // 6: Top Right
-        { left: '91%', top: '50%', align: 'left',   betPos: 'left' },   // 7: Middle Right
-        { left: '82%', top: '76%', align: 'left',   betPos: 'top' },    // 8: Bottom Right
-      ];
+      const isShowdown = state.phase === 'showdown' || state.phase === 'hand_ended';
+      const hasWinners = isShowdown && state.handWinners && state.handWinners.length > 0;
 
       state.seats.forEach((seat, idx) => {
         const pos = seatPositions[idx];
@@ -1213,7 +1565,7 @@
           else if (pos.betPos === 'right') betStyle += ' top: 50%; right: -65px; transform: translateY(-50%);';
           else if (pos.betPos === 'left') betStyle += ' top: 50%; left: -65px; transform: translateY(-50%);';
 
-          // Capsule Player HUD (Matching Screenshot!)
+          // Capsule Player HUD
           const capsuleBorder = isWinner
             ? 'border-amber-400 win-glow'
             : isTurn
@@ -1250,14 +1602,39 @@
             </div>
           `;
 
-          // Hole Cards block (tilted cards)
-          const cardsBlock = seat.hasCards ? `
-            <div class="flex items-center -space-x-3 z-20 ${seat.isFolded ? 'opacity-35 grayscale' : ''} card-deal-enter">
-              ${seat.holeCards && seat.holeCards.length > 0
-                ? seat.holeCards.map((c, cIdx) => createHoleCardHTML(c, isHero, cIdx === 0 ? '-rotate-6' : 'rotate-6')).join('')
-                : (createFaceDownCardHTML('-rotate-6') + createFaceDownCardHTML('rotate-6'))}
-            </div>
-          ` : '';
+          // Hole Cards block with Fan-out & Peeking Squeeze
+          let cardsBlock = '';
+          if (seat.hasCards) {
+            if (seat.holeCards && seat.holeCards.length > 0) {
+              const cardsHtml = seat.holeCards.map((c, cIdx) => {
+                const cardKey = `${c.rank}-${c.suit}`;
+                const isHit = isHero && hitInfo && hitInfo.hits.has(cardKey);
+                const isWinningCard = isWinner;
+                const fanClass = cIdx === 0 ? 'hero-card-left' : 'hero-card-right';
+                return createHoleCardHTML(c, isHero, fanClass, isHit, isWinningCard);
+              }).join('');
+
+              cardsBlock = `
+                <div class="relative flex flex-col items-center">
+                  ${isHero && hitInfo && hitInfo.description ? `
+                    <div class="absolute -top-6 left-1/2 -translate-x-1/2 bg-blue-600/90 border border-blue-400 text-white font-black text-[9px] px-2 py-0.5 rounded-full shadow-lg font-mono animate-bounce whitespace-nowrap z-40">
+                      ${hitInfo.description}
+                    </div>
+                  ` : ''}
+                  <div class="flex items-center hero-card-container z-20 ${seat.isFolded ? 'opacity-35 grayscale' : ''}">
+                    ${cardsHtml}
+                  </div>
+                </div>
+              `;
+            } else {
+              cardsBlock = `
+                <div class="flex items-center -space-x-3 z-20 ${seat.isFolded ? 'opacity-35 grayscale' : ''}">
+                  ${createFaceDownCardHTML('hero-card-left')}
+                  ${createFaceDownCardHTML('hero-card-right')}
+                </div>
+              `;
+            }
+          }
 
           // Assembly based on direction
           let layoutHTML = '';
@@ -1346,14 +1723,19 @@
       return div;
     }
 
-    function createHoleCardHTML(card, isHero = false, rotateClass = '') {
+    function createHoleCardHTML(card, isHero = false, fanClass = '', isHit = false, isWinningCard = false) {
       const suitSymbol = { s: '♠', h: '♥', d: '♦', c: '♣' }[card.suit];
       const rankText = { 14: 'A', 13: 'K', 12: 'Q', 11: 'J' }[card.rank] || card.rank;
       const isRed = ['h', 'd'].includes(card.suit);
       const color = isRed ? 'text-red-600' : 'text-slate-950';
 
+      let glowClasses = '';
+      if (isWinningCard) glowClasses = 'win-card-glow';
+      else if (isHit) glowClasses = 'card-hit-glow';
+
       return `
-        <div class="w-9 h-13 sm:w-11 sm:h-16 rounded-lg bg-white shadow-xl border border-slate-300 flex flex-col justify-between p-1 select-none ${color} transition transform ${rotateClass} card-shadow">
+        <div class="hero-card ${fanClass} ${glowClasses} w-9 h-13 sm:w-11 sm:h-16 rounded-lg bg-white shadow-xl border border-slate-300 flex flex-col justify-between p-1 select-none ${color} card-shadow"
+             onmouseenter="playSound('cardSnap')" ontouchstart="playSound('cardSnap')">
           <div class="flex items-center justify-between leading-none">
             <span class="text-xs font-black font-mono">${rankText}</span>
             <span class="text-[10px]">${suitSymbol}</span>
@@ -1367,9 +1749,10 @@
       `;
     }
 
-    function createFaceDownCardHTML(rotateClass = '') {
+    function createFaceDownCardHTML(fanClass = '') {
       return `
-        <div class="w-8 h-12 sm:w-9 sm:h-14 rounded-lg bg-gradient-to-br from-blue-700 via-indigo-950 to-slate-950 border border-blue-400/60 shadow-xl flex items-center justify-center p-1 select-none transform ${rotateClass} card-shadow">
+        <div class="hero-card ${fanClass} w-8 h-12 sm:w-9 sm:h-14 rounded-lg bg-gradient-to-br from-blue-700 via-indigo-950 to-slate-950 border border-blue-400/60 shadow-xl flex items-center justify-center p-1 select-none card-shadow"
+             onmouseenter="playSound('cardSnap')" ontouchstart="playSound('cardSnap')">
           <div class="w-full h-full rounded border border-blue-300/30 bg-blue-900/30 flex items-center justify-center text-blue-200/50 text-xs">
             ♠
           </div>
@@ -1378,7 +1761,86 @@
     }
 
     // ==========================================
-    // 4. ACTION DOCK (BOTTOM)
+    // 7. CLIENT-SIDE HAND HIT & STRENGTH EVALUATOR
+    // ==========================================
+    function evaluateHandHits(holeCards, communityCards) {
+      if (!holeCards || holeCards.length < 2 || !communityCards || communityCards.length < 3) {
+        return { description: '', hits: new Set() };
+      }
+
+      const allCards = [...holeCards, ...communityCards];
+      const rankCounts = {};
+      const suitCounts = {};
+      allCards.forEach(c => {
+        rankCounts[c.rank] = (rankCounts[c.rank] || 0) + 1;
+        suitCounts[c.suit] = (suitCounts[c.suit] || 0) + 1;
+      });
+
+      const hits = new Set();
+      let description = '';
+
+      const h1 = holeCards[0];
+      const h2 = holeCards[1];
+      const isPocketPair = h1.rank === h2.rank;
+
+      const pairs = [];
+      const trips = [];
+      const quads = [];
+
+      for (const [rankStr, count] of Object.entries(rankCounts)) {
+        const r = Number(rankStr);
+        const inHole = h1.rank === r || h2.rank === r;
+        if (inHole) {
+          if (count === 4) quads.push(r);
+          else if (count === 3) trips.push(r);
+          else if (count === 2) pairs.push(r);
+        }
+      }
+
+      const rankNames = { 14: 'Aces', 13: 'Kings', 12: 'Queens', 11: 'Jacks', 10: 'Tens', 9: 'Nines', 8: 'Eights', 7: 'Sevens', 6: 'Sixes', 5: 'Fives', 4: 'Fours', 3: 'Threes', 2: 'Twos' };
+
+      let flushSuit = null;
+      let flushDrawSuit = null;
+      for (const [suit, count] of Object.entries(suitCounts)) {
+        const holeHasSuit = h1.suit === suit || h2.suit === suit;
+        if (holeHasSuit) {
+          if (count >= 5) flushSuit = suit;
+          else if (count === 4) flushDrawSuit = suit;
+        }
+      }
+
+      if (quads.length > 0) {
+        description = `🔥 Four of a Kind (${rankNames[quads[0]]})`;
+        allCards.filter(c => c.rank === quads[0]).forEach(c => hits.add(`${c.rank}-${c.suit}`));
+      } else if (trips.length > 0 && (pairs.length > 0 || isPocketPair)) {
+        description = `🏰 Full House (${rankNames[trips[0]]})`;
+        allCards.filter(c => c.rank === trips[0] || pairs.includes(c.rank) || c.rank === h1.rank || c.rank === h2.rank)
+                .forEach(c => hits.add(`${c.rank}-${c.suit}`));
+      } else if (flushSuit) {
+        description = `🌊 Flush (${flushSuit === 's' ? '♠' : flushSuit === 'h' ? '♥' : flushSuit === 'd' ? '♦' : '♣'})`;
+        allCards.filter(c => c.suit === flushSuit).forEach(c => hits.add(`${c.rank}-${c.suit}`));
+      } else if (trips.length > 0) {
+        description = `⭐ Three of a Kind (${rankNames[trips[0]]})`;
+        allCards.filter(c => c.rank === trips[0]).forEach(c => hits.add(`${c.rank}-${c.suit}`));
+      } else if (pairs.length >= 2 || (isPocketPair && pairs.length >= 1)) {
+        const p1 = pairs[0];
+        const p2 = pairs[1] || (isPocketPair ? h1.rank : null);
+        description = `✌️ Two Pair`;
+        allCards.filter(c => c.rank === p1 || c.rank === p2).forEach(c => hits.add(`${c.rank}-${c.suit}`));
+      } else if (pairs.length === 1 || isPocketPair) {
+        const pRank = pairs[0] || h1.rank;
+        description = `🎯 Pair of ${rankNames[pRank] || pRank}`;
+        allCards.filter(c => c.rank === pRank).forEach(c => hits.add(`${c.rank}-${c.suit}`));
+      } else if (flushDrawSuit) {
+        description = `✨ Flush Draw (4 to Flush)`;
+        allCards.filter(c => c.suit === flushDrawSuit).forEach(c => hits.add(`${c.rank}-${c.suit}`));
+      }
+
+      return { description, hits };
+    }
+
+    // ==========================================
+    // 8. ACTION DOCK (BOTTOM)
     // ==========================================
     function updateActionDock(state, myPlayer) {
       const isMyTurn = myPlayer && state.currentTurnSeat === myPlayer.seatIndex;
@@ -1482,7 +1944,7 @@
     };
 
     // ==========================================
-    // 5. TURN TIMER LOOP & AUTO-DEAL
+    // 9. TURN TIMER LOOP & AUTO-DEAL
     // ==========================================
     function startTurnAnimationLoop() {
       if (turnAnimationTimer) cancelAnimationFrame(turnAnimationTimer);
@@ -1576,7 +2038,7 @@
           if (promptContainer) {
             promptContainer.innerHTML = `
               <div class="flex items-center gap-2 mt-1">
-                <span class="text-xs text-amber-300 font-bold bg-black/70 px-3 py-1 rounded-full border border-amber-500/40 shadow flex items-center gap-1.5">
+                <span class="text-xs text-amber-300 font-bold bg-black/70 px-3.5 py-1 rounded-full border border-amber-500/40 shadow flex items-center gap-1.5">
                   <span>⏱️</span> แจกไพ่รอบต่อไปใน <span id="autoDealSec" class="font-mono font-black text-amber-400 text-sm">${autoDealCountdown}</span>s...
                 </span>
                 <button onclick="requestStartGame()" class="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white text-xs rounded-full font-bold shadow-lg border border-blue-400 transition hover:scale-105 active:scale-95 flex items-center gap-1">
@@ -1605,7 +2067,7 @@
     }
 
     // ==========================================
-    // 6. RIGHT SIDEBAR: TABS & HISTORY
+    // 10. RIGHT SIDEBAR: TABS & HISTORY
     // ==========================================
     function switchRightTab(tab) {
       ['history', 'progress', 'chat'].forEach(t => {
@@ -1645,7 +2107,7 @@
     }
 
     // ==========================================
-    // 7. CLOSE TABLE & CLEAR ALL PLAYERS (USER REQUEST!)
+    // 11. CLOSE TABLE & CLEAR ALL PLAYERS (USER REQUEST!)
     // ==========================================
     function openClearTableModal() {
       document.getElementById('closeAndClearModal').classList.remove('hidden');
@@ -1665,7 +2127,7 @@
     }
 
     // ==========================================
-    // 8. SIT DOWN, LEAVE & REBUY
+    // 12. SIT DOWN, LEAVE & REBUY
     // ==========================================
     let selectedSeatToSit = null;
 
@@ -1721,7 +2183,7 @@
     }
 
     // ==========================================
-    // 9. MODALS: LEARN, PROFILE, SETTINGS, STATS
+    // 13. MODALS: LEARN, PROFILE, SETTINGS, STATS
     // ==========================================
     function openLearnModal() {
       document.getElementById('learnModal').classList.remove('hidden');
