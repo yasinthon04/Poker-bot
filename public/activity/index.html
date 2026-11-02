@@ -179,25 +179,25 @@
       filter: grayscale(40%);
     }
 
-    /* 5. FLYING DEAL CARD FROM DECK SHOE (100% GPU Transform Acceleration) */
+    /* 5. FLYING DEAL CARD FROM DECK SHOE (100% GPU Transform Acceleration - Smooth Casino Glide) */
     .flying-deal-card {
       position: absolute;
-      width: 38px;
-      height: 54px;
+      width: 40px;
+      height: 56px;
       background: linear-gradient(135deg, #1d4ed8, #0f172a);
-      border: 1px solid #60a5fa;
-      border-radius: 6px;
-      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.75);
+      border: 1.5px solid #60a5fa;
+      border-radius: 7px;
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.85);
       pointer-events: none;
       z-index: 60;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: rgba(147, 197, 253, 0.8);
+      color: rgba(147, 197, 253, 0.9);
       font-weight: bold;
-      font-size: 14px;
+      font-size: 15px;
       will-change: transform, opacity;
-      transition: transform 0.32s cubic-bezier(0.2, 0.9, 0.3, 1), opacity 0.32s ease;
+      transition: transform 0.55s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.55s ease;
     }
 
     /* GLOWS & PULSE */
@@ -1444,7 +1444,7 @@
     function triggerClockwiseDealingAnimation(state) {
       const activeIndices = [];
       state.seats.forEach((s, idx) => {
-        if (s && s.chips > 0) activeIndices.push(idx);
+        if (s && s.chips > 0 && s.hasCards) activeIndices.push(idx);
       });
       if (activeIndices.length === 0) return;
 
@@ -1452,12 +1452,14 @@
       // Round 1: 1st card to each active player clockwise
       activeIndices.forEach(idx => {
         launchFlyingCard(idx, delay);
-        delay += 75;
+        delay += 240;
       });
+      // Brief pause between dealing 1st and 2nd hole cards
+      delay += 120;
       // Round 2: 2nd card to each active player clockwise
       activeIndices.forEach(idx => {
         launchFlyingCard(idx, delay);
-        delay += 75;
+        delay += 240;
       });
     }
 
@@ -1505,7 +1507,7 @@
           setTimeout(() => {
             playSound('cardFeltThud');
             flyCard.remove();
-          }, 330);
+          }, 560);
         });
       }, delayMs);
     }
@@ -1614,7 +1616,7 @@
           // Capsule Player HUD
           const capsuleBorder = isWinner
             ? 'border-amber-400 win-glow'
-            : isTurn
+            : (isTurn && seat.hasCards)
             ? 'border-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.7)]'
             : seat.isFolded
             ? 'border-slate-800 opacity-45'
@@ -1623,7 +1625,10 @@
           // Real status calculation (NO MOCK DATA)
           let seatStatusText = 'กำลังเล่น';
           let seatStatusColor = 'text-blue-400';
-          if (seat.isFolded) {
+          if (!seat.hasCards && state.phase !== 'waiting' && state.phase !== 'hand_ended' && state.phase !== 'showdown') {
+            seatStatusText = 'รอรอบถัดไป';
+            seatStatusColor = 'text-amber-400 font-semibold';
+          } else if (seat.isFolded) {
             seatStatusText = 'หมอบ (Fold)';
             seatStatusColor = 'text-slate-500';
           } else if (seat.isAllIn) {
@@ -1644,11 +1649,11 @@
             <div class="relative w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0">
               ${isDealer ? '<span class="absolute -top-1.5 -left-1.5 bg-amber-400 text-slate-950 font-black text-[9px] w-4 h-4 rounded-full flex items-center justify-center shadow-lg z-30 border border-slate-900 select-none">D</span>' : ''}
               
-              <div class="w-full h-full rounded-full border-2 ${isTurn ? 'border-blue-400' : 'border-slate-600'} overflow-hidden bg-slate-800 shadow-md">
+              <div class="w-full h-full rounded-full border-2 ${(isTurn && seat.hasCards) ? 'border-blue-400' : 'border-slate-600'} overflow-hidden bg-slate-800 shadow-md">
                 <img src="${seat.avatarUrl || 'https://api.dicebear.com/7.x/adventurer/svg?seed=' + seat.userId}" class="w-full h-full object-cover">
               </div>
 
-              ${isTurn ? `
+              ${(isTurn && seat.hasCards) ? `
                 <div id="turnBadge-${idx}" class="turn-badge">
                   5s
                 </div>
@@ -1909,7 +1914,7 @@
     // 8. ACTION DOCK (BOTTOM)
     // ==========================================
     function updateActionDock(state, myPlayer) {
-      const isMyTurn = myPlayer && state.currentTurnSeat === myPlayer.seatIndex;
+      const isMyTurn = myPlayer && state.currentTurnSeat === myPlayer.seatIndex && myPlayer.hasCards && !myPlayer.isFolded;
       const foldBtn = document.getElementById('foldBtn');
       const checkCallBtn = document.getElementById('checkCallBtn');
       const raiseBtn = document.getElementById('raiseBtn');
@@ -2019,12 +2024,18 @@
       if (turnTimerInterval) clearInterval(turnTimerInterval);
 
       turnTimerInterval = setInterval(() => {
-        if (!tableState || tableState.currentTurnSeat === null || tableState.phase === 'showdown' || tableState.phase === 'waiting') {
+        if (!tableState || tableState.currentTurnSeat === null || tableState.phase === 'showdown' || tableState.phase === 'waiting' || tableState.phase === 'hand_ended') {
           lastRenderedTurnSec = -1;
           return;
         }
 
         const turnIdx = tableState.currentTurnSeat;
+        const turnPlayer = tableState.seats[turnIdx];
+        if (!turnPlayer || !turnPlayer.hasCards || turnPlayer.isFolded) {
+          lastRenderedTurnSec = -1;
+          return;
+        }
+
         const badgeEl = document.getElementById(`turnBadge-${turnIdx}`);
         if (!badgeEl) return;
 
@@ -2095,37 +2106,55 @@
         if (eligiblePlayers.length >= 2) {
           if (headerStartBtn) headerStartBtn.classList.remove('hidden');
 
-          if (lastHandEndedHandNum !== state.handNumber) {
-            lastHandEndedHandNum = state.handNumber;
-            autoDealCountdown = 3;
-            if (autoDealInterval) clearInterval(autoDealInterval);
+          // REQUIREMENT: If bot is sitting at table, do NOT auto start! Require manual start button.
+          if (state.hasBots) {
+            if (autoDealInterval) {
+              clearInterval(autoDealInterval);
+              autoDealInterval = null;
+            }
+            if (promptContainer) {
+              promptContainer.innerHTML = `
+                <div class="flex items-center gap-2 mt-1">
+                  <button onclick="requestStartGame()" class="px-5 py-2 bg-gradient-to-r from-amber-500 to-emerald-600 hover:from-amber-400 hover:to-emerald-500 text-white font-extrabold text-xs sm:text-sm rounded-full shadow-2xl border border-amber-300 animate-pulse transition transform hover:scale-105 active:scale-95 flex items-center gap-2 cursor-pointer">
+                    <span class="text-base">▶️</span> แจกไพ่รอบต่อไป (Next Hand)
+                  </button>
+                </div>
+              `;
+            }
+          } else {
+            // Live humans table: 3-second countdown to auto-deal
+            if (lastHandEndedHandNum !== state.handNumber) {
+              lastHandEndedHandNum = state.handNumber;
+              autoDealCountdown = 3;
+              if (autoDealInterval) clearInterval(autoDealInterval);
 
-            autoDealInterval = setInterval(() => {
-              autoDealCountdown--;
-              const timerEl = document.getElementById('autoDealSec');
-              if (timerEl) timerEl.innerText = autoDealCountdown;
+              autoDealInterval = setInterval(() => {
+                autoDealCountdown--;
+                const timerEl = document.getElementById('autoDealSec');
+                if (timerEl) timerEl.innerText = autoDealCountdown;
 
-              if (autoDealCountdown <= 0) {
-                clearInterval(autoDealInterval);
-                autoDealInterval = null;
-                if (tableState && (tableState.phase === 'hand_ended' || tableState.phase === 'showdown')) {
-                  requestStartGame();
+                if (autoDealCountdown <= 0) {
+                  clearInterval(autoDealInterval);
+                  autoDealInterval = null;
+                  if (tableState && (tableState.phase === 'hand_ended' || tableState.phase === 'showdown')) {
+                    requestStartGame();
+                  }
                 }
-              }
-            }, 1000);
-          }
+              }, 1000);
+            }
 
-          if (promptContainer) {
-            promptContainer.innerHTML = `
-              <div class="flex items-center gap-2 mt-1">
-                <span class="text-xs text-amber-300 font-bold bg-black/70 px-3.5 py-1 rounded-full border border-amber-500/40 shadow flex items-center gap-1.5">
-                  <span>⏱️</span> แจกไพ่รอบต่อไปใน <span id="autoDealSec" class="font-mono font-black text-amber-400 text-sm">${autoDealCountdown}</span>s...
-                </span>
-                <button onclick="requestStartGame()" class="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white text-xs rounded-full font-bold shadow-lg border border-blue-400 transition hover:scale-105 active:scale-95 flex items-center gap-1">
-                  <span>▶️</span> แจกไพ่เลย
-                </button>
-              </div>
-            `;
+            if (promptContainer) {
+              promptContainer.innerHTML = `
+                <div class="flex items-center gap-2 mt-1">
+                  <span class="text-xs text-amber-300 font-bold bg-black/70 px-3.5 py-1 rounded-full border border-amber-500/40 shadow flex items-center gap-1.5">
+                    <span>⏱️</span> แจกไพ่รอบต่อไปใน <span id="autoDealSec" class="font-mono font-black text-amber-400 text-sm">${autoDealCountdown}</span>s...
+                  </span>
+                  <button onclick="requestStartGame()" class="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white text-xs rounded-full font-bold shadow-lg border border-blue-400 transition hover:scale-105 active:scale-95 flex items-center gap-1">
+                    <span>▶️</span> แจกไพ่เลย
+                  </button>
+                </div>
+              `;
+            }
           }
         } else {
           if (headerStartBtn) headerStartBtn.classList.add('hidden');

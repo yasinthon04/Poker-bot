@@ -207,7 +207,7 @@ describe('Texas Hold\'em Poker Table State Machine', () => {
     assert.strictEqual(table.communityCards.length, 0);
   });
 
-  test('Broke bot rebuys automatically so checkAutoStart never halts solo testing', () => {
+  test('Broke bot rebuys automatically and checkAutoStart does NOT auto-start when bot is at the table', () => {
     const table = new PokerTable('tab12', 'chan12', 'user1', 100);
     table.sitDown(0, { id: 'u1', username: 'alice', displayName: 'Alice' }, 200);
     table.addBot(1, 'Bot Sharky', 'medium', 200);
@@ -218,10 +218,58 @@ describe('Texas Hold\'em Poker Table State Machine', () => {
 
     table.checkAutoStart();
 
-    // Bot should have been reloaded and Hand started!
-    assert.strictEqual(table.phase, 'preflop');
+    // Bot should have been reloaded with chips, but table does NOT auto-start because a bot is present!
     assert.strictEqual(table.seats[1]!.chips > 0, true);
+    assert.strictEqual(table.phase, 'hand_ended');
+
+    // When player clicks Start / Next Hand manually:
+    const started = table.startHand();
+    assert.strictEqual(started, true);
+    assert.strictEqual(table.phase, 'preflop');
     assert.strictEqual(table.handNumber, 1);
+  });
+
+  test('Player joining mid-hand is marked folded/waiting, has no holeCards, and receives no turns', () => {
+    const table = new PokerTable('tab12b', 'chan12b', 'user1', 100);
+    table.sitDown(0, { id: 'u1', username: 'alice', displayName: 'Alice' }, 200);
+    table.sitDown(1, { id: 'u2', username: 'bob', displayName: 'Bob' }, 200);
+
+    // Start Hand 1 (Alice vs Bob)
+    table.startHand();
+    assert.strictEqual(table.phase, 'preflop');
+
+    // Charlie sits down mid-hand at seat 2
+    const seated = table.sitDown(2, { id: 'u3', username: 'charlie', displayName: 'Charlie' }, 200);
+    assert.strictEqual(seated, true);
+
+    const charlie = table.seats[2]!;
+    assert.strictEqual(charlie.holeCards.length, 0); // No cards in hand!
+    assert.strictEqual(charlie.isFolded, true); // Marked folded so sits out current hand!
+
+    // Alice calls preflop
+    table.handleAction('u1', 'call');
+
+    // Bob checks
+    table.handleAction('u2', 'check');
+
+    // Flop deals
+    assert.strictEqual(table.phase, 'flop');
+    // Turn must NOT be Charlie!
+    assert.notStrictEqual(table.currentTurnSeat, 2);
+
+    // Alice bets, Bob folds -> Alice wins immediately, not blocked by Charlie!
+    table.handleAction('u1', 'bet', 20);
+    table.handleAction('u2', 'fold');
+
+    assert.strictEqual(table.phase, 'hand_ended');
+    assert.strictEqual(table.handWinners?.[0]?.userId, 'u1');
+
+    // Now start Hand 2 -> Charlie is now included and receives cards!
+    table.startHand();
+    assert.strictEqual(table.phase, 'preflop');
+    assert.strictEqual(table.handNumber, 2);
+    assert.strictEqual(table.seats[2]!.holeCards.length, 2);
+    assert.strictEqual(table.seats[2]!.isFolded, false);
   });
 
   test('updateSettings updates defaultBuyIn, turnDuration, smallBlind, and bigBlind', () => {

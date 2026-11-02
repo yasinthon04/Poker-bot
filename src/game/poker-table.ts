@@ -200,6 +200,7 @@ export class PokerTable {
     if (existingIndex !== -1) return false;
 
     const actualBuyIn = buyIn && buyIn > 0 ? buyIn : this.defaultBuyIn;
+    const isHandInProgress = this.phase !== 'waiting' && this.phase !== 'hand_ended' && this.phase !== 'showdown';
 
     this.seats[seatIndex] = {
       userId: user.id,
@@ -213,13 +214,16 @@ export class PokerTable {
       currentRoundBet: 0,
       totalHandBet: 0,
       holeCards: [],
-      isFolded: false,
+      isFolded: isHandInProgress, // Sit out current hand if joining mid-hand
       isAllIn: false,
       isBot: false,
-      hasActedThisRound: false,
+      hasActedThisRound: isHandInProgress,
       connected: true,
     };
 
+    if (isHandInProgress) {
+      this.lastActionMessage = `🪑 ${user.displayName} นั่งที่นั่งที่ ${seatIndex + 1} (รอเริ่มแฮนด์ถัดไป)`;
+    }
     this.emitChange();
     this.checkAutoStart();
     return true;
@@ -236,6 +240,8 @@ export class PokerTable {
 
     const actualChips = chips && chips > 0 ? chips : (this.defaultBuyIn * 2 || 200);
     const botId = `bot_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    const isHandInProgress = this.phase !== 'waiting' && this.phase !== 'hand_ended' && this.phase !== 'showdown';
+
     this.seats[seatIndex] = {
       userId: botId,
       seatIndex,
@@ -248,15 +254,17 @@ export class PokerTable {
       currentRoundBet: 0,
       totalHandBet: 0,
       holeCards: [],
-      isFolded: false,
+      isFolded: isHandInProgress, // Sit out current hand if added mid-hand
       isAllIn: false,
       isBot: true,
       botDifficulty: difficulty,
-      hasActedThisRound: false,
+      hasActedThisRound: isHandInProgress,
       connected: true,
     };
 
-    this.lastActionMessage = `🤖 เพิ่ม ${name} (${difficulty.toUpperCase()}) เข้าที่นั่งที่ ${seatIndex + 1}`;
+    this.lastActionMessage = isHandInProgress
+      ? `🤖 เพิ่ม ${name} (${difficulty.toUpperCase()}) เข้าที่นั่งที่ ${seatIndex + 1} (รอเริ่มแฮนด์ถัดไป)`
+      : `🤖 เพิ่ม ${name} (${difficulty.toUpperCase()}) เข้าที่นั่งที่ ${seatIndex + 1}`;
     this.emitChange();
     this.checkAutoStart();
     return true;
@@ -353,7 +361,7 @@ export class PokerTable {
       return;
     }
 
-    // Auto-reload bots that have 0 chips so solo testing never stops
+    // Auto-reload bots that have 0 chips so they have chips when player starts
     for (const p of this.seats) {
       if (p && p.isBot && p.chips <= 0) {
         const reloadAmount = p.initialBuyIn || 200;
@@ -364,16 +372,21 @@ export class PokerTable {
       }
     }
 
+    // REQUIREMENT: If any bot is sitting at the table, do NOT auto start!
+    if (this.seats.some(p => p && p.isBot)) {
+      return;
+    }
+
     const eligible = this.activePlayers.filter(p => p.chips > 0);
     if (eligible.length >= 2) {
       if (this.phase === 'waiting') {
         setTimeout(() => {
-          if (this.phase === 'waiting' && this.activePlayers.filter(p => p.chips > 0).length >= 2) {
+          if (this.phase === 'waiting' && !this.seats.some(p => p && p.isBot) && this.activePlayers.filter(p => p.chips > 0).length >= 2) {
             this.startHand();
           }
         }, 1200);
       } else {
-        // Hand just finished (showdown or all others folded), start next hand
+        // Hand just finished (showdown or all others folded), start next hand (only if no bots)
         this.startHand();
       }
     } else {
@@ -587,7 +600,7 @@ export class PokerTable {
     this.lastEvent = { type: eventType, userId, amount: player.currentRoundBet, timestamp: Date.now() };
 
     // Check if only 1 player remains in hand
-    const remainingInHand = this.seats.filter(p => p !== null && !p.isFolded);
+    const remainingInHand = this.seats.filter(p => p !== null && !p.isFolded && p.holeCards.length > 0);
     if (remainingInHand.length === 1) {
       this.awardPotToSingleWinner(remainingInHand[0]!);
       return true;
@@ -604,7 +617,7 @@ export class PokerTable {
   }
 
   public isBettingRoundComplete(): boolean {
-    const active = this.seats.filter((p): p is TablePlayer => p !== null && !p.isFolded);
+    const active = this.seats.filter((p): p is TablePlayer => p !== null && !p.isFolded && p.holeCards.length > 0);
     const nonAllIn = active.filter(p => !p.isAllIn);
 
     if (nonAllIn.length <= 1) {
@@ -688,7 +701,7 @@ export class PokerTable {
     this.clearTurnTimer();
     this.phase = 'showdown';
 
-    const activePlayers = this.seats.filter((p): p is TablePlayer => p !== null && !p.isFolded);
+    const activePlayers = this.seats.filter((p): p is TablePlayer => p !== null && !p.isFolded && p.holeCards.length > 0);
     const evaluatedHands = new Map<string, EvaluatedHand>();
 
     for (const p of activePlayers) {
@@ -804,7 +817,7 @@ export class PokerTable {
   private checkBotTurn() {
     if (this.currentTurnSeat === null) return;
     const player = this.seats[this.currentTurnSeat];
-    if (!player || player.isFolded || player.isAllIn) return;
+    if (!player || player.isFolded || player.isAllIn || player.holeCards.length === 0) return;
 
     if (player.isBot) {
       // Humanized delay: 1.5 - 2.5s
@@ -864,7 +877,7 @@ export class PokerTable {
     for (let i = 1; i <= 9; i++) {
       const idx = (startIndex + i) % 9;
       const p = this.seats[idx];
-      if (p !== null && !p.isFolded && !p.isAllIn && !p.isEarlyLeaver && p.chips > 0) {
+      if (p !== null && !p.isFolded && !p.isAllIn && !p.isEarlyLeaver && p.chips > 0 && p.holeCards.length > 0) {
         return idx;
       }
     }
