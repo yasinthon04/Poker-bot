@@ -567,23 +567,24 @@
     </div>
 
     <!-- Middle Row: Presets & Custom Bet Box -->
+    <!-- Middle Row: Presets & Custom Bet Box -->
     <div class="flex items-center justify-between gap-1.5 text-xs">
       <div class="flex items-center gap-1.5">
-        <button onclick="setRaiseMultiplier('min')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl border border-slate-700/60 transition">Min</button>
-        <button onclick="setRaiseMultiplier(0.5)" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl border border-slate-700/60 transition">1/2 Pot</button>
-        <button onclick="setRaiseMultiplier(1)" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl border border-slate-700/60 transition">Pot</button>
-        <button onclick="setRaiseMultiplier(2)" class="px-3 py-1.5 bg-blue-950 hover:bg-blue-900 text-blue-300 font-bold rounded-xl border border-blue-500/40 transition">2x Pot</button>
-        <button onclick="setRaiseMultiplier('allin')" class="px-3 py-1.5 bg-slate-800 hover:bg-rose-950 hover:border-rose-500/40 text-slate-300 hover:text-rose-300 font-semibold rounded-xl border border-slate-700/60 transition">All In</button>
+        <button id="presetBtnMin" onclick="setRaiseMultiplier('min')" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl border border-blue-400 transition shadow">Min</button>
+        <button id="presetBtnHalf" onclick="setRaiseMultiplier(0.5)" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl border border-slate-700/60 transition">1/2 Pot</button>
+        <button id="presetBtnPot" onclick="setRaiseMultiplier(1)" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl border border-slate-700/60 transition">Pot</button>
+        <button id="presetBtn2x" onclick="setRaiseMultiplier(2)" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl border border-slate-700/60 transition">2x Pot</button>
+        <button id="presetBtnAllIn" onclick="setRaiseMultiplier('allin')" class="px-3 py-1.5 bg-slate-800 hover:bg-rose-950 hover:border-rose-500/40 text-slate-300 hover:text-rose-300 font-semibold rounded-xl border border-slate-700/60 transition">All In</button>
       </div>
 
       <!-- Amount Input Box -->
       <div class="relative w-28">
-        <input id="raiseInput" type="number" step="10" min="20" oninput="onRaiseInputChange(this.value)" class="w-full bg-slate-950 border border-slate-700/80 text-center font-black text-white rounded-xl text-sm py-1.5 px-2 focus:outline-none focus:border-blue-500 font-mono" value="0">
+        <input id="raiseInput" type="number" step="5" min="20" oninput="onRaiseInputChange(this.value)" class="w-full bg-slate-950 border border-slate-700/80 text-center font-black text-white rounded-xl text-sm py-1.5 px-2 focus:outline-none focus:border-blue-500 font-mono" value="0">
         <span class="absolute right-2.5 top-2 text-xs text-slate-500 font-mono pointer-events-none">฿</span>
       </div>
     </div>
 
-    <!-- Primary Action Buttons Row (Fold, Call, Raise - Exact Match to Screenshot!) -->
+    <!-- Primary Action Buttons Row (Fold, Call, Raise) -->
     <div class="flex items-center gap-2 pt-1">
       <!-- Fold (Coral Red) -->
       <button id="foldBtn" class="flex-1 bg-[#ff5a5f] hover:bg-[#ff4046] disabled:opacity-30 disabled:cursor-not-allowed text-white py-3 rounded-xl font-extrabold text-sm sm:text-base transition shadow-lg transform active:scale-95">
@@ -592,12 +593,12 @@
 
       <!-- Check / Call (Crisp White Button with Bold Dark Text) -->
       <button id="checkCallBtn" class="flex-1 bg-white hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed text-[#0f172a] py-3 rounded-xl font-extrabold text-sm sm:text-base transition shadow-lg transform active:scale-95 flex items-center justify-center gap-1.5">
-        <span id="checkCallText">Call ฿80</span>
+        <span id="checkCallText">Check</span>
       </button>
 
       <!-- Raise / Bet (Royal Blue Button) -->
       <button id="raiseBtn" class="flex-1 bg-[#3b82f6] hover:bg-[#2563eb] disabled:opacity-30 disabled:cursor-not-allowed text-white py-3 rounded-xl font-extrabold text-sm sm:text-base transition shadow-lg transform active:scale-95 flex items-center justify-center gap-1.5">
-        <span id="raiseBtnText">Raise to ฿160</span>
+        <span id="raiseBtnText">Raise</span>
       </button>
     </div>
 
@@ -1913,6 +1914,29 @@
     // ==========================================
     // 8. ACTION DOCK (BOTTOM)
     // ==========================================
+    let lastTurnWasMine = false;
+    let lastDockHandNumber = -1;
+    let lastDockPhase = '';
+
+    function updatePresetButtonsUI(activeType) {
+      const presets = [
+        { id: 'presetBtnMin', type: 'min' },
+        { id: 'presetBtnHalf', type: 0.5 },
+        { id: 'presetBtnPot', type: 1 },
+        { id: 'presetBtn2x', type: 2 },
+        { id: 'presetBtnAllIn', type: 'allin' },
+      ];
+      presets.forEach(p => {
+        const btn = document.getElementById(p.id);
+        if (!btn) return;
+        if (p.type === activeType) {
+          btn.className = 'px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl border border-blue-400 shadow transition';
+        } else {
+          btn.className = 'px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl border border-slate-700/60 transition';
+        }
+      });
+    }
+
     function updateActionDock(state, myPlayer) {
       const isMyTurn = myPlayer && state.currentTurnSeat === myPlayer.seatIndex && myPlayer.hasCards && !myPlayer.isFolded;
       const foldBtn = document.getElementById('foldBtn');
@@ -1932,37 +1956,64 @@
       if (toCall === 0) {
         checkCallText.innerText = 'Check';
       } else {
-        checkCallText.innerText = `Call ฿${toCall}`;
+        checkCallText.innerText = `Call ฿${toCall.toLocaleString()}`;
       }
 
       if (myPlayer) {
-        const minRaiseTotal = state.currentHighBet + state.minRaise;
+        const minRaiseTotal = state.currentHighBet === 0 
+          ? state.bigBlind 
+          : state.currentHighBet + state.minRaise;
         const maxChips = myPlayer.chips + myPlayer.currentRoundBet;
-        raiseInput.min = minRaiseTotal;
+        const actualMin = Math.min(minRaiseTotal, maxChips);
+
+        raiseInput.min = actualMin;
         raiseInput.max = maxChips;
-        raiseSlider.min = minRaiseTotal;
+        raiseSlider.min = actualMin;
         raiseSlider.max = maxChips;
 
+        const turnJustBecameMine = isMyTurn && !lastTurnWasMine;
+        const handChanged = state.handNumber !== lastDockHandNumber;
+        const phaseChanged = state.phase !== lastDockPhase;
+
         const currentVal = parseInt(raiseInput.value, 10);
-        if (isNaN(currentVal) || currentVal < minRaiseTotal) {
-          raiseInput.value = minRaiseTotal;
-          raiseSlider.value = minRaiseTotal;
+        // Reset default raise whenever turn arrives, hand changes, street changes, or value is out of bounds
+        if (turnJustBecameMine || handChanged || phaseChanged || isNaN(currentVal) || currentVal < actualMin || currentVal > maxChips) {
+          raiseInput.value = actualMin;
+          raiseSlider.value = actualMin;
+          updatePresetButtonsUI('min');
         }
-        document.getElementById('raiseBtnText').innerText = `Raise to ฿${raiseInput.value}`;
+
+        const actionLabel = (toCall === 0 && state.currentHighBet === 0) ? 'Bet' : 'Raise to';
+        document.getElementById('raiseBtnText').innerText = `${actionLabel} ฿${parseInt(raiseInput.value, 10).toLocaleString()}`;
         updateSliderGradient(raiseSlider);
+      } else {
+        document.getElementById('raiseBtnText').innerText = 'Raise / Bet';
+        updatePresetButtonsUI('min');
       }
+
+      lastTurnWasMine = isMyTurn;
+      lastDockHandNumber = state.handNumber;
+      lastDockPhase = state.phase;
     }
 
     function onSliderChange(val) {
       document.getElementById('raiseInput').value = val;
-      document.getElementById('raiseBtnText').innerText = `Raise to ฿${val}`;
+      const myPlayer = tableState && mySeatIndex !== null ? tableState.seats[mySeatIndex] : null;
+      const toCall = myPlayer ? Math.max(0, tableState.currentHighBet - myPlayer.currentRoundBet) : 0;
+      const actionLabel = (toCall === 0 && tableState && tableState.currentHighBet === 0) ? 'Bet' : 'Raise to';
+      document.getElementById('raiseBtnText').innerText = `${actionLabel} ฿${parseInt(val, 10).toLocaleString()}`;
       updateSliderGradient(document.getElementById('raiseSlider'));
+      updatePresetButtonsUI(null);
     }
 
     function onRaiseInputChange(val) {
       document.getElementById('raiseSlider').value = val;
-      document.getElementById('raiseBtnText').innerText = `Raise to ฿${val}`;
+      const myPlayer = tableState && mySeatIndex !== null ? tableState.seats[mySeatIndex] : null;
+      const toCall = myPlayer ? Math.max(0, tableState.currentHighBet - myPlayer.currentRoundBet) : 0;
+      const actionLabel = (toCall === 0 && tableState && tableState.currentHighBet === 0) ? 'Bet' : 'Raise to';
+      document.getElementById('raiseBtnText').innerText = `${actionLabel} ฿${parseInt(val, 10).toLocaleString()}`;
       updateSliderGradient(document.getElementById('raiseSlider'));
+      updatePresetButtonsUI(null);
     }
 
     function updateSliderGradient(slider) {
@@ -1979,7 +2030,9 @@
       const myPlayer = tableState.seats[mySeatIndex];
       if (!myPlayer) return;
 
-      const minRaise = tableState.currentHighBet + tableState.minRaise;
+      const minRaise = tableState.currentHighBet === 0
+        ? tableState.bigBlind
+        : tableState.currentHighBet + tableState.minRaise;
       const maxChips = myPlayer.chips + myPlayer.currentRoundBet;
       let target = minRaise;
 
@@ -1995,8 +2048,12 @@
       target = Math.min(maxChips, Math.max(minRaise, target));
       document.getElementById('raiseInput').value = target;
       document.getElementById('raiseSlider').value = target;
-      document.getElementById('raiseBtnText').innerText = `Raise to ฿${target}`;
+
+      const toCall = Math.max(0, tableState.currentHighBet - myPlayer.currentRoundBet);
+      const actionLabel = (toCall === 0 && tableState.currentHighBet === 0) ? 'Bet' : 'Raise to';
+      document.getElementById('raiseBtnText').innerText = `${actionLabel} ฿${target.toLocaleString()}`;
       updateSliderGradient(document.getElementById('raiseSlider'));
+      updatePresetButtonsUI(type);
     }
 
     // Action button listeners
