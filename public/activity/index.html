@@ -568,20 +568,27 @@
     </div>
 
     <!-- Middle Row: Presets & Custom Bet Box -->
-    <!-- Middle Row: Presets & Custom Bet Box -->
     <div class="flex items-center justify-between gap-1.5 text-xs">
-      <div class="flex items-center gap-1.5">
-        <button id="presetBtnMin" onclick="setRaiseMultiplier('min')" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl border border-blue-400 transition shadow">Min</button>
-        <button id="presetBtnHalf" onclick="setRaiseMultiplier(0.5)" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl border border-slate-700/60 transition">1/2 Pot</button>
-        <button id="presetBtnPot" onclick="setRaiseMultiplier(1)" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl border border-slate-700/60 transition">Pot</button>
-        <button id="presetBtn2x" onclick="setRaiseMultiplier(2)" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl border border-slate-700/60 transition">2x Pot</button>
-        <button id="presetBtnAllIn" onclick="setRaiseMultiplier('allin')" class="px-3 py-1.5 bg-slate-800 hover:bg-rose-950 hover:border-rose-500/40 text-slate-300 hover:text-rose-300 font-semibold rounded-xl border border-slate-700/60 transition">All In</button>
+      <div class="flex items-center gap-1 sm:gap-1.5 flex-wrap">
+        <button id="presetBtnMin" onclick="setRaiseMultiplier('min')" class="px-2.5 sm:px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl border border-blue-400 transition shadow cursor-pointer">Min</button>
+        <button id="presetBtnHalf" onclick="setRaiseMultiplier(0.5)" class="px-2.5 sm:px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl border border-slate-700/60 transition cursor-pointer">1/2 Pot</button>
+        <button id="presetBtnPot" onclick="setRaiseMultiplier(1)" class="px-2.5 sm:px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl border border-slate-700/60 transition cursor-pointer">Pot</button>
+        <button id="presetBtn2x" onclick="setRaiseMultiplier(2)" class="px-2.5 sm:px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl border border-slate-700/60 transition cursor-pointer">2x Pot</button>
+        <button id="presetBtnAllIn" onclick="setRaiseMultiplier('allin')" class="px-2.5 sm:px-3 py-1.5 bg-slate-800 hover:bg-rose-950 hover:border-rose-500/40 text-slate-300 hover:text-rose-300 font-bold rounded-xl border border-slate-700/60 transition cursor-pointer">All In</button>
       </div>
 
-      <!-- Amount Input Box -->
-      <div class="relative w-28">
-        <input id="raiseInput" type="number" step="5" min="20" oninput="onRaiseInputChange(this.value)" class="w-full bg-slate-950 border border-slate-700/80 text-center font-black text-white rounded-xl text-sm py-1.5 px-2 focus:outline-none focus:border-blue-500 font-mono" value="0">
-        <span class="absolute right-2.5 top-2 text-xs text-slate-500 font-mono pointer-events-none">฿</span>
+      <!-- Right Side: Auto All-In Checkbox & Amount Input Box -->
+      <div class="flex items-center gap-2">
+        <label id="autoAllInLabel" class="flex items-center gap-1.5 text-[11px] text-slate-300 hover:text-rose-400 cursor-pointer select-none bg-slate-950/80 px-2.5 py-1.5 rounded-xl border border-slate-800 transition" title="เมื่อถึงตาของคุณ ระบบจะ All-In ให้โดยอัตโนมัติ">
+          <input type="checkbox" id="autoAllInCheckbox" onchange="onAutoAllInToggle(this.checked)" class="rounded accent-rose-600 cursor-pointer">
+          <span class="text-rose-400 font-bold whitespace-nowrap">⚡ Auto All-In</span>
+        </label>
+
+        <!-- Amount Input Box -->
+        <div class="relative w-24 sm:w-28">
+          <input id="raiseInput" type="number" step="5" min="20" oninput="onRaiseInputChange(this.value)" class="w-full bg-slate-950 border border-slate-700/80 text-center font-black text-white rounded-xl text-sm py-1.5 px-2 focus:outline-none focus:border-blue-500 font-mono" value="0">
+          <span class="absolute right-2.5 top-2 text-xs text-slate-500 font-mono pointer-events-none">฿</span>
+        </div>
       </div>
     </div>
 
@@ -1953,6 +1960,7 @@
     let lastTurnWasMine = false;
     let lastDockHandNumber = -1;
     let lastDockPhase = '';
+    let currentSelectedPreset = 'min'; // 'min', 0.5, 1, 2, 'allin', 'custom'
 
     function updatePresetButtonsUI(activeType) {
       const presets = [
@@ -1966,11 +1974,29 @@
         const btn = document.getElementById(p.id);
         if (!btn) return;
         if (p.type === activeType) {
-          btn.className = 'px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl border border-blue-400 shadow transition';
+          if (p.type === 'allin') {
+            btn.className = 'px-2.5 sm:px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-black rounded-xl border border-rose-400 shadow-lg shadow-rose-900/50 transition cursor-pointer';
+          } else {
+            btn.className = 'px-2.5 sm:px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl border border-blue-400 shadow transition cursor-pointer';
+          }
         } else {
-          btn.className = 'px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl border border-slate-700/60 transition';
+          if (p.type === 'allin') {
+            btn.className = 'px-2.5 sm:px-3 py-1.5 bg-slate-800 hover:bg-rose-950 hover:border-rose-500/40 text-slate-300 hover:text-rose-300 font-bold rounded-xl border border-slate-700/60 transition cursor-pointer';
+          } else {
+            btn.className = 'px-2.5 sm:px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl border border-slate-700/60 transition cursor-pointer';
+          }
         }
       });
+    }
+
+    function onAutoAllInToggle(checked) {
+      if (checked) {
+        setRaiseMultiplier('allin');
+      } else {
+        if (currentSelectedPreset === 'allin') {
+          setRaiseMultiplier('min');
+        }
+      }
     }
 
     function updateActionDock(state, myPlayer) {
@@ -2011,17 +2037,72 @@
         const handChanged = state.handNumber !== lastDockHandNumber;
         const phaseChanged = state.phase !== lastDockPhase;
 
-        const currentVal = parseInt(raiseInput.value, 10);
-        // Reset default raise whenever turn arrives, hand changes, street changes, or value is out of bounds
-        if (turnJustBecameMine || handChanged || phaseChanged || isNaN(currentVal) || currentVal < actualMin || currentVal > maxChips) {
-          raiseInput.value = actualMin;
-          raiseSlider.value = actualMin;
-          updatePresetButtonsUI('min');
+        // When a new hand starts, reset preset to default min
+        if (handChanged) {
+          currentSelectedPreset = 'min';
+          const autoCb = document.getElementById('autoAllInCheckbox');
+          if (autoCb) autoCb.checked = false;
         }
 
-        const actionLabel = (toCall === 0 && state.currentHighBet === 0) ? 'Bet' : 'Raise to';
-        document.getElementById('raiseBtnText').innerText = `${actionLabel} ฿${parseInt(raiseInput.value, 10).toLocaleString()}`;
+        // Calculate appropriate raise target based on active preset
+        let targetVal = actualMin;
+        if (currentSelectedPreset === 'allin') {
+          targetVal = maxChips;
+        } else if (currentSelectedPreset === 'min') {
+          targetVal = actualMin;
+        } else if (typeof currentSelectedPreset === 'number') {
+          const potCalc = Math.round(state.totalPot * currentSelectedPreset);
+          targetVal = Math.max(actualMin, Math.min(maxChips, state.currentHighBet + potCalc));
+        } else {
+          // 'custom' amount entered by user
+          const currentVal = parseInt(raiseInput.value, 10);
+          if (isNaN(currentVal) || currentVal < actualMin || currentVal > maxChips) {
+            targetVal = actualMin;
+            currentSelectedPreset = 'min';
+          } else {
+            targetVal = currentVal;
+          }
+        }
+
+        // If All In was selected by user, keep it locked to maxChips without resetting!
+        if (currentSelectedPreset === 'allin') {
+          raiseInput.value = maxChips;
+          raiseSlider.value = maxChips;
+          updatePresetButtonsUI('allin');
+        } else if (handChanged || phaseChanged || isNaN(parseInt(raiseInput.value, 10)) || parseInt(raiseInput.value, 10) < actualMin || parseInt(raiseInput.value, 10) > maxChips) {
+          raiseInput.value = targetVal;
+          raiseSlider.value = targetVal;
+          updatePresetButtonsUI(currentSelectedPreset);
+        }
+
+        const finalVal = parseInt(raiseInput.value, 10);
+        const isAllInAmount = finalVal >= maxChips;
+        const actionLabel = isAllInAmount 
+          ? '🔥 ALL-IN' 
+          : ((toCall === 0 && state.currentHighBet === 0) ? 'Bet' : 'Raise to');
+        
+        const raiseBtnText = document.getElementById('raiseBtnText');
+        if (isAllInAmount) {
+          raiseBtnText.innerHTML = `<span>🔥 ALL-IN</span> <span class="font-mono text-sm">(฿${finalVal.toLocaleString()})</span>`;
+          raiseBtn.className = 'flex-1 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 disabled:opacity-30 disabled:cursor-not-allowed text-white py-3 rounded-xl font-extrabold text-sm sm:text-base transition shadow-lg shadow-rose-900/40 border border-rose-400 transform active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer animate-pulse';
+        } else {
+          raiseBtnText.innerText = `${actionLabel} ฿${finalVal.toLocaleString()}`;
+          raiseBtn.className = 'flex-1 bg-[#3b82f6] hover:bg-[#2563eb] disabled:opacity-30 disabled:cursor-not-allowed text-white py-3 rounded-xl font-extrabold text-sm sm:text-base transition shadow-lg transform active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer';
+        }
         updateSliderGradient(raiseSlider);
+
+        // Auto All-In trigger if queued via checkbox
+        if (turnJustBecameMine && isMyTurn) {
+          const autoCb = document.getElementById('autoAllInCheckbox');
+          if (autoCb && autoCb.checked && currentSelectedPreset === 'allin') {
+            autoCb.checked = false; // Reset after auto firing
+            setTimeout(() => {
+              if (ws && tableState && tableState.currentTurnSeat === mySeatIndex) {
+                ws.send(JSON.stringify({ type: 'action', action: 'all_in' }));
+              }
+            }, 300);
+          }
+        }
       } else {
         document.getElementById('raiseBtnText').innerText = 'Raise / Bet';
         updatePresetButtonsUI('min');
@@ -2033,23 +2114,57 @@
     }
 
     function onSliderChange(val) {
+      currentSelectedPreset = 'custom';
+      const autoCb = document.getElementById('autoAllInCheckbox');
+      if (autoCb) autoCb.checked = false;
+
       document.getElementById('raiseInput').value = val;
       const myPlayer = tableState && mySeatIndex !== null ? tableState.seats[mySeatIndex] : null;
       const toCall = myPlayer ? Math.max(0, tableState.currentHighBet - myPlayer.currentRoundBet) : 0;
-      const actionLabel = (toCall === 0 && tableState && tableState.currentHighBet === 0) ? 'Bet' : 'Raise to';
-      document.getElementById('raiseBtnText').innerText = `${actionLabel} ฿${parseInt(val, 10).toLocaleString()}`;
+      const maxChips = myPlayer ? myPlayer.chips + myPlayer.currentRoundBet : 0;
+      const intVal = parseInt(val, 10);
+      const isAllInAmount = intVal >= maxChips;
+      const actionLabel = isAllInAmount ? '🔥 ALL-IN' : ((toCall === 0 && tableState && tableState.currentHighBet === 0) ? 'Bet' : 'Raise to');
+      
+      const raiseBtn = document.getElementById('raiseBtn');
+      const raiseBtnText = document.getElementById('raiseBtnText');
+      if (isAllInAmount) {
+        raiseBtnText.innerHTML = `<span>🔥 ALL-IN</span> <span class="font-mono text-sm">(฿${intVal.toLocaleString()})</span>`;
+        if (raiseBtn) raiseBtn.className = 'flex-1 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 disabled:opacity-30 disabled:cursor-not-allowed text-white py-3 rounded-xl font-extrabold text-sm sm:text-base transition shadow-lg shadow-rose-900/40 border border-rose-400 transform active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer animate-pulse';
+      } else {
+        raiseBtnText.innerText = `${actionLabel} ฿${intVal.toLocaleString()}`;
+        if (raiseBtn) raiseBtn.className = 'flex-1 bg-[#3b82f6] hover:bg-[#2563eb] disabled:opacity-30 disabled:cursor-not-allowed text-white py-3 rounded-xl font-extrabold text-sm sm:text-base transition shadow-lg transform active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer';
+      }
+
       updateSliderGradient(document.getElementById('raiseSlider'));
-      updatePresetButtonsUI(null);
+      updatePresetButtonsUI(isAllInAmount ? 'allin' : null);
     }
 
     function onRaiseInputChange(val) {
+      currentSelectedPreset = 'custom';
+      const autoCb = document.getElementById('autoAllInCheckbox');
+      if (autoCb) autoCb.checked = false;
+
       document.getElementById('raiseSlider').value = val;
       const myPlayer = tableState && mySeatIndex !== null ? tableState.seats[mySeatIndex] : null;
       const toCall = myPlayer ? Math.max(0, tableState.currentHighBet - myPlayer.currentRoundBet) : 0;
-      const actionLabel = (toCall === 0 && tableState && tableState.currentHighBet === 0) ? 'Bet' : 'Raise to';
-      document.getElementById('raiseBtnText').innerText = `${actionLabel} ฿${parseInt(val, 10).toLocaleString()}`;
+      const maxChips = myPlayer ? myPlayer.chips + myPlayer.currentRoundBet : 0;
+      const intVal = parseInt(val, 10);
+      const isAllInAmount = intVal >= maxChips;
+      const actionLabel = isAllInAmount ? '🔥 ALL-IN' : ((toCall === 0 && tableState && tableState.currentHighBet === 0) ? 'Bet' : 'Raise to');
+      
+      const raiseBtn = document.getElementById('raiseBtn');
+      const raiseBtnText = document.getElementById('raiseBtnText');
+      if (isAllInAmount) {
+        raiseBtnText.innerHTML = `<span>🔥 ALL-IN</span> <span class="font-mono text-sm">(฿${intVal.toLocaleString()})</span>`;
+        if (raiseBtn) raiseBtn.className = 'flex-1 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 disabled:opacity-30 disabled:cursor-not-allowed text-white py-3 rounded-xl font-extrabold text-sm sm:text-base transition shadow-lg shadow-rose-900/40 border border-rose-400 transform active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer animate-pulse';
+      } else {
+        raiseBtnText.innerText = `${actionLabel} ฿${intVal.toLocaleString()}`;
+        if (raiseBtn) raiseBtn.className = 'flex-1 bg-[#3b82f6] hover:bg-[#2563eb] disabled:opacity-30 disabled:cursor-not-allowed text-white py-3 rounded-xl font-extrabold text-sm sm:text-base transition shadow-lg transform active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer';
+      }
+
       updateSliderGradient(document.getElementById('raiseSlider'));
-      updatePresetButtonsUI(null);
+      updatePresetButtonsUI(isAllInAmount ? 'allin' : null);
     }
 
     function updateSliderGradient(slider) {
@@ -2065,6 +2180,12 @@
       if (!tableState || mySeatIndex === null) return;
       const myPlayer = tableState.seats[mySeatIndex];
       if (!myPlayer) return;
+
+      currentSelectedPreset = type;
+      const autoCb = document.getElementById('autoAllInCheckbox');
+      if (autoCb) {
+        autoCb.checked = (type === 'allin');
+      }
 
       const minRaise = tableState.currentHighBet === 0
         ? tableState.bigBlind
@@ -2086,8 +2207,19 @@
       document.getElementById('raiseSlider').value = target;
 
       const toCall = Math.max(0, tableState.currentHighBet - myPlayer.currentRoundBet);
-      const actionLabel = (toCall === 0 && tableState.currentHighBet === 0) ? 'Bet' : 'Raise to';
-      document.getElementById('raiseBtnText').innerText = `${actionLabel} ฿${target.toLocaleString()}`;
+      const isAllInAmount = target >= maxChips;
+      const actionLabel = isAllInAmount ? '🔥 ALL-IN' : ((toCall === 0 && tableState.currentHighBet === 0) ? 'Bet' : 'Raise to');
+      
+      const raiseBtn = document.getElementById('raiseBtn');
+      const raiseBtnText = document.getElementById('raiseBtnText');
+      if (isAllInAmount) {
+        raiseBtnText.innerHTML = `<span>🔥 ALL-IN</span> <span class="font-mono text-sm">(฿${target.toLocaleString()})</span>`;
+        if (raiseBtn) raiseBtn.className = 'flex-1 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 disabled:opacity-30 disabled:cursor-not-allowed text-white py-3 rounded-xl font-extrabold text-sm sm:text-base transition shadow-lg shadow-rose-900/40 border border-rose-400 transform active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer animate-pulse';
+      } else {
+        raiseBtnText.innerText = `${actionLabel} ฿${target.toLocaleString()}`;
+        if (raiseBtn) raiseBtn.className = 'flex-1 bg-[#3b82f6] hover:bg-[#2563eb] disabled:opacity-30 disabled:cursor-not-allowed text-white py-3 rounded-xl font-extrabold text-sm sm:text-base transition shadow-lg transform active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer';
+      }
+
       updateSliderGradient(document.getElementById('raiseSlider'));
       updatePresetButtonsUI(type);
     }
@@ -2104,7 +2236,15 @@
     };
     document.getElementById('raiseBtn').onclick = () => {
       const amount = parseInt(document.getElementById('raiseInput').value, 10);
-      if (ws && !isNaN(amount)) ws.send(JSON.stringify({ type: 'action', action: 'raise', amount }));
+      if (ws && !isNaN(amount)) {
+        const myPlayer = tableState && mySeatIndex !== null ? tableState.seats[mySeatIndex] : null;
+        const maxChips = myPlayer ? myPlayer.chips + myPlayer.currentRoundBet : 0;
+        if (myPlayer && amount >= maxChips) {
+          ws.send(JSON.stringify({ type: 'action', action: 'all_in' }));
+        } else {
+          ws.send(JSON.stringify({ type: 'action', action: 'raise', amount }));
+        }
+      }
     };
 
     // ==========================================
