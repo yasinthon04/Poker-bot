@@ -32,7 +32,7 @@
       font-family: 'JetBrains Mono', monospace;
     }
     
-    /* 3D FLOATING POKER CHIPS IN CORNERS */
+    /* 3D FLOATING POKER CHIPS IN CORNERS (Optimized: Hardware-accelerated static transforms) */
     .floating-chip-top {
       position: absolute;
       top: -20px;
@@ -41,8 +41,8 @@
       height: 250px;
       pointer-events: none;
       z-index: 5;
-      filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.75));
-      animation: floatChipTop 7s ease-in-out infinite alternate;
+      transform: translate3d(0, -8px, 0) rotate(-16deg);
+      filter: drop-shadow(0 15px 30px rgba(0, 0, 0, 0.7));
     }
     .floating-chip-bottom {
       position: absolute;
@@ -52,16 +52,8 @@
       height: 190px;
       pointer-events: none;
       z-index: 5;
-      filter: drop-shadow(0 20px 35px rgba(0, 0, 0, 0.8));
-      animation: floatChipBottom 6.5s ease-in-out infinite alternate;
-    }
-    @keyframes floatChipTop {
-      0% { transform: translateY(0px) rotate(-18deg) scale(1); }
-      100% { transform: translateY(-16px) rotate(-14deg) scale(1.02); }
-    }
-    @keyframes floatChipBottom {
-      0% { transform: translateY(0px) rotate(14deg) scale(1); }
-      100% { transform: translateY(14px) rotate(18deg) scale(1.03); }
+      transform: translate3d(0, 8px, 0) rotate(16deg);
+      filter: drop-shadow(0 15px 30px rgba(0, 0, 0, 0.7));
     }
 
     /* POKER TABLE STADIUM FELT */
@@ -166,36 +158,28 @@
       }
     }
 
-    /* 3. CARD HIT / CONNECTION GLOW (When board matches hole cards!) */
+    /* 3. CARD HIT / CONNECTION GLOW (GPU Composited Outline & Subtle Aura) */
     .card-hit-glow {
-      box-shadow: 0 0 16px 3px rgba(56, 189, 248, 0.95), 0 0 28px 7px rgba(59, 130, 246, 0.7) !important;
+      box-shadow: 0 0 12px 2px rgba(56, 189, 248, 0.75) !important;
+      outline: 2px solid #38bdf8 !important;
       border-color: #38bdf8 !important;
-      animation: hitGlowPulse 1.8s infinite alternate ease-in-out;
-    }
-    @keyframes hitGlowPulse {
-      0% { box-shadow: 0 0 12px 2px rgba(56, 189, 248, 0.8); }
-      100% { box-shadow: 0 0 24px 6px rgba(56, 189, 248, 1), 0 0 35px 10px rgba(59, 130, 246, 0.5); }
     }
 
-    /* 4. SHOWDOWN WINNER CARDS AURA */
+    /* 4. SHOWDOWN WINNER CARDS AURA (GPU Transform Lift & Crisp Gold Ring) */
     .win-card-glow {
-      box-shadow: 0 0 24px 5px rgba(245, 158, 11, 0.95), 0 0 40px 10px rgba(251, 191, 36, 0.75) !important;
+      box-shadow: 0 0 16px 3px rgba(245, 158, 11, 0.85) !important;
+      outline: 2px solid #f59e0b !important;
       border-color: #f59e0b !important;
       translate: 0 -8px;
-      scale: 1.06;
+      scale: 1.05;
       z-index: 45 !important;
-      animation: winCardPulse 1.2s infinite alternate ease-in-out;
-    }
-    @keyframes winCardPulse {
-      0% { box-shadow: 0 0 16px 4px rgba(245, 158, 11, 0.8); }
-      100% { box-shadow: 0 0 32px 8px rgba(245, 158, 11, 1), 0 0 45px 12px rgba(251, 191, 36, 0.8); }
     }
     .card-dimmed {
       opacity: 0.45 !important;
-      filter: grayscale(40%) blur(0.4px);
+      filter: grayscale(40%);
     }
 
-    /* 5. FLYING DEAL CARD FROM DECK SHOE */
+    /* 5. FLYING DEAL CARD FROM DECK SHOE (100% GPU Transform Acceleration) */
     .flying-deal-card {
       position: absolute;
       width: 38px;
@@ -203,7 +187,7 @@
       background: linear-gradient(135deg, #1d4ed8, #0f172a);
       border: 1px solid #60a5fa;
       border-radius: 6px;
-      box-shadow: 0 15px 25px rgba(0, 0, 0, 0.8);
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.75);
       pointer-events: none;
       z-index: 60;
       display: flex;
@@ -212,19 +196,40 @@
       color: rgba(147, 197, 253, 0.8);
       font-weight: bold;
       font-size: 14px;
-      transition: all 0.36s cubic-bezier(0.22, 1, 0.36, 1);
+      will-change: transform, opacity;
+      transition: transform 0.32s cubic-bezier(0.2, 0.9, 0.3, 1), opacity 0.32s ease;
     }
 
     /* GLOWS & PULSE */
     .active-blue-glow {
-      box-shadow: 0 0 20px 2px rgba(59, 130, 246, 0.7);
+      box-shadow: 0 0 16px 2px rgba(59, 130, 246, 0.7);
     }
     .win-glow {
-      animation: winPulse 1.2s infinite alternate;
+      box-shadow: 0 0 18px 4px rgba(245, 158, 11, 0.85);
+      border-color: #fbbf24 !important;
     }
-    @keyframes winPulse {
-      0% { box-shadow: 0 0 20px 4px #fbbf24; }
-      100% { box-shadow: 0 0 40px 10px #f59e0b; }
+    .turn-badge {
+      position: absolute;
+      bottom: -4px;
+      right: -4px;
+      background: #2563eb;
+      color: #ffffff;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      font-weight: 800;
+      padding: 1px 4px;
+      border-radius: 9999px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+      border: 1px solid #93c5fd;
+    }
+    .turn-badge.turn-warning {
+      background: #e11d48;
+      border-color: #fda4af;
+      animation: pingWarning 1s cubic-bezier(0, 0, 0.2, 1) infinite alternate;
+    }
+    @keyframes pingWarning {
+      0% { transform: scale(1); }
+      100% { transform: scale(1.1); }
     }
 
     /* CUSTOM BET SLIDER */
@@ -363,7 +368,7 @@
         </div>
         <div class="flex flex-col text-left pr-1 leading-tight">
           <span id="headerUserName" class="text-xs font-bold text-white truncate max-w-[90px]">Player</span>
-          <span id="headerUserElo" class="text-[10px] text-blue-400 font-mono font-medium">3,290 ELO</span>
+          <span id="headerUserSub" class="text-[10px] text-blue-400 font-mono font-medium">โหลดข้อมูล...</span>
         </div>
         <span class="text-slate-400 text-xs">⌵</span>
       </div>
@@ -373,7 +378,7 @@
   <!-- ==================== MAIN GAME AREA WITH LEFT & RIGHT SIDEBARS ==================== -->
   <div class="flex-1 flex overflow-hidden py-1 sm:py-2 gap-2 sm:gap-3 relative z-10">
 
-    <!-- LEFT SIDEBAR: STATS & ELO TREND (Matching Screenshot!) -->
+    <!-- LEFT SIDEBAR: REAL USER STATS & TABLE INFO (NO MOCK DATA) -->
     <aside id="leftSidebar" class="hidden xl:flex flex-col gap-2.5 w-60 bg-slate-900/70 backdrop-blur-md rounded-2xl border border-slate-800/80 p-3 shadow-xl overflow-y-auto">
       <!-- Game Info Header -->
       <div>
@@ -381,65 +386,70 @@
         <p id="tableSidebarSub" class="text-[11px] text-slate-400 font-mono">฿10 / ฿20 · Hand #0</p>
       </div>
 
-      <!-- Your Stats Card -->
+      <!-- Real User Stats Card -->
       <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-2.5 space-y-1.5 text-xs">
-        <span class="font-bold text-[11px] text-slate-300">Your stats</span>
+        <span class="font-bold text-[11px] text-slate-300 flex items-center justify-between">
+          <span>สถิติของคุณ (Stats)</span>
+          <span class="text-[9px] text-slate-500 font-normal">Real Data</span>
+        </span>
         <div class="flex items-center justify-between text-slate-400">
-          <span>ELO</span>
-          <span id="statEloVal" class="font-bold text-white font-mono">3,290</span>
+          <span>กำไรสะสม</span>
+          <span id="statProfitVal" class="font-bold text-white font-mono">0฿</span>
         </div>
         <div class="flex items-center justify-between text-slate-400">
           <span>Win rate</span>
-          <span id="statWinRateVal" class="font-bold text-white font-mono">61%</span>
+          <span id="statWinRateVal" class="font-bold text-white font-mono">0%</span>
         </div>
         <div class="flex items-center justify-between text-slate-400">
-          <span>Accuracy</span>
-          <span id="statAccuracyVal" class="font-bold text-white font-mono">82%</span>
+          <span>จำนวนเกม</span>
+          <span id="statGamesVal" class="font-bold text-white font-mono">0 เกม</span>
         </div>
         <div class="flex items-center justify-between text-slate-400">
-          <span>Session</span>
-          <span id="statSessionVal" class="font-bold text-emerald-400 font-mono bg-emerald-950/40 px-1.5 py-0.2 rounded border border-emerald-500/30">+12 ELO</span>
+          <span>เซสชันนี้</span>
+          <span id="statSessionVal" class="font-bold text-slate-400 font-mono bg-slate-900/80 px-1.5 py-0.5 rounded border border-slate-800">0฿</span>
         </div>
         <div class="flex items-center justify-between text-slate-400">
-          <span>Bankroll</span>
-          <span id="statBankrollVal" class="font-extrabold text-emerald-400 font-mono">฿12,450</span>
+          <span>ชิปบนโต๊ะ</span>
+          <span id="statBankrollVal" class="font-extrabold text-emerald-400 font-mono">0฿</span>
         </div>
       </div>
 
-      <!-- Next Rank Card -->
+      <!-- Real Table Info Card -->
       <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-2.5 space-y-1.5 text-xs">
-        <span class="font-bold text-[11px] text-slate-300">Next rank</span>
-        <div class="flex items-center justify-between text-[11px]">
-          <span class="text-blue-400 font-semibold">Master</span>
-          <span class="text-slate-400 font-mono">2,200 ELO</span>
+        <span class="font-bold text-[11px] text-slate-300">ข้อมูลโต๊ะ (Table Info)</span>
+        <div class="flex items-center justify-between text-slate-400">
+          <span>ค่าบลายด์ (SB/BB)</span>
+          <span id="tableInfoBlinds" class="font-bold text-emerald-400 font-mono">10/20฿</span>
         </div>
-        <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-          <div class="bg-gradient-to-r from-blue-600 to-cyan-400 h-full rounded-full" style="width: 78%"></div>
+        <div class="flex items-center justify-between text-slate-400">
+          <span>Buy-in โต๊ะ</span>
+          <span id="tableInfoBuyIn" class="font-bold text-cyan-400 font-mono">200฿</span>
+        </div>
+        <div class="flex items-center justify-between text-slate-400">
+          <span>เวลาต่อเทิร์น</span>
+          <span id="tableInfoTimer" class="font-bold text-amber-400 font-mono">20s</span>
+        </div>
+        <div class="flex items-center justify-between text-slate-400">
+          <span>แฮนด์ที่</span>
+          <span id="tableInfoHandNum" class="font-bold text-white font-mono">#0</span>
         </div>
       </div>
 
-      <!-- Trend, ELO Sparkline Card -->
+      <!-- Real Performance Highlights Card -->
       <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-2.5 space-y-1.5 text-xs">
-        <div class="flex items-center justify-between">
-          <span class="font-bold text-[11px] text-slate-300">Trend, ELO</span>
-          <div class="flex items-center gap-1 text-[9px] text-slate-400">
-            <span class="px-1 py-0.5 rounded hover:text-white cursor-pointer">All</span>
-            <span class="px-1 py-0.5 rounded hover:text-white cursor-pointer">30d</span>
-            <span class="px-1 py-0.5 rounded bg-blue-600/30 text-blue-400 font-bold border border-blue-500/40">7d</span>
-            <span class="px-1 py-0.5 rounded hover:text-white cursor-pointer">1d</span>
-          </div>
+        <span class="font-bold text-[11px] text-slate-300">ผลงานสูงสุด (Highlights)</span>
+        <div class="flex items-center justify-between text-slate-400">
+          <span>ชนะสูงสุด</span>
+          <span id="statBiggestWin" class="font-bold text-emerald-400 font-mono">0฿</span>
         </div>
-        <!-- SVG Sparkline curve -->
-        <svg viewBox="0 0 160 40" class="w-full h-10 mt-1">
-          <defs>
-            <linearGradient id="sparklineGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="#10b981" stop-opacity="0.35"/>
-              <stop offset="100%" stop-color="#10b981" stop-opacity="0.0"/>
-            </linearGradient>
-          </defs>
-          <path d="M0,28 Q20,32 40,24 T80,26 T120,16 T160,10 L160,40 L0,40 Z" fill="url(#sparklineGrad)"/>
-          <path d="M0,28 Q20,32 40,24 T80,26 T120,16 T160,10" fill="none" stroke="#10b981" stroke-width="2"/>
-        </svg>
+        <div class="flex items-center justify-between text-slate-400">
+          <span>เสียสูงสุด</span>
+          <span id="statBiggestLoss" class="font-bold text-rose-400 font-mono">0฿</span>
+        </div>
+        <div class="flex items-center justify-between text-slate-400">
+          <span>ชนะ / แพ้</span>
+          <span id="statWinLossRatio" class="font-bold text-slate-300 font-mono">0W / 0L</span>
+        </div>
       </div>
 
       <!-- Quick Action Pill Buttons -->
@@ -528,11 +538,14 @@
 
       <!-- Progress Tab Content -->
       <div id="progressTabContent" class="hidden flex-1 overflow-y-auto space-y-2 text-xs text-slate-300">
-        <div class="p-2.5 bg-slate-950/60 rounded-xl border border-slate-800 space-y-1">
-          <span class="font-bold text-white text-[11px]">🏆 Season 1 Tier</span>
+        <div class="p-2.5 bg-slate-950/60 rounded-xl border border-slate-800 space-y-1.5">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-white text-[11px]">🎮 ประสบการณ์ (Milestone)</span>
+            <span id="progressGoalText" class="text-[10px] text-blue-400 font-mono">0 / 50</span>
+          </div>
           <p class="text-[10px] text-slate-400">เล่นครบ 50 แฮนด์เพื่อปลดล็อคฉายา Shark Hunter</p>
           <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1">
-            <div class="bg-blue-500 h-full rounded-full" style="width: 45%"></div>
+            <div id="progressBarFill" class="bg-gradient-to-r from-blue-600 to-cyan-400 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
           </div>
         </div>
       </div>
@@ -553,7 +566,7 @@
       <input id="raiseSlider" type="range" class="poker-slider flex-1 cursor-pointer" oninput="onSliderChange(this.value)">
     </div>
 
-    <!-- Middle Row: Presets & Custom Bet Box (Matching Screenshot: Min, 1/2 Pot, Pot, 2x Pot, All In, $160) -->
+    <!-- Middle Row: Presets & Custom Bet Box -->
     <div class="flex items-center justify-between gap-1.5 text-xs">
       <div class="flex items-center gap-1.5">
         <button onclick="setRaiseMultiplier('min')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl border border-slate-700/60 transition">Min</button>
@@ -563,9 +576,9 @@
         <button onclick="setRaiseMultiplier('allin')" class="px-3 py-1.5 bg-slate-800 hover:bg-rose-950 hover:border-rose-500/40 text-slate-300 hover:text-rose-300 font-semibold rounded-xl border border-slate-700/60 transition">All In</button>
       </div>
 
-      <!-- Amount Input Box (Matching Screenshot "$160") -->
+      <!-- Amount Input Box -->
       <div class="relative w-28">
-        <input id="raiseInput" type="number" step="10" min="20" oninput="onRaiseInputChange(this.value)" class="w-full bg-slate-950 border border-slate-700/80 text-center font-black text-white rounded-xl text-sm py-1.5 px-2 focus:outline-none focus:border-blue-500 font-mono" value="160">
+        <input id="raiseInput" type="number" step="10" min="20" oninput="onRaiseInputChange(this.value)" class="w-full bg-slate-950 border border-slate-700/80 text-center font-black text-white rounded-xl text-sm py-1.5 px-2 focus:outline-none focus:border-blue-500 font-mono" value="0">
         <span class="absolute right-2.5 top-2 text-xs text-slate-500 font-mono pointer-events-none">฿</span>
       </div>
     </div>
@@ -1016,15 +1029,14 @@
     let lastHandNumberProcessed = -1;
     let lastHitCount = 0;
 
-    // Recent hands history for the right sidebar
-    let recentHandsHistory = [
-      { cards: [{rank:13,suit:'s'},{rank:12,suit:'d'},{rank:11,suit:'c'}], pot: 240, time: 'Now' },
-      { cards: [{rank:14,suit:'h'},{rank:12,suit:'s'},{rank:3,suit:'d'}], pot: 580, time: '2m' },
-      { cards: [{rank:9,suit:'c'},{rank:9,suit:'h'},{rank:2,suit:'s'}], pot: 320, time: '5m' },
-      { cards: [{rank:11,suit:'d'},{rank:10,suit:'c'},{rank:6,suit:'h'}], pot: 410, time: '8m' },
-      { cards: [{rank:13,suit:'h'},{rank:12,suit:'c'},{rank:11,suit:'s'}], pot: 240, time: '9m' },
-      { cards: [{rank:14,suit:'c'},{rank:12,suit:'h'},{rank:3,suit:'s'}], pot: 580, time: '10m' },
-    ];
+    // Real Live State Variables
+    let currentUserStats = null;
+    let recentHandsHistory = [];
+    let lastRecordedHandNum = -1;
+    let lastRenderedCommCardsKey = '';
+    let turnTimerInterval = null;
+    let lastRenderedTurnSec = -1;
+    let lastTurnSeat = null;
 
     // Web Audio Synthesizer (Zero-latency synthetic casino sounds)
     let audioCtx = null;
@@ -1263,6 +1275,11 @@
           channelId,
           user: myUser
         }));
+        // Request user's real database stats immediately
+        ws.send(JSON.stringify({
+          type: 'get_stats',
+          userId: myUser.id
+        }));
       };
 
       ws.onmessage = (event) => {
@@ -1285,6 +1302,8 @@
           tableState = msg.state;
           renderTable(tableState);
           handleTableEvents(tableState);
+          updateSidebarStats(currentUserStats, tableState);
+          recordHandHistoryIfEnded(tableState);
           break;
         }
         case 'leaderboard_data': {
@@ -1292,7 +1311,9 @@
           break;
         }
         case 'stats_data': {
+          currentUserStats = msg.stats;
           renderStats(msg.stats, msg.user);
+          updateSidebarStats(currentUserStats, tableState);
           break;
         }
         case 'preview_settlement_data': {
@@ -1443,33 +1464,48 @@
     function launchFlyingCard(targetSeatIndex, delayMs = 0) {
       setTimeout(() => {
         const table = document.getElementById('pokerTable');
-        if (!table) return;
+        const deckShoe = document.getElementById('deckShoe');
+        const seatEl = document.getElementById(`seat-wrapper-${targetSeatIndex}`);
+        if (!table || !deckShoe) return;
+
+        const shoeRect = deckShoe.getBoundingClientRect();
+        const tableRect = table.getBoundingClientRect();
+        const startX = (shoeRect.left - tableRect.left) + (shoeRect.width / 2) - 19;
+        const startY = (shoeRect.top - tableRect.top) + (shoeRect.height / 2) - 27;
+
+        let deltaX = 0;
+        let deltaY = 180;
+        if (seatEl) {
+          const seatRect = seatEl.getBoundingClientRect();
+          const targetX = (seatRect.left - tableRect.left) + (seatRect.width / 2) - 19;
+          const targetY = (seatRect.top - tableRect.top) + (seatRect.height / 2) - 27;
+          deltaX = targetX - startX;
+          deltaY = targetY - startY;
+        } else {
+          const targetPos = seatPositions[targetSeatIndex] || { left: '50%', top: '83%' };
+          const pLeft = parseFloat(targetPos.left) / 100 * tableRect.width - 19;
+          const pTop = parseFloat(targetPos.top) / 100 * tableRect.height - 27;
+          deltaX = pLeft - startX;
+          deltaY = pTop - startY;
+        }
 
         const flyCard = document.createElement('div');
         flyCard.className = 'flying-deal-card';
         flyCard.innerHTML = '♠';
-
-        // Start at Deck Shoe position
-        flyCard.style.left = '50%';
-        flyCard.style.top = '27%';
-        flyCard.style.transform = 'translate(-50%, -50%) scale(0.5) rotate(0deg)';
+        flyCard.style.left = `${startX}px`;
+        flyCard.style.top = `${startY}px`;
+        flyCard.style.transform = 'translate3d(0, 0, 0) scale(0.6) rotate(0deg)';
         table.appendChild(flyCard);
 
         playSound('cardSlide');
 
-        const targetPos = seatPositions[targetSeatIndex] || { left: '50%', top: '83%' };
-
+        // Execute 100% on GPU compositor thread
         requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            flyCard.style.left = targetPos.left;
-            flyCard.style.top = targetPos.top;
-            flyCard.style.transform = 'translate(-50%, -50%) scale(1.0) rotate(12deg)';
-
-            setTimeout(() => {
-              playSound('cardFeltThud');
-              flyCard.remove();
-            }, 360);
-          });
+          flyCard.style.transform = `translate3d(${deltaX}px, ${deltaY}px, 0) scale(1.0) rotate(10deg)`;
+          setTimeout(() => {
+            playSound('cardFeltThud');
+            flyCard.remove();
+          }, 330);
         });
       }, delayMs);
     }
@@ -1479,10 +1515,18 @@
     // ==========================================
     function renderCommunityCards(cards, hitCardsSet, state) {
       const commContainer = document.getElementById('communityCards');
-      commContainer.innerHTML = '';
+      if (!commContainer) return;
 
+      const currentCardsKey = (cards || []).map(c => `${c.rank}${c.suit}`).join(',');
       const isShowdown = state && (state.phase === 'showdown' || state.phase === 'hand_ended');
       const hasWinners = isShowdown && state.handWinners && state.handWinners.length > 0;
+      const stateKey = `${currentCardsKey}_${isShowdown}_${hasWinners}`;
+
+      // Avoid DOM destruction if community state hasn't changed
+      if (stateKey === lastRenderedCommCardsKey) {
+        return;
+      }
+      lastRenderedCommCardsKey = stateKey;
 
       // Detect street progression sounds
       if (cards.length === 3 && lastCommunityCardCount < 3) {
@@ -1492,13 +1536,14 @@
       }
       lastCommunityCardCount = cards.length;
 
+      commContainer.innerHTML = '';
+
       for (let i = 0; i < 5; i++) {
         const card = cards[i];
         if (card) {
           const cardKey = `${card.rank}-${card.suit}`;
           const isHit = hitCardsSet && hitCardsSet.has(cardKey);
 
-          // Check if this community card is part of the winner's best 5 cards
           let isWinningCard = false;
           if (hasWinners) {
             isWinningCard = state.handWinners.some(w =>
@@ -1548,6 +1593,7 @@
       state.seats.forEach((seat, idx) => {
         const pos = seatPositions[idx];
         const wrapper = document.createElement('div');
+        wrapper.id = `seat-wrapper-${idx}`;
         wrapper.className = 'absolute -translate-x-1/2 -translate-y-1/2 pointer-events-auto flex items-center justify-center';
         wrapper.style.left = pos.left;
         wrapper.style.top = pos.top;
@@ -1574,6 +1620,26 @@
             ? 'border-slate-800 opacity-45'
             : 'border-slate-700/70';
 
+          // Real status calculation (NO MOCK DATA)
+          let seatStatusText = 'กำลังเล่น';
+          let seatStatusColor = 'text-blue-400';
+          if (seat.isFolded) {
+            seatStatusText = 'หมอบ (Fold)';
+            seatStatusColor = 'text-slate-500';
+          } else if (seat.isAllIn) {
+            seatStatusText = 'ALL-IN';
+            seatStatusColor = 'text-rose-400 font-extrabold';
+          } else if (seat.isBot) {
+            seatStatusText = `Bot (${(seat.botDifficulty || 'bot').toUpperCase()})`;
+            seatStatusColor = 'text-indigo-400';
+          } else if (state.dealerSeat === idx) {
+            seatStatusText = 'Dealer (D)';
+            seatStatusColor = 'text-amber-400';
+          } else if (seat.currentRoundBet > 0) {
+            seatStatusText = `Bet ฿${seat.currentRoundBet.toLocaleString()}`;
+            seatStatusColor = 'text-cyan-400';
+          }
+
           const avatarBlock = `
             <div class="relative w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0">
               ${isDealer ? '<span class="absolute -top-1.5 -left-1.5 bg-amber-400 text-slate-950 font-black text-[9px] w-4 h-4 rounded-full flex items-center justify-center shadow-lg z-30 border border-slate-900 select-none">D</span>' : ''}
@@ -1583,7 +1649,7 @@
               </div>
 
               ${isTurn ? `
-                <div id="turnBadge-${idx}" class="absolute -bottom-1 -right-1 bg-blue-600 text-white font-mono text-[9px] font-extrabold px-1 rounded-full shadow-lg border border-blue-300">
+                <div id="turnBadge-${idx}" class="turn-badge">
                   5s
                 </div>
               ` : ''}
@@ -1593,8 +1659,8 @@
               <span class="text-[10px] sm:text-[11px] font-bold text-white truncate max-w-[80px] sm:max-w-[95px]">
                 ${seat.isBot ? '🤖 ' : ''}${seat.displayName}
               </span>
-              <span class="text-[9px] text-blue-400 font-mono font-medium">
-                ${seat.isFolded ? 'Folded' : seat.isAllIn ? 'All-in' : '3,290 ELO'}
+              <span class="text-[9px] ${seatStatusColor} font-mono font-medium truncate max-w-[85px] sm:max-w-[100px]">
+                ${seatStatusText}
               </span>
               <span class="text-[10px] sm:text-[11px] font-extrabold font-mono text-white leading-tight">
                 ฿${seat.chips.toLocaleString()}
@@ -1946,33 +2012,47 @@
     // ==========================================
     // 9. TURN TIMER LOOP & AUTO-DEAL
     // ==========================================
+    // ==========================================
+    // 9. TURN TIMER LOOP & AUTO-DEAL (Optimized: 0% RAF Thrashing)
+    // ==========================================
     function startTurnAnimationLoop() {
-      if (turnAnimationTimer) cancelAnimationFrame(turnAnimationTimer);
+      if (turnTimerInterval) clearInterval(turnTimerInterval);
 
-      function updateTimer() {
-        if (tableState && tableState.currentTurnSeat !== null && tableState.phase !== 'showdown' && tableState.phase !== 'waiting') {
-          const turnIdx = tableState.currentTurnSeat;
-          const badgeEl = document.getElementById(`turnBadge-${turnIdx}`);
-          if (badgeEl) {
-            const elapsed = (Date.now() - tableState.turnStartedAt) / 1000;
-            const remaining = Math.max(0, tableState.turnDuration - elapsed);
-            const remainingSec = Math.ceil(remaining);
-            badgeEl.innerText = `${remainingSec}s`;
+      turnTimerInterval = setInterval(() => {
+        if (!tableState || tableState.currentTurnSeat === null || tableState.phase === 'showdown' || tableState.phase === 'waiting') {
+          lastRenderedTurnSec = -1;
+          return;
+        }
 
-            if (remainingSec <= 5) {
-              badgeEl.className = 'absolute -bottom-1 -right-1 bg-rose-600 text-white font-mono text-[9px] font-black px-1 rounded-full shadow-lg border border-rose-300 animate-pulse';
-              if (lastTickedSecond !== remainingSec && remainingSec > 0) {
-                lastTickedSecond = remainingSec;
-                playSound('timerTick');
-              }
-            } else {
-              badgeEl.className = 'absolute -bottom-1 -right-1 bg-blue-600 text-white font-mono text-[9px] font-extrabold px-1 rounded-full shadow-lg border border-blue-300';
+        const turnIdx = tableState.currentTurnSeat;
+        const badgeEl = document.getElementById(`turnBadge-${turnIdx}`);
+        if (!badgeEl) return;
+
+        const elapsed = (Date.now() - tableState.turnStartedAt) / 1000;
+        const remaining = Math.max(0, tableState.turnDuration - elapsed);
+        const remainingSec = Math.ceil(remaining);
+
+        // Only update DOM when the second actually changes
+        if (remainingSec !== lastRenderedTurnSec || turnIdx !== lastTurnSeat) {
+          lastRenderedTurnSec = remainingSec;
+          lastTurnSeat = turnIdx;
+          badgeEl.innerText = `${remainingSec}s`;
+
+          if (remainingSec <= 5) {
+            if (!badgeEl.classList.contains('turn-warning')) {
+              badgeEl.classList.add('turn-warning');
+            }
+            if (lastTickedSecond !== remainingSec && remainingSec > 0) {
+              lastTickedSecond = remainingSec;
+              playSound('timerTick');
+            }
+          } else {
+            if (badgeEl.classList.contains('turn-warning')) {
+              badgeEl.classList.remove('turn-warning');
             }
           }
         }
-        turnAnimationTimer = requestAnimationFrame(updateTimer);
-      }
-      turnAnimationTimer = requestAnimationFrame(updateTimer);
+      }, 200);
     }
     startTurnAnimationLoop();
 
@@ -2067,7 +2147,7 @@
     }
 
     // ==========================================
-    // 10. RIGHT SIDEBAR: TABS & HISTORY
+    // 10. RIGHT SIDEBAR: TABS & REAL HISTORY
     // ==========================================
     function switchRightTab(tab) {
       ['history', 'progress', 'chat'].forEach(t => {
@@ -2083,27 +2163,153 @@
       });
     }
 
+    function recordHandHistoryIfEnded(state) {
+      if (!state) return;
+      const isHandFinished = state.phase === 'showdown' || state.phase === 'hand_ended';
+      if (isHandFinished && state.handWinners && state.handWinners.length > 0 && state.handNumber !== lastRecordedHandNum) {
+        lastRecordedHandNum = state.handNumber;
+        const winner = state.handWinners[0];
+        const winCards = winner.cards || state.communityCards || [];
+        recentHandsHistory.unshift({
+          handNumber: state.handNumber,
+          cards: winCards.slice(0, 5),
+          pot: state.totalPot,
+          winnerName: winner.name,
+          handName: winner.handName || 'Hand Won',
+          time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
+        });
+        if (recentHandsHistory.length > 20) recentHandsHistory.pop();
+        renderHistoryList();
+      }
+    }
+
     function renderHistoryList() {
       const listEl = document.getElementById('historyRowsList');
       if (!listEl) return;
       listEl.innerHTML = '';
 
+      if (recentHandsHistory.length === 0) {
+        listEl.innerHTML = `
+          <div class="text-slate-500 text-center py-8 text-xs space-y-1">
+            <div class="text-2xl">🃏</div>
+            <div class="font-medium text-slate-400">ยังไม่มีประวัติในเซสชันนี้</div>
+            <div class="text-[10px] text-slate-600">จะบันทึกอัตโนมัติเมื่อจบแต่ละแฮนด์</div>
+          </div>
+        `;
+        return;
+      }
+
       recentHandsHistory.forEach(h => {
         const row = document.createElement('div');
-        row.className = 'flex items-center justify-between p-2 rounded-xl bg-slate-950/50 border border-slate-800/80 text-[11px]';
-        
-        const cardsPills = h.cards.map(c => {
+        row.className = 'p-2 rounded-xl bg-slate-950/60 border border-slate-800/80 text-[11px] space-y-1';
+
+        const cardsPills = (h.cards || []).map(c => {
           const rankText = { 14: 'A', 13: 'K', 12: 'Q', 11: 'J' }[c.rank] || c.rank;
-          return `<span class="bg-slate-800 text-slate-200 px-1.5 py-0.5 rounded font-mono font-bold text-[10px]">${rankText}</span>`;
+          const suitSymbol = { s: '♠', h: '♥', d: '♦', c: '♣' }[c.suit] || '';
+          const isRed = ['h', 'd'].includes(c.suit);
+          return `<span class="bg-slate-800 ${isRed ? 'text-red-400' : 'text-slate-200'} px-1.5 py-0.5 rounded font-mono font-bold text-[10px]">${rankText}${suitSymbol}</span>`;
         }).join(' ');
 
         row.innerHTML = `
-          <div class="flex items-center gap-1">${cardsPills}</div>
-          <span class="font-extrabold text-white font-mono">฿${h.pot}</span>
-          <span class="text-slate-500 text-[10px]">${h.time}</span>
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-white flex items-center gap-1">
+              <span class="text-amber-400">👑</span> <span class="truncate max-w-[90px]">${h.winnerName}</span>
+            </span>
+            <span class="font-extrabold text-emerald-400 font-mono">฿${h.pot.toLocaleString()}</span>
+          </div>
+          <div class="flex items-center justify-between text-[10px]">
+            <div class="flex items-center gap-1">${cardsPills}</div>
+            <span class="text-slate-500 font-mono text-[9px]">${h.time}</span>
+          </div>
+          ${h.handName ? `<div class="text-[9px] text-blue-400 truncate">${h.handName}</div>` : ''}
         `;
         listEl.appendChild(row);
       });
+    }
+
+    // ==========================================
+    // REAL LIVE STATS UPDATER (NO MOCK DATA)
+    // ==========================================
+    function updateSidebarStats(stats, state) {
+      if (stats) {
+        const profit = stats.totalProfit !== undefined ? stats.totalProfit : (stats.net_profit || 0);
+        const winRate = stats.winRate !== undefined ? stats.winRate : (stats.win_rate || 0);
+        const games = stats.gamesPlayed !== undefined ? stats.gamesPlayed : (stats.hands_played || 0);
+        const bigWin = stats.biggestWin || 0;
+        const bigLoss = stats.biggestLoss || 0;
+        const wins = stats.wins || 0;
+        const losses = stats.losses || 0;
+
+        const profitEl = document.getElementById('statProfitVal');
+        if (profitEl) {
+          profitEl.innerText = `${profit >= 0 ? '+' : ''}${profit.toLocaleString()}฿`;
+          profitEl.className = profit >= 0 ? 'font-bold text-emerald-400 font-mono' : 'font-bold text-rose-400 font-mono';
+        }
+
+        const wrEl = document.getElementById('statWinRateVal');
+        if (wrEl) wrEl.innerText = `${winRate}%`;
+
+        const gamesEl = document.getElementById('statGamesVal');
+        if (gamesEl) gamesEl.innerText = `${games} เกม`;
+
+        const bigWinEl = document.getElementById('statBiggestWin');
+        if (bigWinEl) bigWinEl.innerText = `+${bigWin.toLocaleString()}฿`;
+
+        const bigLossEl = document.getElementById('statBiggestLoss');
+        if (bigLossEl) bigLossEl.innerText = `-${bigLoss.toLocaleString()}฿`;
+
+        const ratioEl = document.getElementById('statWinLossRatio');
+        if (ratioEl) ratioEl.innerText = `${wins}W / ${losses}L`;
+
+        // Right sidebar Progress milestone
+        const goalText = document.getElementById('progressGoalText');
+        if (goalText) goalText.innerText = `${games} / 50`;
+        const barFill = document.getElementById('progressBarFill');
+        if (barFill) barFill.style.width = `${Math.min(100, Math.round((games / 50) * 100))}%`;
+      }
+
+      if (state) {
+        const blindsEl = document.getElementById('tableInfoBlinds');
+        if (blindsEl) blindsEl.innerText = `${state.smallBlind}/${state.bigBlind}฿`;
+
+        const buyInEl = document.getElementById('tableInfoBuyIn');
+        if (buyInEl) buyInEl.innerText = `${state.defaultBuyIn || 200}฿`;
+
+        const timerEl = document.getElementById('tableInfoTimer');
+        if (timerEl) timerEl.innerText = `${state.turnDuration || 20}s`;
+
+        const handNumEl = document.getElementById('tableInfoHandNum');
+        if (handNumEl) handNumEl.innerText = `#${state.handNumber}`;
+
+        // My Seat session stats
+        const myPlayer = mySeatIndex !== null && state.seats ? state.seats[mySeatIndex] : null;
+        const sessionValEl = document.getElementById('statSessionVal');
+        const headerSubEl = document.getElementById('headerUserSub');
+
+        if (myPlayer) {
+          const sessionNet = myPlayer.chips - (myPlayer.totalBuyIn || 0);
+          if (sessionValEl) {
+            sessionValEl.innerText = `${sessionNet >= 0 ? '+' : ''}${sessionNet.toLocaleString()}฿`;
+            sessionValEl.className = sessionNet >= 0
+              ? 'font-bold text-emerald-400 font-mono bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-500/30'
+              : 'font-bold text-rose-400 font-mono bg-rose-950/40 px-1.5 py-0.5 rounded border border-rose-500/30';
+          }
+          if (headerSubEl) {
+            headerSubEl.innerText = `ชิป: ${myPlayer.chips.toLocaleString()}฿`;
+            headerSubEl.className = 'text-[10px] text-emerald-400 font-mono font-medium';
+          }
+        } else {
+          if (sessionValEl) {
+            sessionValEl.innerText = '0฿';
+            sessionValEl.className = 'font-bold text-slate-400 font-mono bg-slate-900/80 px-1.5 py-0.5 rounded border border-slate-800';
+          }
+          if (headerSubEl) {
+            const winRate = stats ? (stats.winRate !== undefined ? stats.winRate : (stats.win_rate || 0)) : null;
+            headerSubEl.innerText = winRate !== null ? `Win Rate: ${winRate}%` : 'ยังไม่นั่ง';
+            headerSubEl.className = 'text-[10px] text-blue-400 font-mono font-medium';
+          }
+        }
+      }
     }
 
     // ==========================================
@@ -2321,12 +2527,22 @@
         content.innerHTML = '<div class="text-center text-slate-500 py-6">ไม่พบข้อมูลสถิติ</div>';
         return;
       }
+      const profit = stats.totalProfit !== undefined ? stats.totalProfit : (stats.net_profit || 0);
+      const winRate = stats.winRate !== undefined ? stats.winRate : (stats.win_rate || 0);
+      const games = stats.gamesPlayed !== undefined ? stats.gamesPlayed : (stats.hands_played || 0);
+      const wins = stats.wins || 0;
+      const losses = stats.losses || 0;
+      const biggestWin = stats.biggestWin || 0;
+      const biggestLoss = stats.biggestLoss || 0;
+
       content.innerHTML = `
         <div class="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
           <div class="flex justify-between"><span>ผู้เล่น:</span><strong class="text-white">${user?.display_name || myUser.displayName}</strong></div>
-          <div class="flex justify-between"><span>กำไรสุทธิ:</span><strong class="${stats.net_profit >= 0 ? 'text-emerald-400' : 'text-rose-400'} font-mono">${stats.net_profit >= 0 ? '+' : ''}${stats.net_profit?.toLocaleString() || 0}฿</strong></div>
-          <div class="flex justify-between"><span>Win Rate:</span><strong class="text-white font-mono">${stats.win_rate || 0}%</strong></div>
-          <div class="flex justify-between"><span>จำนวนเกมทั้งหมด:</span><strong class="text-white font-mono">${stats.hands_played || 0}</strong></div>
+          <div class="flex justify-between"><span>กำไรสุทธิสะสม:</span><strong class="${profit >= 0 ? 'text-emerald-400' : 'text-rose-400'} font-mono">${profit >= 0 ? '+' : ''}${profit.toLocaleString()}฿</strong></div>
+          <div class="flex justify-between"><span>Win Rate:</span><strong class="text-white font-mono">${winRate}%</strong></div>
+          <div class="flex justify-between"><span>จำนวนเกมทั้งหมด:</span><strong class="text-white font-mono">${games} เกม (${wins}W / ${losses}L)</strong></div>
+          <div class="flex justify-between"><span>ชนะสูงสุด:</span><strong class="text-emerald-400 font-mono">+${biggestWin.toLocaleString()}฿</strong></div>
+          <div class="flex justify-between"><span>เสียสูงสุด:</span><strong class="text-rose-400 font-mono">-${biggestLoss.toLocaleString()}฿</strong></div>
         </div>
       `;
     }
