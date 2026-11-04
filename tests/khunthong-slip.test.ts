@@ -214,5 +214,83 @@ describe('KhunThong Debt Tracking & Slip Verification Engine', () => {
     assert.strictEqual(res35.matchedDebt?.id, 102);
     assert.strictEqual(res35.matchedDebt?.to_user_id, 'creditor_ploy');
   });
+
+  test('processes multiple slips sequentially and clears multiple debts in one message batch', async () => {
+    await repo.upsertUser('user_nadear', 'Nadear', 'Nadear');
+    await repo.upsertUser('user_jj', 'JJ.', 'JJ');
+    await repo.upsertUser('user_sasikarn', 'Sasikarn', 'Sasikarn');
+
+    const session = await repo.createSession('guild_1', 'chan_1', 'user_jj', 300);
+    await repo.joinPlayer(session.id, 'user_nadear', 300);
+    await repo.joinPlayer(session.id, 'user_jj', 300);
+    await repo.joinPlayer(session.id, 'user_sasikarn', 300);
+
+    // Nadear lost 300, JJ won 85, Sasikarn won 215
+    await repo.finalizeSession(session.id, {
+      user_nadear: 0,
+      user_jj: 385,
+      user_sasikarn: 515,
+    });
+
+    let pendingDebts = await repo.getPendingSettlementsForUser('user_nadear', 'chan_1');
+    assert.strictEqual(pendingDebts.length, 2);
+
+    // Mock slip verifier: returns 85 for slip1 and 215 for slip2
+    setMockSlipVerifier(async (url: string) => {
+      if (url.includes('slip1')) {
+        return {
+          success: true,
+          isSlip: true,
+          reason: 'สลิปถูกต้อง',
+          data: {
+            isBankSlip: true,
+            transAmount: 85,
+            bankName: 'KTB',
+            transRef: 'A129064ae13a54ff2',
+          },
+        };
+      }
+      return {
+        success: true,
+        isSlip: true,
+        reason: 'สลิปถูกต้อง',
+        data: {
+          isBankSlip: true,
+          transAmount: 215,
+          bankName: 'KTB',
+          transRef: 'Ae981d456784f405c',
+        },
+      };
+    });
+
+    const { verifyAndMatchSlip } = await import('../src/services/slip-verifier');
+
+    // Simulate multi-slip attachment loop (like in messageCreate)
+    const attachments = [{ url: 'http://cdn.discord/slip1.png' }, { url: 'http://cdn.discord/slip2.png' }];
+    for (const att of attachments) {
+      if (pendingDebts.length === 0) break;
+      const verification = await verifyAndMatchSlip(att.url, pendingDebts);
+      assert.strictEqual(verification.success, true);
+      assert.ok(verification.matchedDebt);
+
+      await repo.markSettlementPaid(verification.matchedDebt.id, att.url, verification.data?.transRef);
+      pendingDebts = pendingDebts.filter(d => d.id !== verification.matchedDebt!.id);
+    }
+
+    // Both debts should now be cleared
+    assert.strictEqual(pendingDebts.length, 0);
+
+    const remainingInDb = await repo.getPendingSettlementsForUser('user_nadear', 'chan_1');
+    assert.strictEqual(remainingInDb.length, 0);
+
+    const allSettlements = await repo.getSessionSettlements(session.id);
+    const debt85 = allSettlements.find(s => s.amount === 85);
+    const debt215 = allSettlements.find(s => s.amount === 215);
+
+    assert.strictEqual(debt85?.status, 'paid');
+    assert.strictEqual(debt85?.trans_ref, 'A129064ae13a54ff2');
+    assert.strictEqual(debt215?.status, 'paid');
+    assert.strictEqual(debt215?.trans_ref, 'Ae981d456784f405c');
+  });
 });
 

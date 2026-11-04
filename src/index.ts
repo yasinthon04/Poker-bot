@@ -1040,10 +1040,12 @@ client.on('messageCreate', async (message: Message) => {
     if (message.author.bot || !message.guild) return;
 
     // Check for image attachments (by contentType or extension)
-    const imageAttachment = message.attachments.find(
-      a => a.contentType?.startsWith('image/') || /\.(png|jpe?g|webp|gif|heic)$/i.test(a.name || '')
+    const imageAttachments = Array.from(
+      message.attachments
+        .filter(a => a.contentType?.startsWith('image/') || /\.(png|jpe?g|webp|gif|heic)$/i.test(a.name || ''))
+        .values()
     );
-    if (!imageAttachment) return;
+    if (imageAttachments.length === 0) return;
 
     // Check if the author owes any pending debts in this channel or guild
     let pendingDebts = await repo.getPendingSettlementsForUser(message.author.id, message.channelId);
@@ -1056,43 +1058,75 @@ client.on('messageCreate', async (message: Message) => {
     await message.react('🔍').catch(() => {});
 
     const { verifyAndMatchSlip } = await import('./services/slip-verifier');
-    const verification = await verifyAndMatchSlip(imageAttachment.url, pendingDebts);
+    const { createSlipReceiptEmbed } = await import('./ui/embeds');
+    const { createDebtorContestRow } = await import('./ui/components');
+    const { refreshSessionBillMessage } = await import('./commands/poker');
+
+    let hasSuccess = false;
+    let hasSlipError = false;
+    const affectedSessionIds = new Set<number>();
+
+    for (const imageAttachment of imageAttachments) {
+      if (pendingDebts.length === 0) break;
+
+      try {
+        const verification = await verifyAndMatchSlip(imageAttachment.url, pendingDebts);
+
+        if (verification.success && verification.matchedDebt) {
+          hasSuccess = true;
+          const targetDebt = verification.matchedDebt;
+
+          // Mark paid in database
+          await repo.markSettlementPaid(targetDebt.id, imageAttachment.url, verification.data?.transRef);
+
+          // Remove matched debt from local pending list for subsequent slips
+          pendingDebts = pendingDebts.filter(d => d.id !== targetDebt.id);
+          affectedSessionIds.add(targetDebt.session_id);
+
+          const receipt = createSlipReceiptEmbed(
+            message.author.id,
+            targetDebt.to_user_id,
+            targetDebt.amount,
+            verification.data,
+            imageAttachment.url
+          );
+
+          await message.reply({
+            embeds: [receipt],
+            components: [createDebtorContestRow(targetDebt.id)],
+          });
+        } else {
+          if (verification.isSlip) {
+            hasSlipError = true;
+            // Recognized as a bank slip, but amount or recipient mismatched
+            await message.reply({
+              content: `⚠️ **ตรวจพบสลิปโอนเงิน แต่ไม่สามารถตัดหนี้ได้:**\n${verification.reason}\n*(หากต้องการตรวจใหม่ กรุณาแนบรูปใหม่อีกครั้ง หรือให้เจ้าหนี้กดยืนยันด้วยมือ)*`,
+            });
+          }
+        }
+      } catch (slipErr) {
+        console.warn('Error processing slip attachment:', imageAttachment.url, slipErr);
+      }
+    }
 
     // Remove bot's own 🔍 reaction
     await message.reactions.resolve('🔍')?.users.remove(client.user?.id).catch(() => {});
 
-    if (verification.success && verification.matchedDebt) {
-      const targetDebt = verification.matchedDebt;
+    if (hasSuccess) {
       await message.react('✅').catch(() => {});
-      await repo.markSettlementPaid(targetDebt.id, imageAttachment.url, verification.data?.transRef);
+    } else if (hasSlipError) {
+      await message.react('⚠️').catch(() => {});
+    }
 
-      const { createSlipReceiptEmbed } = await import('./ui/embeds');
-      const { createDebtorContestRow } = await import('./ui/components');
-      const receipt = createSlipReceiptEmbed(
-        message.author.id,
-        targetDebt.to_user_id,
-        targetDebt.amount,
-        verification.data,
-        imageAttachment.url
-      );
-
-      await message.reply({
-        embeds: [receipt],
-        components: [createDebtorContestRow(targetDebt.id)],
-      });
-
-      const session = await repo.getSessionById(targetDebt.session_id);
-      if (session) {
-        const { refreshSessionBillMessage } = await import('./commands/poker');
-        await refreshSessionBillMessage({ channel: message.channel, client }, session);
-      }
-    } else {
-      if (verification.isSlip) {
-        // Recognized as a bank slip, but amount or recipient mismatched
-        await message.react('⚠️').catch(() => {});
-        await message.reply({
-          content: `⚠️ **ตรวจพบสลิปโอนเงิน แต่ไม่สามารถตัดหนี้ได้:**\n${verification.reason}\n*(หากต้องการตรวจใหม่ กรุณาแนบรูปใหม่อีกครั้ง หรือให้เจ้าหนี้กดยืนยันด้วยมือ)*`,
-        });
+    // Refresh affected session bills
+    for (const sessionId of affectedSessionIds) {
+      try {
+        const session = await repo.getSessionById(sessionId);
+        if (session) {
+          await refreshSessionBillMessage({ channel: message.channel, client }, session);
+        }
+      } catch (billErr) {
+        console.warn('Failed to refresh bill message for session', sessionId, billErr);
       }
     }
   } catch (err) {
